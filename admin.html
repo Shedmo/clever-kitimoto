@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="sw"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Clever Kitimoto — Admin</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet"><style>
+:root{--ink:#17120e;--muted:#75685f;--cream:#faf6ef;--paper:#fffdf9;--line:#eadfd3;--accent:#8f2d16;--gold:#c79745}*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:'DM Sans',sans-serif}.wrap{max-width:1000px;margin:auto;padding:28px 18px 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:25px}.brand{font:800 30px 'Playfair Display',serif}.brand span{color:var(--accent)}a,button{border:0;border-radius:12px;padding:11px 15px;font-weight:700;text-decoration:none;cursor:pointer}.back{background:#eee2d5;color:var(--ink)}.save{background:var(--accent);color:white}.reset{background:#2e2925;color:white}.panel{background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:24px;margin:16px 0}.panel h2{font:700 26px 'Playfair Display',serif;margin:0 0 16px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}.field input,.field select,.field textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:white;font-size:15px}.actions{display:flex;gap:10px;flex-wrap:wrap}.notice{background:#f2e7d8;border-left:4px solid var(--gold);padding:14px;border-radius:10px;color:#594a3e;line-height:1.5}.login{max-width:430px;margin:70px auto;background:var(--paper);padding:28px;border-radius:22px;border:1px solid var(--line)}.login input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;margin:8px 0 12px}.add-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.full{grid-column:1/-1}.field textarea{resize:vertical;font-family:inherit}.custom-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}.custom-row:last-child{border-bottom:0}.mini{font-size:12px;color:var(--muted)}.delete{background:#f5d9d3;color:#7c1d12}.error{color:#9d1c10;font-size:13px;min-height:18px}@media(max-width:700px){.grid,.add-grid{grid-template-columns:1fr}.full{grid-column:auto}}@media(max-width:430px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+</style></head><body>
+<div id="login" class="login"><div class="brand">Clever <span>Kitimoto</span></div><p>Admin Panel — badilisha bei za menu.</p><label>PIN ya Admin</label><input id="pin" type="password" placeholder="Weka PIN"><div class="error" id="err"></div><button class="save" onclick="login()">Ingia Admin</button></div>
+<div id="app" class="wrap" style="display:none"><div class="top"><div class="brand">Clever <span>Kitimoto</span> — Admin</div><div class="actions"><a class="back" href="index.html">← View Menu</a><button class="reset" onclick="resetPrices()">Reset Prices</button></div></div>
+<div class="notice"><b>Smart Admin:</b> Badilisha bei hapa kisha bonyeza <b>Save Changes</b>. Mfumo huu wa sasa huhifadhi mabadiliko kwenye browser hii. Kwa admin ya kweli inayobadilisha bei kwa wateja wote, tunahitaji kuunganisha database (Supabase/Firebase) kabla ya production.</div>
+<div id="forms"></div>
+<div class="panel" id="addMenuPanel">
+<h2>➕ Add New Menu</h2>
+<div class="add-grid">
+<div class="field"><label>Menu Name</label><input id="newName" placeholder="Mfano: Kisinia Special"></div>
+<div class="field"><label>Category</label><select id="newCategory"><option>Kitimoto</option><option>Choma</option><option>Choma ya Foil</option><option>Rosti</option><option>Kavu</option><option>Kisinia Packages</option><option>Mixed Packages</option><option>Zege</option><option>Sides</option><option>Other</option></select></div>
+<div class="field"><label>Price (TSH)</label><input id="newPrice" type="number" min="0" placeholder="25000"></div>
+<div class="field"><label>Serving / Size</label><input id="newSize" placeholder="½ KG"></div>
+<div class="field full"><label>Description</label><textarea id="newDesc" placeholder="Maelezo mafupi ya menu..." rows="3"></textarea></div>
+<div class="field full"><label>Image URL (optional)</label><input id="newImage" placeholder="https://..."></div>
+</div>
+<div class="actions"><button class="save" onclick="addMenu()">➕ Add Menu</button></div>
+</div>
+<div class="panel"><h2>📋 My Added Menus</h2><div id="customMenus"></div></div>
+<div class="panel"><div class="actions"><button class="save" onclick="save()">💾 Save Changes</button><a class="back" href="index.html">👀 Preview Menu</a></div></div></div>
+<script>
+const KEY='cleverKitimotoMenuV1';const PIN_KEY='cleverKitimotoAdminPin';
+const groups={
+'Choma':[['choma','½ KG','9,000'],['choma1','1 KG','18,000'],['choma15','1½ KG','27,000'],['choma2','2 KG','36,000']],
+'Choma ya Foil':[['foil','½ KG','9,000'],['foil1','1 KG','18,000'],['foil15','1½ KG','27,000'],['foil2','2 KG','36,000']],
+'Rosti':[['rosti','½ KG','8,500'],['rosti1','1 KG','17,000'],['rosti15','1½ KG','25,500'],['rosti2','2 KG','34,000']],
+'Kavu':[['kavu','½ KG','8,500'],['kavu1','1 KG','17,000'],['kavu15','1½ KG','25,500'],['kavu2','2 KG','34,000']],
+'Kisinia Packages':[['single','Single — Mtu 1','20,000'],['couple','Couple — Watu 2','35,000'],['family','Family — Watu 4','65,000']],
+'Mixed Packages':[['mixedhalf','½ KG Mix','25,000'],['mixedone','1 KG Mix','35,000'],['mixedtwo','2 KG Mix Special','65,000']],
+'Zege':[['zegeSingle','Zege Single','15,000'],['zegeCouple','Zege Couple','30,000'],['zegeSpecial','Zege Special','35,000']],
+'Sides':[['chipsiKavu','Chipsi Kavu','2,000'],['chipsiYai','Chipsi Yai','3,000'],['ndizi','Ndizi 1','500'],['ugali','Ugali 1','1,000'],['kachumbari','Kachumbari','1,000']]
+};
+const defaults=Object.fromEntries(Object.values(groups).flat().map(x=>[x[0],x[2]]));
+function login(){let p=document.getElementById('pin').value;let saved=localStorage.getItem(PIN_KEY);if(!saved){localStorage.setItem(PIN_KEY,p);saved=p}if(p===saved){document.getElementById('login').style.display='none';document.getElementById('app').style.display='block';render()}else document.getElementById('err').textContent='PIN si sahihi.'}
+function render(){let d={...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')};let out='';for(const [g,items] of Object.entries(groups)){out+=`<div class="panel"><h2>${g}</h2><div class="grid">`;for(const [k,l,v] of items)out+=`<div class="field"><label>${l}</label><input data-key="${k}" value="${d[k]||v}"></div>`;out+='</div></div>'}document.getElementById('forms').innerHTML=out}
+function save(){let d={};document.querySelectorAll('[data-key]').forEach(i=>d[i.dataset.key]=i.value.replace(/TSH/gi,'').trim());localStorage.setItem(KEY,JSON.stringify(d));alert('Bei zimehifadhiwa kwenye browser hii.');}
+function resetPrices(){if(confirm('Rudisha bei zote kwenye default?')){localStorage.removeItem(KEY);render()}}
+
+const CUSTOM_KEY='cleverKitimotoCustomMenusV1';
+function getCustom(){try{return JSON.parse(localStorage.getItem(CUSTOM_KEY)||'[]')}catch(e){return[]}}
+function addMenu(){
+ const name=document.getElementById('newName').value.trim(); const category=document.getElementById('newCategory').value;
+ const price=document.getElementById('newPrice').value.trim(); const size=document.getElementById('newSize').value.trim();
+ const desc=document.getElementById('newDesc').value.trim(); const image=document.getElementById('newImage').value.trim();
+ if(!name||!price){alert('Tafadhali weka jina la menu na bei.');return}
+ const list=getCustom(); list.push({id:Date.now().toString(),name,category,price,size,desc,image,active:true});
+ localStorage.setItem(CUSTOM_KEY,JSON.stringify(list));
+ ['newName','newPrice','newSize','newDesc','newImage'].forEach(id=>document.getElementById(id).value=''); renderCustom(); alert('Menu mpya imeongezwa.');
+}
+function renderCustom(){const el=document.getElementById('customMenus'); const list=getCustom(); if(!list.length){el.innerHTML='<div class="mini">Bado hujaongeza menu mpya.</div>';return}
+ el.innerHTML=list.map(x=>`<div class="custom-row"><div><b>${escapeHtml(x.name)}</b><div class="mini">${escapeHtml(x.category)} · ${escapeHtml(x.size||'')} · TSH ${escapeHtml(x.price)}</div></div><button class="delete" onclick="deleteMenu('${x.id}')">🗑 Delete</button></div>`).join('')}
+function deleteMenu(id){if(!confirm('Futa menu hii?'))return;localStorage.setItem(CUSTOM_KEY,JSON.stringify(getCustom().filter(x=>x.id!==id)));renderCustom()}
+function escapeHtml(v){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+const oldRender=render; render=function(){oldRender();renderCustom()};
+</script></body></html>

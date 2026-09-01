@@ -59,13 +59,72 @@
     </div>
   </div>
 
-  <div class="notice">
-    <b>Smart Admin:</b> Badilisha bei hapa kisha bonyeza <b>Save Changes</b>.
-    Mabadiliko yanaonekana mara moja kwenye menu (browser hii).
-    Kwa production, unganisha database (Supabase/Firebase) ili bei zisawazishe kwa wateja wote.
+  <div class="notice notice-compact">
+    <b>Dashboard:</b> Angalia oda, mapato, na wageni. Ripoti zinaweza kupakuliwa (CSV). Data ya browser hii tu — kwa production tumia database.
   </div>
 
-  <div id="forms"></div>
+  <section class="panel dashboard-panel" id="dashboardPanel">
+    <div class="panel-head-row">
+      <div>
+        <h2>📊 Dashboard</h2>
+        <p class="panel-note panel-note-tight">Muhtasari wa biashara yako</p>
+      </div>
+      <div class="report-actions">
+        <button class="btn btn-back btn-sm" type="button" id="exportOrdersBtn">⬇ Oda CSV</button>
+        <button class="btn btn-back btn-sm" type="button" id="exportVisitsBtn">⬇ Wageni CSV</button>
+        <button class="btn btn-save btn-sm" type="button" id="printReportBtn">🖨 Ripoti</button>
+      </div>
+    </div>
+    <div class="stats-grid" id="dashboardStats"></div>
+  </section>
+
+  <section class="panel reports-panel" id="reportsPanel">
+    <div class="panel-head-row">
+      <h2>📋 Ripoti</h2>
+      <div class="report-tabs" id="reportTabs">
+        <button type="button" class="report-tab active" data-tab="orders">Oda Zote</button>
+        <button type="button" class="report-tab" data-tab="visits">Wageni</button>
+      </div>
+    </div>
+
+    <div class="report-pane active" id="ordersPane">
+      <div class="report-summary" id="ordersSummary"></div>
+      <div class="panel-head-row report-toolbar">
+        <p class="panel-note panel-note-tight">Oda zilizotumwa kupitia WhatsApp/SMS</p>
+        <button class="btn btn-reset btn-sm" type="button" id="clearOrdersBtn">Futa oda</button>
+      </div>
+      <div id="ordersList" class="orders-list"></div>
+    </div>
+
+    <div class="report-pane" id="visitsPane">
+      <div class="report-summary" id="visitsSummary"></div>
+      <div class="panel-head-row report-toolbar">
+        <p class="panel-note panel-note-tight">Orodha ya wageni waliofungua menu</p>
+        <button class="btn btn-reset btn-sm" type="button" id="clearVisitsBtn">Futa wageni</button>
+      </div>
+      <div class="report-table-wrap">
+        <table class="report-table" id="visitsTable">
+          <thead>
+            <tr>
+              <th>Muda</th>
+              <th>Mgeni</th>
+              <th>Kifaa</th>
+              <th>Ukurasa</th>
+              <th>Chanzo</th>
+            </tr>
+          </thead>
+          <tbody id="visitsList"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="panel">
+    <h2>💰 Bei za Menu</h2>
+    <p class="panel-note">Badilisha bei kisha bonyeza Save Changes chini.</p>
+  </div>
+
+  <div id="priceForms"></div>
 
   <div class="panel" id="addMenuPanel">
     <h2>➕ Add New Menu</h2>
@@ -91,15 +150,6 @@
   <div class="panel">
     <h2>📋 My Added Menus</h2>
     <div id="customMenus"></div>
-  </div>
-
-  <div class="panel" id="ordersPanel">
-    <div class="panel-head-row">
-      <h2>📦 Oda Zote</h2>
-      <button class="btn btn-reset btn-sm" type="button" id="clearOrdersBtn">Futa historia</button>
-    </div>
-    <p class="panel-note">Oda zote zinahifadhiwa kwenye browser hii baada ya kutuma WhatsApp/SMS.</p>
-    <div id="ordersList" class="orders-list"></div>
   </div>
 
   <div class="panel">

@@ -4,6 +4,7 @@
   const KEY = 'cleverKitimotoMenuV1';
   const CUSTOM_KEY = 'cleverKitimotoCustomMenusV1';
   const ORDER_HISTORY_KEY = 'cleverKitimotoOrderHistoryV1';
+  const VISIT_LOG_KEY = 'cleverKitimotoVisitLogV1';
   const SESSION_KEY = 'cleverKitimotoAdminSession';
   const ADMIN_USER = 'clever';
   const ADMIN_PASS = 'Clever@2026';
@@ -57,7 +58,9 @@
     $('login')?.classList.add('hidden');
     $('app')?.classList.remove('hidden');
     render();
+    renderDashboard();
     renderOrders();
+    renderVisits();
   }
 
   function showLogin() {
@@ -132,7 +135,7 @@
       }
       out += '</div></div>';
     }
-    $('forms').innerHTML = out;
+    $('priceForms').innerHTML = out;
     renderCustom();
   }
 
@@ -198,6 +201,251 @@
     return String(v).replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
   }
 
+  function formatMoney(n) {
+    return Number(n || 0).toLocaleString('en-US');
+  }
+
+  function isToday(iso) {
+    const d = new Date(iso);
+    const t = new Date();
+    return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
+  }
+
+  function getVisits() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(VISIT_LOG_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function computeStats() {
+    const orders = getOrders();
+    const visits = getVisits();
+    const totalRevenue = orders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0);
+    const todayOrders = orders.filter(o => isToday(o.at));
+    const todayVisits = visits.filter(v => isToday(v.at));
+    const uniqueVisitors = new Set(visits.map(v => v.visitorId)).size;
+    const whatsapp = orders.filter(o => o.channel === 'whatsapp').length;
+    const sms = orders.filter(o => o.channel === 'sms').length;
+
+    return {
+      orderCount: orders.length,
+      totalRevenue,
+      todayOrderCount: todayOrders.length,
+      todayRevenue: todayOrders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0),
+      visitCount: visits.length,
+      todayVisitCount: todayVisits.length,
+      uniqueVisitors,
+      whatsapp,
+      sms
+    };
+  }
+
+  function renderDashboard() {
+    const el = $('dashboardStats');
+    if (!el) return;
+    const s = computeStats();
+    el.innerHTML = `
+      <article class="stat-card stat-primary">
+        <span class="stat-label">Jumla ya Mapato</span>
+        <strong class="stat-value">TSH ${formatMoney(s.totalRevenue)}</strong>
+        <span class="stat-sub">Leo: TSH ${formatMoney(s.todayRevenue)}</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Oda Zote</span>
+        <strong class="stat-value">${s.orderCount}</strong>
+        <span class="stat-sub">Leo: ${s.todayOrderCount} · WhatsApp ${s.whatsapp} · SMS ${s.sms}</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Wageni</span>
+        <strong class="stat-value">${s.visitCount}</strong>
+        <span class="stat-sub">Leo: ${s.todayVisitCount} · Unique: ${s.uniqueVisitors}</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Wastani kwa Oda</span>
+        <strong class="stat-value">${s.orderCount ? 'TSH ' + formatMoney(Math.round(s.totalRevenue / s.orderCount)) : '—'}</strong>
+        <span class="stat-sub">Bila delivery</span>
+      </article>
+    `;
+  }
+
+  function renderOrdersSummary() {
+    const el = $('ordersSummary');
+    if (!el) return;
+    const orders = getOrders();
+    const total = orders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0);
+    el.innerHTML = `
+      <div class="summary-chip"><span>Oda</span><b>${orders.length}</b></div>
+      <div class="summary-chip highlight"><span>Jumla ya Mapato</span><b>TSH ${formatMoney(total)}</b></div>
+    `;
+  }
+
+  function renderVisitsSummary() {
+    const el = $('visitsSummary');
+    if (!el) return;
+    const visits = getVisits();
+    const unique = new Set(visits.map(v => v.visitorId)).size;
+    const mobile = visits.filter(v => v.device === 'Mobile').length;
+    el.innerHTML = `
+      <div class="summary-chip"><span>Wageni</span><b>${visits.length}</b></div>
+      <div class="summary-chip"><span>Unique</span><b>${unique}</b></div>
+      <div class="summary-chip"><span>Mobile</span><b>${mobile}</b></div>
+      <div class="summary-chip"><span>Desktop</span><b>${visits.length - mobile}</b></div>
+    `;
+  }
+
+  function shortReferrer(ref) {
+    if (!ref || ref === 'Direct') return 'Direct';
+    try {
+      const u = new URL(ref);
+      return u.hostname.replace(/^www\./, '');
+    } catch {
+      return ref.slice(0, 40);
+    }
+  }
+
+  function renderVisits() {
+    const el = $('visitsList');
+    if (!el) return;
+    renderVisitsSummary();
+    const visits = getVisits();
+    if (!visits.length) {
+      el.innerHTML = '<tr><td colspan="5" class="empty-cell">Hakuna wageni bado. Wageni wataonekana watakapofungua menu.</td></tr>';
+      return;
+    }
+    el.innerHTML = visits.map(v => `
+      <tr>
+        <td>${escapeHtml(formatOrderDate(v.at))}</td>
+        <td><code class="visitor-id">${escapeHtml((v.visitorId || '—').slice(-10))}</code></td>
+        <td>${escapeHtml(v.device || '—')}</td>
+        <td>${escapeHtml(v.page || '—')}</td>
+        <td>${escapeHtml(shortReferrer(v.referrer))}</td>
+      </tr>
+    `).join('');
+  }
+
+  function csvEscape(val) {
+    const s = String(val ?? '');
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+
+  function downloadCsv(filename, rows) {
+    const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function exportOrdersCsv() {
+    const orders = getOrders();
+    if (!orders.length) { alert('Hakuna oda za kupakua.'); return; }
+    const header = ['Tarehe', 'Simu', 'Channel', 'Malipo', 'Aina', 'Mahali', 'Maelezo', 'Jumla TSH', 'Bidhaa'];
+    const rows = [header.join(',')];
+    orders.forEach(o => {
+      const items = (o.items || []).map(i =>
+        i.qty + 'x ' + i.name + (i.detail ? ' (' + i.detail + ')' : '') + (i.price ? ' @' + i.price : '')
+      ).join('; ');
+      rows.push([
+        csvEscape(formatOrderDate(o.at)),
+        csvEscape(o.phone),
+        csvEscape(o.channel),
+        csvEscape(paymentLabel(o.payment)),
+        csvEscape(o.fulfillment === 'pickup' ? 'Pickup' : 'Delivery'),
+        csvEscape(o.address),
+        csvEscape(o.notes),
+        csvEscape(o.subtotal || 0),
+        csvEscape(items)
+      ].join(','));
+    });
+    downloadCsv('clever-kitimoto-oda-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
+  }
+
+  function exportVisitsCsv() {
+    const visits = getVisits();
+    if (!visits.length) { alert('Hakuna wageni wa kupakua.'); return; }
+    const header = ['Tarehe', 'Visitor ID', 'Kifaa', 'Ukurasa', 'Chanzo', 'Lugha', 'Screen'];
+    const rows = [header.join(',')];
+    visits.forEach(v => {
+      rows.push([
+        csvEscape(formatOrderDate(v.at)),
+        csvEscape(v.visitorId),
+        csvEscape(v.device),
+        csvEscape(v.page),
+        csvEscape(v.referrer),
+        csvEscape(v.lang),
+        csvEscape(v.screen)
+      ].join(','));
+    });
+    downloadCsv('clever-kitimoto-wageni-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
+  }
+
+  function printReport() {
+    const s = computeStats();
+    const orders = getOrders();
+    const visits = getVisits();
+    const w = window.open('', '_blank');
+    if (!w) { alert('Ruhusu pop-ups kuchapisha ripoti.'); return; }
+    const orderRows = orders.slice(0, 50).map(o => `
+      <tr>
+        <td>${escapeHtml(formatOrderDate(o.at))}</td>
+        <td>${escapeHtml(o.phone || '—')}</td>
+        <td>${escapeHtml(o.channel || '—')}</td>
+        <td>TSH ${formatMoney(o.subtotal)}</td>
+      </tr>
+    `).join('');
+    const visitRows = visits.slice(0, 50).map(v => `
+      <tr>
+        <td>${escapeHtml(formatOrderDate(v.at))}</td>
+        <td>${escapeHtml((v.visitorId || '').slice(-10))}</td>
+        <td>${escapeHtml(v.device || '—')}</td>
+        <td>${escapeHtml(shortReferrer(v.referrer))}</td>
+      </tr>
+    `).join('');
+    w.document.write(`<!DOCTYPE html><html><head><title>Clever Kitimoto Ripoti</title>
+      <style>
+        body{font-family:system-ui,sans-serif;padding:24px;color:#2d1a12}
+        h1{color:#7a1515;margin:0 0 4px} .meta{color:#6b5344;font-size:14px;margin-bottom:24px}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+        .stat{border:1px solid #ddd;border-radius:10px;padding:12px;background:#fff8e7}
+        .stat span{display:block;font-size:11px;text-transform:uppercase;color:#6b5344}
+        .stat b{font-size:20px;color:#7a1515}
+        h2{font-size:16px;color:#7a1515;margin:24px 0 8px}
+        table{width:100%;border-collapse:collapse;font-size:12px}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left}
+        th{background:#7a1515;color:#fff}
+      </style></head><body>
+      <h1>Clever Kitimoto — Ripoti</h1>
+      <p class="meta">Imetengenezwa: ${escapeHtml(new Date().toLocaleString('sw-TZ'))}</p>
+      <div class="stats">
+        <div class="stat"><span>Jumla Mapato</span><b>TSH ${formatMoney(s.totalRevenue)}</b></div>
+        <div class="stat"><span>Oda Zote</span><b>${s.orderCount}</b></div>
+        <div class="stat"><span>Wageni</span><b>${s.visitCount}</b></div>
+        <div class="stat"><span>Unique Wageni</span><b>${s.uniqueVisitors}</b></div>
+      </div>
+      <h2>Oda (50 za mwisho)</h2>
+      <table><thead><tr><th>Tarehe</th><th>Simu</th><th>Channel</th><th>Jumla</th></tr></thead>
+      <tbody>${orderRows || '<tr><td colspan="4">Hakuna oda</td></tr>'}</tbody></table>
+      <h2>Wageni (50 wa mwisho)</h2>
+      <table><thead><tr><th>Tarehe</th><th>Mgeni</th><th>Kifaa</th><th>Chanzo</th></tr></thead>
+      <tbody>${visitRows || '<tr><td colspan="4">Hakuna wageni</td></tr>'}</tbody></table>
+      </body></html>`);
+    w.document.close();
+    w.focus();
+    w.print();
+  }
+
+  function switchReportTab(tab) {
+    document.querySelectorAll('.report-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    $('ordersPane')?.classList.toggle('active', tab === 'orders');
+    $('visitsPane')?.classList.toggle('active', tab === 'visits');
+  }
+
   function getOrders() {
     try {
       const saved = JSON.parse(localStorage.getItem(ORDER_HISTORY_KEY) || '[]');
@@ -225,6 +473,8 @@
   function renderOrders() {
     const el = $('ordersList');
     if (!el) return;
+    renderOrdersSummary();
+    renderDashboard();
     const orders = getOrders();
     if (!orders.length) {
       el.innerHTML = '<div class="empty">Hakuna oda bado. Oda zitaonekana hapa baada ya wateja kutuma WhatsApp/SMS.</div>';
@@ -263,6 +513,13 @@
     renderOrders();
   }
 
+  function clearVisits() {
+    if (!confirm('Futa historia yote ya wageni?')) return;
+    localStorage.removeItem(VISIT_LOG_KEY);
+    renderVisits();
+    renderDashboard();
+  }
+
   function bindEvents() {
     $('loginForm')?.addEventListener('submit', e => { e.preventDefault(); login(); });
     $('togglePass')?.addEventListener('click', togglePassword);
@@ -271,6 +528,13 @@
     $('resetBtn')?.addEventListener('click', resetPrices);
     $('addMenuBtn')?.addEventListener('click', addMenu);
     $('clearOrdersBtn')?.addEventListener('click', clearOrders);
+    $('clearVisitsBtn')?.addEventListener('click', clearVisits);
+    $('exportOrdersBtn')?.addEventListener('click', exportOrdersCsv);
+    $('exportVisitsBtn')?.addEventListener('click', exportVisitsCsv);
+    $('printReportBtn')?.addEventListener('click', printReport);
+    document.querySelectorAll('.report-tab').forEach(btn => {
+      btn.addEventListener('click', () => switchReportTab(btn.dataset.tab));
+    });
   }
 
   document.addEventListener('DOMContentLoaded', () => {

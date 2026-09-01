@@ -30,6 +30,7 @@
     <nav class="nav-links">
       <a href="#popular">Maarufu</a>
       <a href="#halfkg">0.5 KG</a>
+      <a href="#kisinia">Kisinia</a>
       <a href="#kitimoto">Kitimoto</a>
       <a href="#mixed">Mixed</a>
       <a href="#packages">Packages</a>
@@ -53,6 +54,7 @@
     <div style="margin:48px 0 24px;font-family:var(--font-display);font-size:1.4rem;font-weight:800">Menu</div>
     <a href="#kitimoto">Kitimoto</a>
     <a href="#halfkg">Oda 0.5 KG</a>
+    <a href="#kisinia">Clever Kisinia</a>
     <a href="#mixed">Mixed Kitimoto</a>
     <a href="#packages">Kisinia Packages</a>
     <a href="#zege">Kisinia Zege</a>
@@ -126,6 +128,17 @@
     <p>Chagua aina yako — nusu kilo, bei poa. Bonyeza moja tu kuongeza kwenye oda.</p>
   </div>
   <div class="halfkg-grid" id="halfKgGrid"></div>
+</section>
+
+<section class="section kisinia-section" id="kisinia">
+  <div class="section-head compact">
+    <div>
+      <div class="kicker">Clever Kisinia</div>
+      <h2>Oda Kisinia</h2>
+    </div>
+    <p>Packages, Mix na Zege — chagua kisinia lako na bonyeza moja tu kuongeza kwenye oda.</p>
+  </div>
+  <div id="kisiniaRoot"></div>
 </section>
 
 <div class="toolbar">
@@ -299,12 +312,12 @@
 
 <section class="section" id="packages" data-category="packages">
   <div class="section-head">
-    <div><div class="kicker">Share the Goodness</div><h2>Kisinia Packages</h2></div>
-    <p>Solo, couple na family — ready to serve.</p>
+    <div><div class="kicker">Clever Kisinia</div><h2>Kisinia Packages</h2></div>
+    <p>Solo, couple na family — bonyeza kadi au kitufe cha Oda kuongeza kwenye oda yako.</p>
   </div>
   <div class="grid">
 
-    <article class="card" data-searchable>
+    <article class="card kisinia-order-card" data-searchable data-item="Kisinia Single" data-detail="Mtu 1" data-price-key="single">
       <div class="card-photo">
         <img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="Kisinia Single" loading="lazy">
         <span class="card-tag">Mtu 1</span>
@@ -314,13 +327,12 @@
         <p class="card-desc">½ KG Mix + Ndizi 2 + Ugali 1 + Kachumbari.</p>
         <div class="price-main" data-price="single" data-price-prefix="tsh">TSH 20,000</div>
         <div class="card-actions">
-          <button class="btn btn-add btn-sm" data-item="Kisinia Single" data-detail="Mtu 1" data-price-val="20,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Kisinia%20Single">Order</a>
+          <button class="btn btn-primary btn-sm kisinia-add" type="button" data-item="Kisinia Single" data-detail="Mtu 1" data-price-key="single">+ Oda Kisinia</button>
         </div>
       </div>
     </article>
 
-    <article class="card" data-searchable>
+    <article class="card kisinia-order-card" data-searchable data-item="Kisinia Couple" data-detail="Watu 2" data-price-key="couple">
       <div class="card-photo">
         <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=85" alt="Kisinia Couple" loading="lazy">
         <span class="card-tag">Watu 2</span>
@@ -330,13 +342,12 @@
         <p class="card-desc">1 KG Mix + Ndizi 4 + Ugali 2 + Kachumbari.</p>
         <div class="price-main" data-price="couple" data-price-prefix="tsh">TSH 35,000</div>
         <div class="card-actions">
-          <button class="btn btn-add btn-sm" data-item="Kisinia Couple" data-detail="Watu 2" data-price-val="35,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Kisinia%20Couple">Order</a>
+          <button class="btn btn-primary btn-sm kisinia-add" type="button" data-item="Kisinia Couple" data-detail="Watu 2" data-price-key="couple">+ Oda Kisinia</button>
         </div>
       </div>
     </article>
 
-    <article class="card" data-searchable>
+    <article class="card kisinia-order-card" data-searchable data-item="Kisinia Family" data-detail="Watu 4" data-price-key="family">
       <div class="card-photo">
         <img src="https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=900&q=85" alt="Kisinia Family" loading="lazy">
         <span class="card-tag">Watu 4</span>
@@ -346,8 +357,7 @@
         <p class="card-desc">2 KG Mix + Ndizi 8 + Ugali 4 + Chipsi Yai 1 + Kachumbari.</p>
         <div class="price-main" data-price="family" data-price-prefix="tsh">TSH 65,000</div>
         <div class="card-actions">
-          <button class="btn btn-add btn-sm" data-item="Kisinia Family" data-detail="Watu 4" data-price-val="65,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Kisinia%20Family">Order</a>
+          <button class="btn btn-primary btn-sm kisinia-add" type="button" data-item="Kisinia Family" data-detail="Watu 4" data-price-key="family">+ Oda Kisinia</button>
         </div>
       </div>
     </article>

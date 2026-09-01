@@ -9,6 +9,8 @@
   const CUSTOMER_KEY = 'cleverKitimotoCustomerV1';
   const LAST_ORDER_KEY = 'cleverKitimotoLastOrderV1';
   const ORDER_HISTORY_KEY = 'cleverKitimotoOrderHistoryV1';
+  const VISIT_LOG_KEY = 'cleverKitimotoVisitLogV1';
+  const VISITOR_ID_KEY = 'cleverKitimotoVisitorIdV1';
   const DELIVERY_NOTE = 'Bei ya delivery ni kwa mteja';
   const LIPA_NUMBERS = [
     { label: 'Airtel', num: '130119369', display: '130 119 369', agent: 'Shedrack Moshi' },
@@ -21,7 +23,7 @@
   const POPULAR = [
     { name: 'Choma', detail: '0.5 KG', priceKey: 'choma', tag: 'Quick', desc: 'Nusu kilo — bei poa, oda haraka' },
     { name: '1 KG Mix', detail: '', price: '35,000', tag: 'Best Seller', desc: 'Choma + Rosti + Kavu + sides' },
-    { name: 'Kisinia Couple', detail: 'Watu 2', price: '35,000', tag: 'Couple', desc: 'Perfect kwa watu wawili' },
+    { name: 'Kisinia Couple', detail: 'Watu 2', priceKey: 'couple', tag: 'Couple', desc: 'Perfect kwa watu wawili' },
     { name: 'Choma', detail: '1 KG', price: '18,000', tag: 'Classic', desc: 'Kitimoto choma fresh' },
     { name: 'Zege Single', detail: '', price: '15,000', tag: 'Zege', desc: 'Kitimoto + chipsi kavu' }
   ];
@@ -34,6 +36,36 @@
   ];
 
   const SIZE_DETAIL = '0.5 KG';
+
+  const KISINIA_GROUPS = [
+    {
+      title: 'Kisinia Packages',
+      subtitle: 'Single · Couple · Family',
+      items: [
+        { name: 'Kisinia Single', detail: 'Mtu 1', priceKey: 'single', icon: '👤', tag: 'Solo', desc: '½ KG Mix + Ndizi 2 + Ugali 1 + Kachumbari' },
+        { name: 'Kisinia Couple', detail: 'Watu 2', priceKey: 'couple', icon: '👫', tag: 'Couple', desc: '1 KG Mix + Ndizi 4 + Ugali 2 + Kachumbari' },
+        { name: 'Kisinia Family', detail: 'Watu 4', priceKey: 'family', icon: '👨‍👩‍👧‍👦', tag: 'Family', desc: '2 KG Mix + Ndizi 8 + Ugali 4 + Chipsi Yai + Kachumbari' }
+      ]
+    },
+    {
+      title: 'Mixed Kitimoto',
+      subtitle: 'Choma + Rosti + Kavu',
+      items: [
+        { name: '½ KG Mix', detail: '', priceKey: 'mixedhalf', icon: '🍽️', tag: 'Mix', desc: 'Choma + Rosti + Kavu + Ndizi 2 + Ugali 1 + Kachumbari' },
+        { name: '1 KG Mix', detail: '', priceKey: 'mixedone', icon: '⭐', tag: 'Best', desc: 'Choma + Rosti + Kavu + Ndizi 4 + Ugali 2 + Kachumbari' },
+        { name: '2 KG Mix Special', detail: '', priceKey: 'mixedtwo', icon: '🎉', tag: 'Feast', desc: 'Choma 1 KG + Rosti ½ + Kavu ½ + sides' }
+      ]
+    },
+    {
+      title: 'Kisinia Zege',
+      subtitle: 'Kitimoto + Chipsi',
+      items: [
+        { name: 'Zege Single', detail: '', priceKey: 'zegeSingle', icon: '🍟', tag: 'Single', desc: '½ KG Kitimoto + Chipsi Kavu' },
+        { name: 'Zege Couple', detail: '', priceKey: 'zegeCouple', icon: '🍟', tag: 'Couple', desc: '1 KG Kitimoto + Chipsi Kavu + Kachumbari' },
+        { name: 'Zege Special', detail: '', priceKey: 'zegeSpecial', icon: '🍟', tag: 'Special', desc: '1½ KG Kitimoto + sides' }
+      ]
+    }
+  ];
 
   const defaults = {
     choma: '9,000', choma1: '18,000', choma15: '27,000', choma2: '36,000',
@@ -69,6 +101,37 @@
 
   function saveCart() {
     localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  }
+
+  function getVisitorId() {
+    let id = localStorage.getItem(VISITOR_ID_KEY);
+    if (!id) {
+      id = 'v-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      localStorage.setItem(VISITOR_ID_KEY, id);
+    }
+    return id;
+  }
+
+  function trackVisit() {
+    try {
+      const visits = JSON.parse(localStorage.getItem(VISIT_LOG_KEY) || '[]');
+      const last = visits[0];
+      const now = Date.now();
+      if (last && last.visitorId === getVisitorId() && now - new Date(last.at).getTime() < 60000) return;
+
+      visits.unshift({
+        id: 'visit-' + now,
+        at: new Date().toISOString(),
+        visitorId: getVisitorId(),
+        page: location.pathname.split('/').pop() || 'index.html',
+        referrer: document.referrer || 'Direct',
+        lang: navigator.language || '',
+        screen: (window.screen?.width || 0) + '×' + (window.screen?.height || 0),
+        device: /Mobi|Android/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
+      });
+      if (visits.length > 500) visits.length = 500;
+      localStorage.setItem(VISIT_LOG_KEY, JSON.stringify(visits));
+    } catch { /* noop */ }
   }
 
   function showToast(msg) {
@@ -176,6 +239,7 @@
     });
     renderPopularPicks();
     renderHalfKgQuickOrder();
+    renderKisiniaQuickOrder();
   }
 
   function waLink(text) {
@@ -364,10 +428,15 @@
   }
 
   function resolveAddTarget(el) {
+    const priceKey = el.dataset.priceKey;
+    const priceEl = el.querySelector?.('[data-price]');
+    const priceFromMain = priceEl?.dataset?.pricePrefix === 'tsh'
+      ? (priceEl.textContent || '').replace(/^TSH\s*/i, '').trim()
+      : priceEl?.textContent?.trim();
     return {
       name: el.dataset.item,
       detail: el.dataset.detail || '',
-      price: getLivePrice(el),
+      price: priceKey ? formatPrice(priceKey) : (priceFromMain || el.dataset.priceVal || ''),
       el
     };
   }
@@ -508,7 +577,7 @@
     cartEventsBound = true;
 
     document.addEventListener('click', e => {
-      const addEl = e.target.closest('.btn-add, .price-add, .halfkg-add');
+      const addEl = e.target.closest('.btn-add, .price-add, .halfkg-add, .kisinia-add, .kisinia-card');
       if (addEl) {
         e.preventDefault();
         const payload = resolveAddTarget(addEl);
@@ -625,6 +694,63 @@
         </article>
       `;
     }).join('');
+  }
+
+  function renderKisiniaQuickOrder() {
+    const root = document.getElementById('kisiniaRoot');
+    if (!root) return;
+    root.innerHTML = KISINIA_GROUPS.map(group => `
+      <div class="kisinia-group reveal">
+        <div class="kisinia-group-head">
+          <h3>${esc(group.title)}</h3>
+          <span>${esc(group.subtitle)}</span>
+        </div>
+        <div class="kisinia-grid">
+          ${group.items.map(item => {
+            const price = formatPrice(item.priceKey);
+            return `
+              <article class="kisinia-card reveal"
+                data-item="${esc(item.name)}" data-detail="${esc(item.detail)}" data-price-key="${esc(item.priceKey)}">
+                <div class="kisinia-card-top">
+                  <span class="kisinia-icon">${item.icon}</span>
+                  <span class="kisinia-tag">${esc(item.tag)}</span>
+                </div>
+                <h4>${esc(item.name)}${item.detail ? ` <small>· ${esc(item.detail)}</small>` : ''}</h4>
+                <p>${esc(item.desc)}</p>
+                <div class="kisinia-price">TSH ${esc(price)}</div>
+                <span class="kisinia-cta">+ Oda sasa</span>
+              </article>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function initKisiniaOrderCards() {
+    document.querySelectorAll('.kisinia-order-card').forEach(card => {
+      if (card.dataset.kisiniaInit) return;
+      card.dataset.kisiniaInit = '1';
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', 'Ongeza ' + (card.dataset.item || 'Kisinia') + ' kwenye oda');
+
+      const activate = () => {
+        const payload = resolveAddTarget(card);
+        addToCart(payload.name, payload.detail, payload.price, card);
+      };
+
+      card.addEventListener('click', e => {
+        if (e.target.closest('.kisinia-add')) return;
+        activate();
+      });
+      card.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          activate();
+        }
+      });
+    });
   }
 
   function updateOpenStatus() {
@@ -768,7 +894,7 @@
       entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
     }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
 
-    document.querySelectorAll('.section, .card, .order-banner, .popular-card, .halfkg-card, .faq-section').forEach(el => {
+    document.querySelectorAll('.section, .card, .order-banner, .popular-card, .halfkg-card, .kisinia-card, .kisinia-group, .faq-section').forEach(el => {
       el.classList.add('reveal');
       obs.observe(el);
     });
@@ -834,10 +960,12 @@
   window.CK = { getPrices, formatPrice, applyPrices, waLink, smsLink, openSms, openWhatsApp, getOrderMessage, openOrderPanel };
 
   document.addEventListener('DOMContentLoaded', () => {
+    trackVisit();
     applyPrices();
     bindCartEvents();
     initCheckout();
     initSizePickers();
+    initKisiniaOrderCards();
     updateCartUI();
     bindSearch();
     bindNav();
@@ -853,5 +981,6 @@
     renderCustomMenus();
     renderPopularPicks();
     renderHalfKgQuickOrder();
+    renderKisiniaQuickOrder();
   });
 })();

@@ -1237,6 +1237,132 @@ footer {
   .halfkg-grid { grid-template-columns: 1fr; }
 }
 
+/* Clever Kisinia quick order */
+.kisinia-section {
+  max-width: 1240px;
+  margin: 0 auto 28px;
+  padding: 0 24px;
+}
+.kisinia-group {
+  margin-bottom: 22px;
+}
+.kisinia-group:last-child { margin-bottom: 0; }
+.kisinia-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.kisinia-group-head h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  margin: 0;
+  color: var(--maroon);
+}
+.kisinia-group-head span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kisinia-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.kisinia-card {
+  background: var(--surface);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  font-family: var(--font-body);
+  color: inherit;
+}
+.kisinia-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--maroon);
+  box-shadow: var(--shadow);
+}
+.kisinia-card:active { transform: translateY(0); }
+.kisinia-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.kisinia-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--gold-soft);
+  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+}
+.kisinia-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--maroon);
+  background: var(--gold-soft);
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+.kisinia-card h4 {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  margin: 0;
+  color: var(--ink);
+}
+.kisinia-card h4 small {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kisinia-card p {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.45;
+  flex: 1;
+}
+.kisinia-price {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--maroon);
+}
+.kisinia-cta {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--maroon);
+  margin-top: 4px;
+}
+
+.kisinia-order-card {
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.kisinia-order-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--maroon);
+  box-shadow: var(--shadow);
+}
+.kisinia-order-card .card-actions .btn { width: 100%; }
+
+@media (max-width: 900px) {
+  .kisinia-grid { grid-template-columns: 1fr; }
+}
+
 /* Checkout form in order panel */
 .checkout-form {
   padding: 16px 20px 20px;

@@ -1187,6 +1187,111 @@ footer {
 }
 .popular-card .btn { width: 100%; margin-top: auto; }
 
+/* Quick order 0.5 KG */
+.halfkg-section {
+  max-width: 1240px;
+  margin: 0 auto 28px;
+  padding: 0 24px;
+}
+.halfkg-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.halfkg-card {
+  background: linear-gradient(160deg, #fff 0%, var(--gold-soft) 100%);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.halfkg-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--maroon);
+  box-shadow: var(--shadow);
+}
+.halfkg-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+}
+.halfkg-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--maroon);
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+}
+.halfkg-body h3 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 0 0 4px;
+}
+.halfkg-body p {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.halfkg-price {
+  margin-top: 8px;
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--maroon);
+}
+.halfkg-add { width: 100%; }
+
+.price-cell.size-half {
+  position: relative;
+  border-color: rgba(122, 21, 21, 0.35);
+  background: linear-gradient(180deg, #fff 0%, var(--gold-soft) 100%);
+}
+.price-cell.size-half::after {
+  content: 'Bei poa';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.52rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--maroon);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.price-cell.size-half b {
+  display: block;
+  font-size: 0.82rem;
+}
+.price-cell.size-half small {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+@media (max-width: 900px) {
+  .halfkg-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) {
+  .halfkg-grid { grid-template-columns: 1fr; }
+}
+
 /* Checkout form in order panel */
 .checkout-form {
   padding: 16px 20px 20px;
@@ -1321,6 +1426,12 @@ footer {
 .lipa-brand.airtel { color: #e40000; }
 .lipa-brand.yas { color: #0066cc; }
 .lipa-brand.voda { color: #e60000; }
+.lipa-agent {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+}
 .lipa-num {
   font-size: 0.95rem;
   font-weight: 800;

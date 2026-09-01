@@ -11,19 +11,29 @@
   const ORDER_HISTORY_KEY = 'cleverKitimotoOrderHistoryV1';
   const DELIVERY_NOTE = 'Bei ya delivery ni kwa mteja';
   const LIPA_NUMBERS = [
-    { label: 'Airtel', num: '130119369', display: '130 119 369' },
-    { label: 'Yas', num: '7561346', display: '756 1346' },
-    { label: 'Vodacom', num: '58674550', display: '5867 4550' }
+    { label: 'Airtel', num: '130119369', display: '130 119 369', agent: 'Shedrack Moshi' },
+    { label: 'Yas', num: '7561346', display: '756 1346', agent: 'Clever Restaurant' },
+    { label: 'Vodacom', num: '58674550', display: '5867 4550', agent: 'Shedrack Moshi' }
   ];
   const OPEN_HOUR = 10;
   const CLOSE_HOUR = 23;
 
   const POPULAR = [
+    { name: 'Choma', detail: '0.5 KG', priceKey: 'choma', tag: 'Quick', desc: 'Nusu kilo — bei poa, oda haraka' },
     { name: '1 KG Mix', detail: '', price: '35,000', tag: 'Best Seller', desc: 'Choma + Rosti + Kavu + sides' },
     { name: 'Kisinia Couple', detail: 'Watu 2', price: '35,000', tag: 'Couple', desc: 'Perfect kwa watu wawili' },
     { name: 'Choma', detail: '1 KG', price: '18,000', tag: 'Classic', desc: 'Kitimoto choma fresh' },
     { name: 'Zege Single', detail: '', price: '15,000', tag: 'Zege', desc: 'Kitimoto + chipsi kavu' }
   ];
+
+  const HALF_KG_ITEMS = [
+    { name: 'Choma', priceKey: 'choma', icon: '🔥', desc: 'Classic choma' },
+    { name: 'Choma ya Foil', priceKey: 'foil', icon: '✨', desc: 'Juicy & tender' },
+    { name: 'Rosti', priceKey: 'rosti', icon: '🌶️', desc: 'Customer favourite' },
+    { name: 'Kavu', priceKey: 'kavu', icon: '🥩', desc: 'Bold & crispy' }
+  ];
+
+  const SIZE_DETAIL = '0.5 KG';
 
   const defaults = {
     choma: '9,000', choma1: '18,000', choma15: '27,000', choma2: '36,000',
@@ -98,19 +108,31 @@
       if (!name) return;
 
       grid.querySelectorAll('.price-cell').forEach(cell => {
-        const size = cell.querySelector('b')?.textContent?.trim() || '';
+        const sizeEl = cell.querySelector('b');
+        const displaySize = cell.dataset.size === '0.5' ? SIZE_DETAIL : (sizeEl?.textContent?.trim() || '');
         const price = cell.querySelector('[data-price]')?.textContent?.trim() || '';
         cell.classList.add('price-add');
+        if (cell.dataset.size === '0.5' || displaySize === SIZE_DETAIL) {
+          cell.classList.add('size-half');
+        }
         cell.setAttribute('role', 'button');
         cell.setAttribute('tabindex', '0');
+        cell.setAttribute('aria-label', 'Ongeza ' + name + ' ' + displaySize + ' kwenye oda');
         cell.dataset.item = name;
-        cell.dataset.detail = size;
+        cell.dataset.detail = displaySize;
         cell.dataset.priceVal = price;
+
+        cell.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            addToCart(name, displaySize, getLivePrice(cell), cell);
+          }
+        });
       });
 
       const hint = document.createElement('p');
       hint.className = 'size-hint';
-      hint.textContent = '👆 Bonyeza ukubwa kuongeza kwenye oda';
+      hint.innerHTML = '👆 Bonyeza ukubwa kuongeza — <strong>0.5 KG</strong> hadi 2 KG';
       grid.after(hint);
 
       const addBtn = card.querySelector('.card-actions .btn-add');
@@ -152,6 +174,8 @@
         else el.textContent = v;
       }
     });
+    renderPopularPicks();
+    renderHalfKgQuickOrder();
   }
 
   function waLink(text) {
@@ -213,7 +237,7 @@
   }
 
   function lipaNumbersLine() {
-    return LIPA_NUMBERS.map(l => l.label + ': ' + l.num).join(' | ');
+    return LIPA_NUMBERS.map(l => l.label + ' ' + l.num + ' (' + l.agent + ')').join(' | ');
   }
 
   async function copyLipaNumber(num, label) {
@@ -332,6 +356,20 @@
 
   function getCartTotal() {
     return cart.reduce((sum, item) => sum + lineTotal(item), 0);
+  }
+
+  function getLivePrice(el) {
+    const priceEl = el?.querySelector?.('[data-price]');
+    return priceEl?.textContent?.trim() || el?.dataset?.priceVal || '';
+  }
+
+  function resolveAddTarget(el) {
+    return {
+      name: el.dataset.item,
+      detail: el.dataset.detail || '',
+      price: getLivePrice(el),
+      el
+    };
   }
 
   function addToCart(name, detail, price, sourceEl) {
@@ -470,15 +508,11 @@
     cartEventsBound = true;
 
     document.addEventListener('click', e => {
-      const addEl = e.target.closest('.btn-add, .price-add');
+      const addEl = e.target.closest('.btn-add, .price-add, .halfkg-add');
       if (addEl) {
         e.preventDefault();
-        addToCart(
-          addEl.dataset.item,
-          addEl.dataset.detail || '',
-          addEl.dataset.priceVal || '',
-          addEl
-        );
+        const payload = resolveAddTarget(addEl);
+        addToCart(payload.name, payload.detail, payload.price, addEl);
         return;
       }
 
@@ -555,16 +589,42 @@
   function renderPopularPicks() {
     const grid = document.getElementById('popularGrid');
     if (!grid) return;
-    grid.innerHTML = POPULAR.map(p => `
+    grid.innerHTML = POPULAR.map(p => {
+      const price = p.priceKey ? formatPrice(p.priceKey) : p.price;
+      return `
       <article class="popular-card reveal">
         <span class="popular-tag">${esc(p.tag)}</span>
         <h3>${esc(p.name)}</h3>
         <p>${esc(p.desc)}${p.detail ? ' · ' + esc(p.detail) : ''}</p>
-        <div class="popular-price">TSH ${esc(p.price)}</div>
+        <div class="popular-price">TSH ${esc(price)}</div>
         <button type="button" class="btn btn-add btn-sm"
-          data-item="${esc(p.name)}" data-detail="${esc(p.detail)}" data-price-val="${esc(p.price)}">+ Ongeza kwenye Oda</button>
+          data-item="${esc(p.name)}" data-detail="${esc(p.detail)}" data-price-val="${esc(price)}">+ Ongeza kwenye Oda</button>
       </article>
-    `).join('');
+    `;
+    }).join('');
+  }
+
+  function renderHalfKgQuickOrder() {
+    const grid = document.getElementById('halfKgGrid');
+    if (!grid) return;
+    grid.innerHTML = HALF_KG_ITEMS.map(item => {
+      const price = formatPrice(item.priceKey);
+      return `
+        <article class="halfkg-card reveal">
+          <div class="halfkg-icon">${item.icon}</div>
+          <div class="halfkg-body">
+            <span class="halfkg-badge">0.5 KG</span>
+            <h3>${esc(item.name)}</h3>
+            <p>${esc(item.desc)}</p>
+            <div class="halfkg-price">TSH ${esc(price)}</div>
+          </div>
+          <button type="button" class="btn btn-primary halfkg-add"
+            data-item="${esc(item.name)}" data-detail="${SIZE_DETAIL}" data-price-val="${esc(price)}">
+            + Oda 0.5 KG
+          </button>
+        </article>
+      `;
+    }).join('');
   }
 
   function updateOpenStatus() {
@@ -708,7 +768,7 @@
       entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
     }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
 
-    document.querySelectorAll('.section, .card, .order-banner, .popular-card, .faq-section').forEach(el => {
+    document.querySelectorAll('.section, .card, .order-banner, .popular-card, .halfkg-card, .faq-section').forEach(el => {
       el.classList.add('reveal');
       obs.observe(el);
     });
@@ -778,7 +838,6 @@
     bindCartEvents();
     initCheckout();
     initSizePickers();
-    renderPopularPicks();
     updateCartUI();
     bindSearch();
     bindNav();
@@ -792,5 +851,7 @@
   window.addEventListener('storage', () => {
     applyPrices();
     renderCustomMenus();
+    renderPopularPicks();
+    renderHalfKgQuickOrder();
   });
 })();

@@ -29,6 +29,7 @@
     </a>
     <nav class="nav-links">
       <a href="#popular">Maarufu</a>
+      <a href="#halfkg">0.5 KG</a>
       <a href="#kitimoto">Kitimoto</a>
       <a href="#mixed">Mixed</a>
       <a href="#packages">Packages</a>
@@ -51,6 +52,7 @@
     <button class="mobile-close" id="mobileClose" aria-label="Close">✕</button>
     <div style="margin:48px 0 24px;font-family:var(--font-display);font-size:1.4rem;font-weight:800">Menu</div>
     <a href="#kitimoto">Kitimoto</a>
+    <a href="#halfkg">Oda 0.5 KG</a>
     <a href="#mixed">Mixed Kitimoto</a>
     <a href="#packages">Kisinia Packages</a>
     <a href="#zege">Kisinia Zege</a>
@@ -86,7 +88,7 @@
     </div>
     <div class="hero-float">
       <b>From TSH 8,500</b>
-      <span>½ KG · Fresh & hot</span>
+      <span>0.5 KG · Fresh & hot</span>
     </div>
   </div>
 </section>
@@ -125,6 +127,17 @@
   <div class="popular-grid" id="popularGrid"></div>
 </section>
 
+<section class="section halfkg-section" id="halfkg">
+  <div class="section-head compact">
+    <div>
+      <div class="kicker">Quick Order</div>
+      <h2>Oda 0.5 KG</h2>
+    </div>
+    <p>Chagua aina yako — nusu kilo, bei poa. Bonyeza moja tu kuongeza kwenye oda.</p>
+  </div>
+  <div class="halfkg-grid" id="halfKgGrid"></div>
+</section>
+
 <div class="toolbar">
   <div class="search-box">
     <span class="search-icon">🔍</span>
@@ -145,7 +158,7 @@
 <section class="section" id="kitimoto" data-category="kitimoto">
   <div class="section-head">
     <div><div class="kicker">Our Classics</div><h2>Kitimoto</h2></div>
-    <p>Chagua style yako — kila aina inapatikana kwa ½ KG hadi 2 KG.</p>
+    <p>Chagua style yako — kila aina inapatikana kwa 0.5 KG hadi 2 KG.</p>
   </div>
   <div class="grid">
 
@@ -158,7 +171,7 @@
         <h3>Choma</h3>
         <p class="card-desc">Kitimoto choma, fresh na moto — ladha ya asili.</p>
         <div class="price-grid">
-          <div class="price-cell"><b>½ KG</b><span data-price="choma">9,000</span></div>
+          <div class="price-cell size-half" data-size="0.5"><b>0.5 KG</b><small>½ kilo</small><span data-price="choma">9,000</span></div>
           <div class="price-cell"><b>1 KG</b><span data-price="choma1">18,000</span></div>
           <div class="price-cell"><b>1½ KG</b><span data-price="choma15">27,000</span></div>
           <div class="price-cell"><b>2 KG</b><span data-price="choma2">36,000</span></div>
@@ -179,7 +192,7 @@
         <h3>Choma ya Foil</h3>
         <p class="card-desc">Kitimoto yenye ladha iliyopikwa ndani ya foil — juicy & tender.</p>
         <div class="price-grid">
-          <div class="price-cell"><b>½ KG</b><span data-price="foil">9,000</span></div>
+          <div class="price-cell size-half" data-size="0.5"><b>0.5 KG</b><small>½ kilo</small><span data-price="foil">9,000</span></div>
           <div class="price-cell"><b>1 KG</b><span data-price="foil1">18,000</span></div>
           <div class="price-cell"><b>1½ KG</b><span data-price="foil15">27,000</span></div>
           <div class="price-cell"><b>2 KG</b><span data-price="foil2">36,000</span></div>
@@ -200,7 +213,7 @@
         <h3>Rosti</h3>
         <p class="card-desc">Rosti yenye viungo na ladha ya Kisinia — customer favourite.</p>
         <div class="price-grid">
-          <div class="price-cell"><b>½ KG</b><span data-price="rosti">8,500</span></div>
+          <div class="price-cell size-half" data-size="0.5"><b>0.5 KG</b><small>½ kilo</small><span data-price="rosti">8,500</span></div>
           <div class="price-cell"><b>1 KG</b><span data-price="rosti1">17,000</span></div>
           <div class="price-cell"><b>1½ KG</b><span data-price="rosti15">25,500</span></div>
           <div class="price-cell"><b>2 KG</b><span data-price="rosti2">34,000</span></div>
@@ -221,7 +234,7 @@
         <h3>Kavu</h3>
         <p class="card-desc">Kitimoto kavu chenye viungo maalum — bold & crispy.</p>
         <div class="price-grid">
-          <div class="price-cell"><b>½ KG</b><span data-price="kavu">8,500</span></div>
+          <div class="price-cell size-half" data-size="0.5"><b>0.5 KG</b><small>½ kilo</small><span data-price="kavu">8,500</span></div>
           <div class="price-cell"><b>1 KG</b><span data-price="kavu1">17,000</span></div>
           <div class="price-cell"><b>1½ KG</b><span data-price="kavu15">25,500</span></div>
           <div class="price-cell"><b>2 KG</b><span data-price="kavu2">34,000</span></div>
@@ -522,7 +535,7 @@
     </details>
     <details class="faq-item">
       <summary>Nawezaje kulipa?</summary>
-      <p>M-Pesa, cash, au lipa namba. Lipa namba: <b>Airtel 130119369</b>, <b>Yas 7561346</b>, <b>Vodacom 58674550</b>. Malipo baada ya kuhakiki oda.</p>
+      <p>M-Pesa, cash, au lipa namba. Lipa namba: <b>Airtel 130119369</b> (Shedrack Moshi), <b>Yas 7561346</b> (Clever Restaurant), <b>Vodacom 58674550</b> (Shedrack Moshi). Malipo baada ya kuhakiki oda.</p>
     </details>
     <details class="faq-item">
       <summary>Oda inachukua muda gani?</summary>
@@ -617,16 +630,19 @@
         <div class="lipa-grid">
           <button type="button" class="lipa-card" data-lipa="130119369" data-label="Airtel">
             <span class="lipa-brand airtel">Airtel Money</span>
+            <span class="lipa-agent">Shedrack Moshi</span>
             <strong class="lipa-num">130 119 369</strong>
             <span class="lipa-copy">📋 Nakili</span>
           </button>
           <button type="button" class="lipa-card" data-lipa="7561346" data-label="Yas">
             <span class="lipa-brand yas">Yas Mixx</span>
+            <span class="lipa-agent">Clever Restaurant</span>
             <strong class="lipa-num">756 1346</strong>
             <span class="lipa-copy">📋 Nakili</span>
           </button>
           <button type="button" class="lipa-card" data-lipa="58674550" data-label="Vodacom">
             <span class="lipa-brand voda">M-Pesa Vodacom</span>
+            <span class="lipa-agent">Shedrack Moshi</span>
             <strong class="lipa-num">5867 4550</strong>
             <span class="lipa-copy">📋 Nakili</span>
           </button>

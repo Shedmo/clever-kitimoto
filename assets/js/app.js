@@ -53,6 +53,24 @@
     return 'https://wa.me/' + WA + '?text=' + encodeURIComponent(text);
   }
 
+  function parsePrice(val) {
+    const n = parseInt(String(val || '').replace(/[^\d]/g, ''), 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function formatMoney(amount) {
+    return amount.toLocaleString('en-US');
+  }
+
+  function lineTotal(item) {
+    const unit = parsePrice(item.price);
+    return unit > 0 ? unit * item.qty : 0;
+  }
+
+  function getCartTotal() {
+    return cart.reduce((sum, item) => sum + lineTotal(item), 0);
+  }
+
   function addToCart(name, detail, price) {
     const existing = cart.find(i => i.name === name && i.detail === detail);
     if (existing) {
@@ -77,24 +95,56 @@
     const bar = document.getElementById('cartBar');
     const count = document.getElementById('cartCount');
     const preview = document.getElementById('cartPreview');
-    const total = cart.reduce((s, i) => s + i.qty, 0);
+    const totalEl = document.getElementById('cartTotal');
+    const itemCount = cart.reduce((s, i) => s + i.qty, 0);
+    const moneyTotal = getCartTotal();
+    const pricedCount = cart.filter(i => parsePrice(i.price) > 0).reduce((s, i) => s + i.qty, 0);
 
-    if (!total) {
+    if (!itemCount) {
       bar.classList.remove('visible');
       return;
     }
 
     bar.classList.add('visible');
-    count.textContent = total + (total === 1 ? ' item' : ' items');
-    preview.textContent = cart.map(i => i.qty + '× ' + i.name + (i.detail ? ' (' + i.detail + ')' : '')).join(', ');
+    count.textContent = itemCount + (itemCount === 1 ? ' item' : ' items');
+    preview.textContent = cart.map(i => {
+      const sub = lineTotal(i);
+      let line = i.qty + '× ' + i.name + (i.detail ? ' (' + i.detail + ')' : '');
+      if (sub > 0) line += ' — TSH ' + formatMoney(sub);
+      return line;
+    }).join(', ');
+
+    if (totalEl) {
+      if (moneyTotal > 0) {
+        const note = pricedCount < itemCount ? ' (+ baadhi bila bei)' : '';
+        totalEl.textContent = 'JUMLA: TSH ' + formatMoney(moneyTotal) + note;
+      } else {
+        totalEl.textContent = 'JUMLA: —';
+      }
+    }
   }
 
   function sendCart() {
     if (!cart.length) return;
     const lines = ['Habari Clever Kitimoto, naomba kuagiza:', ''];
+    let moneyTotal = 0;
+
     cart.forEach(i => {
-      lines.push('• ' + i.qty + '× ' + i.name + (i.detail ? ' — ' + i.detail : '') + (i.price ? ' (TSH ' + i.price + ')' : ''));
+      const unit = parsePrice(i.price);
+      const sub = lineTotal(i);
+      if (sub > 0) moneyTotal += sub;
+
+      let line = '• ' + i.qty + '× ' + i.name + (i.detail ? ' — ' + i.detail : '');
+      if (unit > 0) {
+        line += ' @ TSH ' + i.price;
+        if (i.qty > 1) line += ' = TSH ' + formatMoney(sub);
+      }
+      lines.push(line);
     });
+
+    if (moneyTotal > 0) {
+      lines.push('', '💰 JUMLA: TSH ' + formatMoney(moneyTotal));
+    }
     lines.push('', 'Asante!');
     window.open(waLink(lines.join('\n')), '_blank');
   }
@@ -186,13 +236,17 @@
   }
 
   function bindPhoneCopy() {
-    const phone = document.getElementById('phoneCopy');
-    phone?.addEventListener('click', () => {
-      navigator.clipboard?.writeText('06834977330').then(() => {
-        const orig = phone.textContent;
-        phone.textContent = '✓ Copied!';
-        setTimeout(() => { phone.textContent = orig; }, 1500);
-      });
+    document.getElementById('phoneCopy')?.addEventListener('click', () => copyPhone('06834977330', 'phoneCopy'));
+    document.getElementById('phoneCopy2')?.addEventListener('click', () => copyPhone('0794607335', 'phoneCopy2'));
+  }
+
+  function copyPhone(num, id) {
+    navigator.clipboard?.writeText(num).then(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const orig = el.textContent;
+      el.textContent = '✓ Copied!';
+      setTimeout(() => { el.textContent = orig; }, 1500);
     });
   }
 

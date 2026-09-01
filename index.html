@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Clever Kitimoto | Digital Menu</title>
 <meta name="description" content="Kisinia Clever Kitimoto — Choma, Choma ya Foil, Rosti, Kavu na Packages. Oda 0683 497 7330.">
-<meta name="theme-color" content="#0f0c09">
+<meta name="theme-color" content="#ffcc00">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -18,8 +18,8 @@
 <header class="header">
   <div class="nav">
     <a class="brand" href="#">
-      <div class="brand-icon">🐷</div>
-      <div class="brand-text">Clever Kitimoto<span>Kisinia cha Ladha</span></div>
+      <img class="brand-logo" src="assets/logo.png" alt="Clever Kitimoto">
+      <div class="brand-text">Clever Kitimoto<span>Kitimoto Bora · Bei Poa</span></div>
     </a>
     <nav class="nav-links">
       <a href="#kitimoto">Kitimoto</a>
@@ -52,13 +52,13 @@
 
 <section class="hero">
   <div>
-    <div class="hero-badge"><span class="hero-badge-dot"></span> Fresh Daily · Open Now</div>
+    <div class="hero-badge"><span class="hero-badge-dot"></span> Kitimoto Bora · Bei Poa · Huduma Bora</div>
     <h1>Kitimoto.<br><em>Made Clever.</em></h1>
     <p class="hero-desc">Choma, Choma ya Foil, Rosti, Kavu na Kisinia Packages — served hot, fresh and ready to enjoy.</p>
     <div class="hero-stats">
-      <div class="stat"><strong>4+</strong><span>Signature styles</span></div>
-      <div class="stat"><strong>9</strong><span>Package combos</span></div>
-      <div class="stat"><strong>📲</strong><span>WhatsApp orders</span></div>
+      <div class="stat"><strong>🥩</strong><span>Kitimoto Safi</span></div>
+      <div class="stat"><strong>🔥</strong><span>Choma · Rosti · Kavu</span></div>
+      <div class="stat"><strong>🛵</strong><span>Delivery DSM</span></div>
     </div>
     <div class="hero-actions">
       <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 Oda WhatsApp</a>
@@ -68,7 +68,7 @@
   <div class="hero-visual">
     <div class="hero-ring"></div>
     <div class="hero-img-wrap">
-      <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=85" alt="Kitimoto choma">
+      <img class="hero-banner-img" src="assets/banner.png" alt="Clever Kitimoto — Choma, Rosti, Kavu">
     </div>
     <div class="hero-float">
       <b>From TSH 8,500</b>
@@ -76,6 +76,24 @@
     </div>
   </div>
 </section>
+
+<div class="delivery-strip">
+  <div class="delivery-strip-inner">
+    <div>
+      <strong>🛵 TUNAFANYA DELIVERY</strong>
+      <span> — Mahali popote ndani ya Dar es Salaam</span>
+    </div>
+    <div>
+      <strong>📞 0683 497 330</strong> · <strong>0794 607 335</strong>
+    </div>
+  </div>
+</div>
+
+<div class="features-strip">
+  <div class="feature-pill"><div class="icon">🥩</div><b>Kitimoto Safi</b><span>Safi na bora</span></div>
+  <div class="feature-pill"><div class="icon">🔥</div><b>Choma · Rosti · Kavu</b><span>Mbinu tatu za kupika</span></div>
+  <div class="feature-pill"><div class="icon">👍</div><b>Ladha Halisi</b><span>Kwa bei rahisi</span></div>
+</div>
 
 <div class="toolbar">
   <div class="search-box">
@@ -450,7 +468,10 @@
   <div>
     <div class="kicker">Ready to Order?</div>
     <h2>Agiza sasa.</h2>
-    <p>Call au WhatsApp: <span class="phone" id="phoneCopy" title="Click to copy">0683 497 7330</span></p>
+    <p>Call au WhatsApp:<br>
+      <span class="phone" id="phoneCopy" title="Click to copy">0683 497 330</span> ·
+      <span class="phone" id="phoneCopy2" title="Click to copy">0794 607 335</span>
+    </p>
   </div>
   <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 WhatsApp Order</a>
 </div>
@@ -467,6 +488,7 @@
       <div class="cart-count" id="cartCount">0 items</div>
       <div class="cart-items-preview" id="cartPreview"></div>
     </div>
+    <div class="cart-total" id="cartTotal">JUMLA: TSH 0</div>
     <div class="cart-actions">
       <button class="btn btn-ghost btn-sm" id="cartClear">Clear</button>
       <button class="btn btn-primary btn-sm" id="cartSend">📲 Send Order</button>

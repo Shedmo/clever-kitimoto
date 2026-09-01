@@ -1,36 +1,34 @@
-/* Clever Kitimoto — Admin Panel */
+/* Clever Kitimoto — Admin (Brand Theme) */
 :root {
-  --bg: #0f0c09;
-  --surface: #1a1510;
-  --surface-2: #221c16;
-  --paper: #2d251d;
-  --ink: #faf6f0;
-  --muted: #9a8f82;
-  --line: rgba(255, 235, 210, 0.08);
-  --line-strong: rgba(255, 235, 210, 0.14);
-  --ember: #e85d2a;
-  --gold: #d4a853;
-  --danger: #e05252;
+  --yellow: #ffcc00;
+  --yellow-light: #ffe566;
+  --maroon: #7a1515;
+  --maroon-dark: #5c1010;
+  --maroon-light: #9b2222;
+  --brown: #2d1a12;
+  --bg: #ffcc00;
+  --surface: #ffffff;
+  --surface-2: #fff8e7;
+  --ink: #2d1a12;
+  --muted: #6b5344;
+  --line: rgba(45, 26, 18, 0.1);
+  --line-strong: rgba(45, 26, 18, 0.18);
+  --ember: #7a1515;
+  --gold: #7a1515;
+  --danger: #c0392b;
   --radius: 18px;
   --font-display: "Fraunces", Georgia, serif;
   --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --shadow: 0 12px 40px rgba(45, 26, 18, 0.12);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 body {
   margin: 0;
-  background: var(--bg);
+  background: linear-gradient(180deg, var(--yellow) 0%, var(--yellow-light) 100%);
   color: var(--ink);
   font-family: var(--font-body);
   min-height: 100vh;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse 60% 40% at 80% 0%, rgba(232, 93, 42, 0.12), transparent 55%);
 }
 
 .wrap {
@@ -49,14 +47,17 @@ body::before {
   flex-wrap: wrap;
 }
 
+.brand-row { display: flex; align-items: center; gap: 14px; }
+.brand-logo { height: 56px; width: auto; }
 .brand {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   letter-spacing: -0.02em;
+  color: var(--maroon);
 }
-.brand span { color: var(--gold); }
-.brand-sub { font-size: 0.75rem; color: var(--muted); font-family: var(--font-body); font-weight: 600; margin-top: 2px; }
+.brand span { color: var(--maroon-dark); }
+.brand-sub { font-size: 0.75rem; color: var(--muted); font-weight: 600; margin-top: 2px; }
 
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
@@ -70,7 +71,7 @@ body::before {
   font-size: 0.82rem;
   font-weight: 700;
   text-decoration: none;
-  border: 1px solid var(--line-strong);
+  border: 2px solid var(--line-strong);
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
@@ -78,45 +79,38 @@ body::before {
 }
 .btn:hover { transform: translateY(-1px); }
 .btn-save {
-  background: linear-gradient(135deg, var(--ember), #c4411f);
-  border-color: transparent;
+  background: var(--maroon);
+  border-color: var(--maroon-dark);
   color: #fff;
 }
 .btn-reset { background: var(--surface-2); color: var(--muted); }
-.btn-back { background: transparent; }
+.btn-back { background: #fff; color: var(--maroon); border-color: var(--maroon); }
 .btn-delete {
-  background: rgba(224, 82, 82, 0.12);
-  border-color: rgba(224, 82, 82, 0.3);
-  color: #ff9a9a;
+  background: rgba(192, 57, 43, 0.1);
+  border-color: rgba(192, 57, 43, 0.3);
+  color: var(--danger);
   padding: 8px 14px;
   font-size: 0.75rem;
 }
 
 .panel {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 2px solid var(--maroon);
   border-radius: var(--radius);
   padding: 24px;
   margin-bottom: 18px;
+  box-shadow: var(--shadow);
 }
 .panel h2 {
   font-family: var(--font-display);
   font-size: 1.35rem;
   font-weight: 800;
   margin: 0 0 18px;
-  letter-spacing: -0.01em;
+  color: var(--maroon);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-.add-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.add-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .full { grid-column: 1 / -1; }
 
 .field label {
@@ -128,9 +122,7 @@ body::before {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.field input,
-.field select,
-.field textarea {
+.field input, .field select, .field textarea {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--line-strong);
@@ -140,28 +132,26 @@ body::before {
   font-family: var(--font-body);
   font-size: 0.9rem;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.field input:focus,
-.field select:focus,
-.field textarea:focus {
-  border-color: rgba(212, 168, 83, 0.4);
-  box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.1);
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--maroon);
+  box-shadow: 0 0 0 3px rgba(122, 21, 21, 0.1);
 }
 .field textarea { resize: vertical; min-height: 80px; }
 
 .notice {
-  background: rgba(212, 168, 83, 0.08);
-  border: 1px solid rgba(212, 168, 83, 0.2);
-  border-left: 3px solid var(--gold);
+  background: var(--surface);
+  border: 2px solid var(--maroon);
+  border-left: 4px solid var(--maroon);
   padding: 16px 18px;
   border-radius: 12px;
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.6;
   margin-bottom: 18px;
+  box-shadow: var(--shadow);
 }
-.notice b { color: var(--gold); }
+.notice b { color: var(--maroon); }
 
 .login-wrap {
   min-height: 100vh;
@@ -173,12 +163,14 @@ body::before {
   width: 100%;
   max-width: 400px;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 3px solid var(--maroon);
   border-radius: 24px;
   padding: 36px 32px;
   text-align: center;
+  box-shadow: var(--shadow);
 }
-.login .brand { font-size: 2rem; margin-bottom: 8px; }
+.login-logo { height: 80px; width: auto; margin-bottom: 12px; }
+.login .brand { font-size: 1.6rem; margin-bottom: 4px; }
 .login p { color: var(--muted); font-size: 0.9rem; margin: 0 0 24px; }
 .login label {
   display: block;
@@ -188,7 +180,6 @@ body::before {
   color: var(--muted);
   margin-bottom: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 .login input {
   width: 100%;
@@ -201,9 +192,7 @@ body::before {
   margin-bottom: 8px;
   outline: none;
 }
-.login input:focus {
-  border-color: rgba(212, 168, 83, 0.4);
-}
+.login input:focus { border-color: var(--maroon); }
 .login .btn-save { width: 100%; justify-content: center; margin-top: 8px; padding: 14px; }
 
 .error { color: var(--danger); font-size: 0.82rem; min-height: 20px; margin-bottom: 4px; }
@@ -217,9 +206,7 @@ body::before {
   border-bottom: 1px solid var(--line);
 }
 .custom-row:last-child { border-bottom: 0; }
-.custom-row b { font-size: 0.95rem; }
 .mini { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
-
 .empty { color: var(--muted); font-size: 0.88rem; padding: 8px 0; }
 
 @media (max-width: 720px) {

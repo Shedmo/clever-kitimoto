@@ -6,7 +6,18 @@
   const WA = '255683497330';
   const SMS_PHONE = '255683497330';
   const CART_KEY = 'cleverKitimotoCartV1';
+  const CUSTOMER_KEY = 'cleverKitimotoCustomerV1';
+  const LAST_ORDER_KEY = 'cleverKitimotoLastOrderV1';
   const DELIVERY_NOTE = 'Bei ya delivery ni kwa mteja';
+  const OPEN_HOUR = 10;
+  const CLOSE_HOUR = 23;
+
+  const POPULAR = [
+    { name: '1 KG Mix', detail: '', price: '35,000', tag: 'Best Seller', desc: 'Choma + Rosti + Kavu + sides' },
+    { name: 'Kisinia Couple', detail: 'Watu 2', price: '35,000', tag: 'Couple', desc: 'Perfect kwa watu wawili' },
+    { name: 'Choma', detail: '1 KG', price: '18,000', tag: 'Classic', desc: 'Kitimoto choma fresh' },
+    { name: 'Zege Single', detail: '', price: '15,000', tag: 'Zege', desc: 'Kitimoto + chipsi kavu' }
+  ];
 
   const defaults = {
     choma: '9,000', choma1: '18,000', choma15: '27,000', choma2: '36,000',
@@ -145,15 +156,68 @@
     return 'sms:' + (phone || SMS_PHONE) + '?body=' + encodeURIComponent(text);
   }
 
-  function buildCartMessage() {
-    const lines = ['Habari Clever Kitimoto, naomba kuagiza:', ''];
-    let moneyTotal = 0;
+  function paymentLabel(val) {
+    return ({ mpesa: 'M-Pesa', cash: 'Cash', lipa: 'Lipa namba' }[val] || val);
+  }
 
+  function getCheckout() {
+    return {
+      name: document.getElementById('custName')?.value.trim() || '',
+      phone: document.getElementById('custPhone')?.value.trim() || '',
+      address: document.getElementById('custAddress')?.value.trim() || '',
+      notes: document.getElementById('custNotes')?.value.trim() || '',
+      fulfillment: document.querySelector('#fulfillmentPills .pill.active')?.dataset.val || 'delivery',
+      payment: document.querySelector('#paymentPills .pill.active')?.dataset.val || 'mpesa'
+    };
+  }
+
+  function saveCheckout() {
+    localStorage.setItem(CUSTOMER_KEY, JSON.stringify(getCheckout()));
+  }
+
+  function loadCheckout() {
+    try {
+      const c = JSON.parse(localStorage.getItem(CUSTOMER_KEY) || '{}');
+      const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+      set('custName', c.name);
+      set('custPhone', c.phone);
+      set('custAddress', c.address);
+      set('custNotes', c.notes);
+      if (c.fulfillment) setPillActive('fulfillmentPills', c.fulfillment);
+      if (c.payment) setPillActive('paymentPills', c.payment);
+      toggleAddressField();
+    } catch { /* noop */ }
+  }
+
+  function setPillActive(groupId, val) {
+    document.querySelectorAll('#' + groupId + ' .pill').forEach(p => {
+      p.classList.toggle('active', p.dataset.val === val);
+    });
+  }
+
+  function toggleAddressField() {
+    const pickup = document.querySelector('#fulfillmentPills .pill.active')?.dataset.val === 'pickup';
+    const addr = document.getElementById('custAddress')?.closest('.ck-field');
+    if (addr) addr.style.display = pickup ? 'none' : '';
+  }
+
+  function buildCartMessage() {
+    const c = getCheckout();
+    const lines = ['Habari Clever Kitimoto, naomba kuagiza:', ''];
+
+    if (c.name) lines.push('Jina: ' + c.name);
+    if (c.phone) lines.push('Simu: ' + c.phone);
+    lines.push('Aina: ' + (c.fulfillment === 'pickup' ? 'Pickup' : 'Delivery'));
+    if (c.fulfillment === 'delivery' && c.address) lines.push('Mahali: ' + c.address);
+    lines.push('Malipo: ' + paymentLabel(c.payment));
+    if (c.notes) lines.push('Maelezo: ' + c.notes);
+    if (c.name || c.phone) lines.push('');
+
+    let moneyTotal = 0;
     cart.forEach(i => {
       const unit = parsePrice(i.price);
       const sub = lineTotal(i);
       if (sub > 0) moneyTotal += sub;
-
       let line = '• ' + i.qty + '× ' + i.name + (i.detail ? ' — ' + i.detail : '');
       if (unit > 0) {
         line += ' @ TSH ' + i.price;
@@ -400,6 +464,9 @@
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeOrderPanel();
     });
+
+    document.getElementById('shareMenuBtn')?.addEventListener('click', shareMenu);
+    document.getElementById('reorderBtn')?.addEventListener('click', reorderLast);
   }
   function sendCart(channel) {
     if (!cart.length) {
@@ -407,9 +474,106 @@
       openOrderPanel();
       return;
     }
+    const c = getCheckout();
+    if (!c.phone) {
+      showToast('Tafadhali weka namba ya simu');
+      openOrderPanel();
+      document.getElementById('custPhone')?.focus();
+      return;
+    }
+    saveCheckout();
+    localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(cart));
+    document.getElementById('reorderBtn')?.removeAttribute('hidden');
+
     const msg = buildCartMessage();
     if (channel === 'sms') openSms(msg);
     else openWhatsApp(msg);
+    showToast('Oda imetumwa — asante!');
+  }
+
+  function renderPopularPicks() {
+    const grid = document.getElementById('popularGrid');
+    if (!grid) return;
+    grid.innerHTML = POPULAR.map(p => `
+      <article class="popular-card reveal">
+        <span class="popular-tag">${esc(p.tag)}</span>
+        <h3>${esc(p.name)}</h3>
+        <p>${esc(p.desc)}${p.detail ? ' · ' + esc(p.detail) : ''}</p>
+        <div class="popular-price">TSH ${esc(p.price)}</div>
+        <button type="button" class="btn btn-add btn-sm"
+          data-item="${esc(p.name)}" data-detail="${esc(p.detail)}" data-price-val="${esc(p.price)}">+ Ongeza kwenye Oda</button>
+      </article>
+    `).join('');
+  }
+
+  function updateOpenStatus() {
+    const h = new Date().getHours();
+    const open = h >= OPEN_HOUR && h < CLOSE_HOUR;
+    const badge = document.getElementById('openStatusBadge');
+    const text = document.getElementById('openStatusText');
+    const dot = document.getElementById('openStatusDot');
+    if (!badge || !text) return;
+
+    badge.classList.toggle('open-now', open);
+    badge.classList.toggle('closed-now', !open);
+    text.textContent = open
+      ? '🟢 Wazi sasa · 10:00 – 23:00'
+      : '🔴 Tumejifunga · Fungua 10:00 – 23:00';
+    if (dot) dot.style.display = open ? '' : 'none';
+  }
+
+  function reorderLast() {
+    try {
+      const last = JSON.parse(localStorage.getItem(LAST_ORDER_KEY) || '[]');
+      if (!last.length) { showToast('Hakuna oda ya mwisho'); return; }
+      cart = last.map(i => ({ ...i, id: i.id || cartId(i.name, i.detail) }));
+      saveCart();
+      updateCartUI();
+      showToast('Oda ya mwisho imeongezwa!');
+      openOrderPanel();
+    } catch { showToast('Imeshindwa kupakia oda ya mwisho'); }
+  }
+
+  async function shareMenu() {
+    const url = window.location.href.split('#')[0];
+    const text = 'Angalia menu ya Clever Kitimoto — Kitimoto Bora, Bei Poa! 🐷';
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Clever Kitimoto Menu', text, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        showToast('🔗 Link imenakiliwa!');
+      }
+    } catch { /* user cancelled */ }
+  }
+
+  function initCheckout() {
+    loadCheckout();
+    ['custName', 'custPhone', 'custAddress', 'custNotes'].forEach(id => {
+      document.getElementById(id)?.addEventListener('input', saveCheckout);
+    });
+    document.querySelectorAll('.pill-group').forEach(group => {
+      group.addEventListener('click', e => {
+        const pill = e.target.closest('.pill');
+        if (!pill) return;
+        group.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        saveCheckout();
+        if (group.id === 'fulfillmentPills') toggleAddressField();
+      });
+    });
+    if (localStorage.getItem(LAST_ORDER_KEY)) {
+      document.getElementById('reorderBtn')?.removeAttribute('hidden');
+    }
+  }
+
+  function initScrollTop() {
+    const btn = document.getElementById('scrollTop');
+    if (!btn) return;
+    window.addEventListener('scroll', () => {
+      btn.hidden = window.scrollY < 400;
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
   }
 
   function filterMenu(query, category) {
@@ -477,7 +641,7 @@
       entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
     }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
 
-    document.querySelectorAll('.section, .card, .order-banner').forEach(el => {
+    document.querySelectorAll('.section, .card, .order-banner, .popular-card, .faq-section').forEach(el => {
       el.classList.add('reveal');
       obs.observe(el);
     });
@@ -545,13 +709,17 @@
   document.addEventListener('DOMContentLoaded', () => {
     applyPrices();
     bindCartEvents();
+    initCheckout();
     initSizePickers();
+    renderPopularPicks();
     updateCartUI();
     bindSearch();
     bindNav();
     bindReveal();
     bindPhoneCopy();
     renderCustomMenus();
+    updateOpenStatus();
+    initScrollTop();
   });
 
   window.addEventListener('storage', () => {

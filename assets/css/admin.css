@@ -287,6 +287,58 @@ body {
 .mini { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
 .empty { color: var(--muted); font-size: 0.88rem; padding: 8px 0; }
 
+.panel-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.panel-head-row h2 { margin: 0; }
+.panel-note {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.btn-sm { padding: 8px 12px; font-size: 0.78rem; }
+.orders-list { display: flex; flex-direction: column; gap: 12px; }
+.order-card {
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface-2);
+  padding: 14px;
+}
+.order-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.order-meta {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.order-total { color: var(--maroon); font-size: 0.95rem; }
+.order-card-body { display: grid; gap: 6px; margin-bottom: 8px; }
+.order-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.82rem;
+}
+.order-row span { color: var(--muted); font-weight: 600; }
+.order-items {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
 @media (max-width: 720px) {
   .grid, .add-grid { grid-template-columns: 1fr; }
   .full { grid-column: auto; }

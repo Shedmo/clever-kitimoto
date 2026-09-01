@@ -8,7 +8,13 @@
   const CART_KEY = 'cleverKitimotoCartV1';
   const CUSTOMER_KEY = 'cleverKitimotoCustomerV1';
   const LAST_ORDER_KEY = 'cleverKitimotoLastOrderV1';
+  const ORDER_HISTORY_KEY = 'cleverKitimotoOrderHistoryV1';
   const DELIVERY_NOTE = 'Bei ya delivery ni kwa mteja';
+  const LIPA_NUMBERS = [
+    { label: 'Airtel', num: '130119369', display: '130 119 369' },
+    { label: 'Yas', num: '7561346', display: '756 1346' },
+    { label: 'Vodacom', num: '58674550', display: '5867 4550' }
+  ];
   const OPEN_HOUR = 10;
   const CLOSE_HOUR = 23;
 
@@ -162,7 +168,6 @@
 
   function getCheckout() {
     return {
-      name: document.getElementById('custName')?.value.trim() || '',
       phone: document.getElementById('custPhone')?.value.trim() || '',
       address: document.getElementById('custAddress')?.value.trim() || '',
       notes: document.getElementById('custNotes')?.value.trim() || '',
@@ -179,13 +184,13 @@
     try {
       const c = JSON.parse(localStorage.getItem(CUSTOMER_KEY) || '{}');
       const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
-      set('custName', c.name);
       set('custPhone', c.phone);
       set('custAddress', c.address);
       set('custNotes', c.notes);
       if (c.fulfillment) setPillActive('fulfillmentPills', c.fulfillment);
       if (c.payment) setPillActive('paymentPills', c.payment);
       toggleAddressField();
+      toggleLipaPanel();
     } catch { /* noop */ }
   }
 
@@ -201,17 +206,72 @@
     if (addr) addr.style.display = pickup ? 'none' : '';
   }
 
+  function toggleLipaPanel() {
+    const lipa = document.querySelector('#paymentPills .pill.active')?.dataset.val === 'lipa';
+    const panel = document.getElementById('lipaPanel');
+    if (panel) panel.classList.toggle('lipa-active', lipa);
+  }
+
+  function lipaNumbersLine() {
+    return LIPA_NUMBERS.map(l => l.label + ': ' + l.num).join(' | ');
+  }
+
+  async function copyLipaNumber(num, label) {
+    try {
+      await navigator.clipboard.writeText(num);
+      showToast('📋 ' + label + ' ' + num + ' imenakiliwa');
+    } catch {
+      showToast('Imeshindwa kunakili — andika: ' + num);
+    }
+  }
+
+  function loadOrderHistory() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(ORDER_HISTORY_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveOrderRecord(channel) {
+    const c = getCheckout();
+    const items = cart.map(i => ({
+      name: i.name,
+      detail: i.detail || '',
+      price: i.price,
+      qty: i.qty
+    }));
+    const record = {
+      id: 'ord-' + Date.now(),
+      at: new Date().toISOString(),
+      channel,
+      phone: c.phone,
+      address: c.address,
+      notes: c.notes,
+      fulfillment: c.fulfillment,
+      payment: c.payment,
+      subtotal: getCartTotal(),
+      items
+    };
+    const history = loadOrderHistory();
+    history.unshift(record);
+    if (history.length > 200) history.length = 200;
+    localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history));
+    return record;
+  }
+
   function buildCartMessage() {
     const c = getCheckout();
     const lines = ['Habari Clever Kitimoto, naomba kuagiza:', ''];
 
-    if (c.name) lines.push('Jina: ' + c.name);
     if (c.phone) lines.push('Simu: ' + c.phone);
     lines.push('Aina: ' + (c.fulfillment === 'pickup' ? 'Pickup' : 'Delivery'));
     if (c.fulfillment === 'delivery' && c.address) lines.push('Mahali: ' + c.address);
     lines.push('Malipo: ' + paymentLabel(c.payment));
+    if (c.payment === 'lipa') lines.push('Lipa namba: ' + lipaNumbersLine());
     if (c.notes) lines.push('Maelezo: ' + c.notes);
-    if (c.name || c.phone) lines.push('');
+    if (c.phone) lines.push('');
 
     let moneyTotal = 0;
     cart.forEach(i => {
@@ -483,6 +543,7 @@
     }
     saveCheckout();
     localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(cart));
+    saveOrderRecord(channel);
     document.getElementById('reorderBtn')?.removeAttribute('hidden');
 
     const msg = buildCartMessage();
@@ -549,7 +610,7 @@
 
   function initCheckout() {
     loadCheckout();
-    ['custName', 'custPhone', 'custAddress', 'custNotes'].forEach(id => {
+    ['custPhone', 'custAddress', 'custNotes'].forEach(id => {
       document.getElementById(id)?.addEventListener('input', saveCheckout);
     });
     document.querySelectorAll('.pill-group').forEach(group => {
@@ -560,6 +621,12 @@
         pill.classList.add('active');
         saveCheckout();
         if (group.id === 'fulfillmentPills') toggleAddressField();
+        if (group.id === 'paymentPills') toggleLipaPanel();
+      });
+    });
+    document.querySelectorAll('.lipa-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        copyLipaNumber(btn.dataset.lipa, btn.dataset.label);
       });
     });
     if (localStorage.getItem(LAST_ORDER_KEY)) {

@@ -112,7 +112,7 @@
 
 <div class="info-strip">
   <div class="info-card"><span>🕐</span><div><b>Fungua</b><small id="hoursText">10:00 – 23:00 kila siku</small></div></div>
-  <div class="info-card"><span>📱</span><div><b>Malipo</b><small>M-Pesa · Cash · Lipa namba</small></div></div>
+  <div class="info-card"><span>📱</span><div><b>Lipa namba</b><small>Airtel · Yas · Vodacom</small></div></div>
   <div class="info-card"><span>📍</span><div><b>Eneo</b><small>Dar es Salaam, Tanzania</small></div></div>
   <button class="info-card info-action" type="button" id="reorderBtn" hidden><span>🔁</span><div><b>Agiza tena</b><small>Oda yako ya mwisho</small></div></button>
 </div>
@@ -522,7 +522,7 @@
     </details>
     <details class="faq-item">
       <summary>Nawezaje kulipa?</summary>
-      <p>M-Pesa, cash, au lipa namba. Malipo yanafanywa baada ya kuhakiki oda yako.</p>
+      <p>M-Pesa, cash, au lipa namba. Lipa namba: <b>Airtel 130119369</b>, <b>Yas 7561346</b>, <b>Vodacom 58674550</b>. Malipo baada ya kuhakiki oda.</p>
     </details>
     <details class="faq-item">
       <summary>Oda inachukua muda gani?</summary>
@@ -588,8 +588,7 @@
       <div class="checkout-form" id="checkoutForm">
       <div class="checkout-title">Taarifa za oda <span class="checkout-hint">— zitaongezwa kwenye ujumbe</span></div>
       <div class="checkout-grid">
-        <label class="ck-field"><span>Jina lako</span><input id="custName" type="text" placeholder="Mfano: Asha" autocomplete="name"></label>
-        <label class="ck-field"><span>Simu</span><input id="custPhone" type="tel" placeholder="07XX XXX XXX" autocomplete="tel"></label>
+        <label class="ck-field full"><span>Simu yako</span><input id="custPhone" type="tel" placeholder="07XX XXX XXX" autocomplete="tel" required></label>
         <label class="ck-field full"><span>Mahali pa delivery</span><input id="custAddress" type="text" placeholder="Mtaa, jengo, alama ya karibu..." autocomplete="street-address"></label>
         <label class="ck-field full"><span>Maelezo ya ziada</span><input id="custNotes" type="text" placeholder="Mfano: bila pilipili, simu kabla ya kuwasilisha..."></label>
       </div>
@@ -606,6 +605,31 @@
           <button type="button" class="pill active" data-val="mpesa">📱 M-Pesa</button>
           <button type="button" class="pill" data-val="cash">💵 Cash</button>
           <button type="button" class="pill" data-val="lipa">💳 Lipa namba</button>
+        </div>
+      </div>
+      <div class="lipa-panel" id="lipaPanel">
+        <div class="lipa-head">
+          <div>
+            <strong>💳 Lipa namba zetu</strong>
+            <small>Bonyeza namba kunakili · lipa kisha tuma oda</small>
+          </div>
+        </div>
+        <div class="lipa-grid">
+          <button type="button" class="lipa-card" data-lipa="130119369" data-label="Airtel">
+            <span class="lipa-brand airtel">Airtel Money</span>
+            <strong class="lipa-num">130 119 369</strong>
+            <span class="lipa-copy">📋 Nakili</span>
+          </button>
+          <button type="button" class="lipa-card" data-lipa="7561346" data-label="Yas">
+            <span class="lipa-brand yas">Yas Mixx</span>
+            <strong class="lipa-num">756 1346</strong>
+            <span class="lipa-copy">📋 Nakili</span>
+          </button>
+          <button type="button" class="lipa-card" data-lipa="58674550" data-label="Vodacom">
+            <span class="lipa-brand voda">M-Pesa Vodacom</span>
+            <strong class="lipa-num">5867 4550</strong>
+            <span class="lipa-copy">📋 Nakili</span>
+          </button>
         </div>
       </div>
     </div>

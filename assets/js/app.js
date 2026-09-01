@@ -240,6 +240,7 @@
     renderPopularPicks();
     renderHalfKgQuickOrder();
     renderKisiniaQuickOrder();
+    renderOrderHalfKgStrip();
   }
 
   function waLink(text) {
@@ -491,7 +492,7 @@
         <div class="order-empty">
           <div class="icon">🛒</div>
           <b>Oda yako haina kitu bado</b>
-          <p>Chagua menu kutoka orodha. Kwa vitu vya ukubwa tofauti (Choma, Rosti…), bonyeza ukubwa unaotaka.</p>
+          <p>Bonyeza <strong>0.5 KG</strong> hapo juu kuongeza haraka, au chagua menu kutoka orodha.</p>
         </div>`;
     } else {
       list.innerHTML = cart.map(item => {
@@ -518,6 +519,27 @@
 
     if (subtotalEl) subtotalEl.textContent = moneyTotal > 0 ? 'TSH ' + formatMoney(moneyTotal) : '—';
     if (grandEl) grandEl.textContent = moneyTotal > 0 ? 'TSH ' + formatMoney(moneyTotal) : '—';
+    renderOrderHalfKgStrip();
+  }
+
+  function renderOrderHalfKgStrip() {
+    const strip = document.getElementById('orderHalfKgStrip');
+    if (!strip) return;
+    strip.innerHTML = HALF_KG_ITEMS.map(item => {
+      const price = formatPrice(item.priceKey);
+      const inCart = cart.find(i => i.id === cartId(item.name, SIZE_DETAIL));
+      const qty = inCart?.qty || 0;
+      return `
+        <button type="button" class="order-halfkg-btn halfkg-add${qty ? ' in-cart' : ''}"
+          data-item="${esc(item.name)}" data-detail="${SIZE_DETAIL}" data-price-key="${esc(item.priceKey)}"
+          title="Ongeza ${esc(item.name)} 0.5 KG">
+          <span class="oh-icon">${item.icon}</span>
+          <span class="oh-name">${esc(item.name)}</span>
+          <span class="oh-size">0.5 KG${qty ? ' · ×' + qty : ''}</span>
+          <span class="oh-price">TSH ${esc(price)}</span>
+        </button>
+      `;
+    }).join('');
   }
 
   function updateCartUI() {

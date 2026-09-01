@@ -6,10 +6,26 @@
   const ORDER_HISTORY_KEY = 'cleverKitimotoOrderHistoryV1';
   const VISIT_LOG_KEY = 'cleverKitimotoVisitLogV1';
   const SESSION_KEY = 'cleverKitimotoAdminSession';
-  const ADMIN_USER = 'clever';
-  const ADMIN_PASS = 'Clever@2026';
   const MAX_ATTEMPTS = 5;
   const LOCK_MS = 60000;
+
+  const ROLE_LABELS = {
+    admin: 'Admin',
+    manager: 'Meneja',
+    seller: 'Muuzaji'
+  };
+
+  const ACCOUNTS = [
+    { user: 'clever', pass: 'Clever@2026', role: 'admin' },
+    { user: 'manager', pass: 'Manager@2026', role: 'manager' },
+    { user: 'seller', pass: 'Seller@2026', role: 'seller' }
+  ];
+
+  const PERMS = {
+    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'reset', 'clear'],
+    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save'],
+    seller: ['dashboard', 'orders', 'users', 'visits', 'export']
+  };
 
   let attempts = 0;
   let lockedUntil = 0;
@@ -36,18 +52,29 @@
     if (el) el.textContent = msg || '';
   }
 
-  function isSessionValid() {
+  function getSession() {
     try {
       const s = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
-      return s && s.user === ADMIN_USER && s.exp > Date.now();
+      if (!s || !s.role || !s.user || s.exp <= Date.now()) return null;
+      return s;
     } catch {
-      return false;
+      return null;
     }
   }
 
-  function createSession() {
+  function hasPerm(perm) {
+    const role = getSession()?.role;
+    return !!(role && (PERMS[role] || []).includes(perm));
+  }
+
+  function isSessionValid() {
+    return !!getSession();
+  }
+
+  function createSession(user, role) {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-      user: ADMIN_USER,
+      user,
+      role,
       exp: Date.now() + 8 * 60 * 60 * 1000
     }));
   }
@@ -56,9 +83,36 @@
     sessionStorage.removeItem(SESSION_KEY);
   }
 
+  function applyRoleUI() {
+    const s = getSession();
+    const badge = $('roleBadge');
+    const sessionBadge = $('sessionBadge');
+    if (badge && s) {
+      badge.textContent = ROLE_LABELS[s.role] || s.role;
+      badge.className = 'role-badge role-' + s.role;
+    }
+    if (sessionBadge && s) {
+      sessionBadge.textContent = '🔓 ' + (ROLE_LABELS[s.role] || s.role);
+    }
+
+    $('priceSection')?.classList.toggle('hidden', !hasPerm('prices'));
+    $('priceForms')?.classList.toggle('hidden', !hasPerm('prices'));
+    $('menuSection')?.classList.toggle('hidden', !hasPerm('menus'));
+    $('customMenuSection')?.classList.toggle('hidden', !hasPerm('menus'));
+    $('saveSection')?.classList.toggle('hidden', !hasPerm('save'));
+    $('resetBtn')?.classList.toggle('hidden', !hasPerm('reset'));
+    $('clearOrdersBtn')?.classList.toggle('hidden', !hasPerm('clear'));
+    $('clearVisitsBtn')?.classList.toggle('hidden', !hasPerm('clear'));
+
+    document.querySelectorAll('#priceForms .panel').forEach(p => {
+      p.classList.toggle('hidden', !hasPerm('prices'));
+    });
+  }
+
   function showApp() {
     $('login')?.classList.add('hidden');
     $('app')?.classList.remove('hidden');
+    applyRoleUI();
     render();
     renderDashboard();
     renderUsers();
@@ -79,7 +133,7 @@
       return;
     }
 
-    const user = ($('username')?.value || '').trim();
+    const user = ($('username')?.value || '').trim().toLowerCase();
     const pass = $('password')?.value || '';
 
     if (!user || !pass) {
@@ -87,13 +141,12 @@
       return;
     }
 
-    const userOk = user.toLowerCase() === ADMIN_USER;
-    const passOk = pass === ADMIN_PASS;
+    const account = ACCOUNTS.find(a => a.user === user && a.pass === pass);
 
-    if (userOk && passOk) {
+    if (account) {
       attempts = 0;
       setError('');
-      createSession();
+      createSession(account.user, account.role);
       showApp();
       return;
     }
@@ -140,9 +193,11 @@
     }
     $('priceForms').innerHTML = out;
     renderCustom();
+    applyRoleUI();
   }
 
   function save() {
+    if (!hasPerm('save')) { alert('Huna ruhusa ya kuhifadhi bei.'); return; }
     const d = {};
     document.querySelectorAll('[data-key]').forEach(i => {
       d[i.dataset.key] = i.value.replace(/TSH/gi, '').trim();
@@ -152,6 +207,7 @@
   }
 
   function resetPrices() {
+    if (!hasPerm('reset')) return;
     if (confirm('Rudisha bei zote kwenye default?')) {
       localStorage.removeItem(KEY);
       render();
@@ -163,6 +219,7 @@
   }
 
   function addMenu() {
+    if (!hasPerm('menus')) return;
     const name = $('newName').value.trim();
     const category = $('newCategory').value;
     const price = $('newPrice').value.trim();
@@ -707,6 +764,7 @@
   }
 
   function clearOrders() {
+    if (!hasPerm('clear')) return;
     if (!confirm('Futa historia yote ya oda?')) return;
     localStorage.removeItem(ORDER_HISTORY_KEY);
     renderOrders();
@@ -714,6 +772,7 @@
   }
 
   function clearVisits() {
+    if (!hasPerm('clear')) return;
     if (!confirm('Futa historia yote ya wageni?')) return;
     localStorage.removeItem(VISIT_LOG_KEY);
     renderVisits();

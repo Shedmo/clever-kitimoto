@@ -545,6 +545,44 @@ body {
   color: #1e7e34;
   font-weight: 700;
 }
+.role-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.role-badge.role-admin {
+  background: rgba(122, 21, 21, 0.12);
+  color: var(--maroon);
+  border: 1px solid rgba(122, 21, 21, 0.25);
+}
+.role-badge.role-manager {
+  background: rgba(255, 204, 0, 0.25);
+  color: #7a5c00;
+  border: 1px solid rgba(255, 204, 0, 0.5);
+}
+.role-badge.role-seller {
+  background: rgba(30, 126, 52, 0.1);
+  color: #1e7e34;
+  border: 1px solid rgba(30, 126, 52, 0.25);
+}
+.login-roles {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 204, 0, 0.12);
+  border: 1px dashed rgba(122, 21, 21, 0.2);
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.5;
+  text-align: left;
+}
+.login-roles strong { color: var(--maroon); }
 .btn-logout {
   background: rgba(192, 57, 43, 0.08);
   color: var(--danger);

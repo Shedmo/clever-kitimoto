@@ -17,7 +17,10 @@
     <div class="login-badge">🔐 Secure Admin Portal</div>
     <img class="login-logo" src="assets/logo.png" alt="Clever Kitimoto">
     <div class="brand">Clever <span>Kitimoto</span></div>
-    <p class="login-sub">Admin Panel — badilisha bei za menu</p>
+    <p class="login-sub">Ingia kwa jukumu lako — Admin, Meneja, au Muuzaji</p>
+    <div class="login-roles">
+      <strong>Jukumu:</strong> Admin (kila kitu) · Meneja (bei & menu, bila kufuta) · Muuzaji (angalia oda & ripoti tu)
+    </div>
 
     <form id="loginForm" class="login-form" autocomplete="on">
       <label class="login-field" for="username">
@@ -49,12 +52,12 @@
       <img class="brand-logo" src="assets/logo.png" alt="Clever Kitimoto">
       <div>
         <div class="brand">Clever <span>Kitimoto</span></div>
-        <div class="brand-sub">Admin Panel · <span class="session-badge">🔓 Imefunguliwa</span></div>
+        <div class="brand-sub">Admin Panel · <span class="session-badge" id="sessionBadge">🔓 Imefunguliwa</span> <span id="roleBadge" class="role-badge"></span></div>
       </div>
     </div>
     <div class="actions">
       <a class="btn btn-back" href="index.html">← View Menu</a>
-      <button class="btn btn-reset" type="button" id="resetBtn">Reset Prices</button>
+      <button class="btn btn-reset hidden" type="button" id="resetBtn">Reset Prices</button>
       <button class="btn btn-logout" type="button" id="logoutBtn">🚪 Toka</button>
     </div>
   </div>
@@ -137,14 +140,14 @@
     </div>
   </section>
 
-  <div class="panel">
+  <div class="panel hidden" id="priceSection">
     <h2>💰 Bei za Menu</h2>
     <p class="panel-note">Badilisha bei kisha bonyeza Save Changes chini.</p>
   </div>
 
   <div id="priceForms"></div>
 
-  <div class="panel" id="addMenuPanel">
+  <div class="panel hidden" id="menuSection">
     <h2>➕ Add New Menu</h2>
     <div class="add-grid">
       <div class="field"><label>Menu Name</label><input id="newName" placeholder="Mfano: Kisinia Special"></div>
@@ -165,12 +168,12 @@
     </div>
   </div>
 
-  <div class="panel">
+  <div class="panel hidden" id="customMenuSection">
     <h2>📋 My Added Menus</h2>
     <div id="customMenus"></div>
   </div>
 
-  <div class="panel">
+  <div class="panel hidden" id="saveSection">
     <div class="actions">
       <button class="btn btn-save" type="button" id="saveBtn">💾 Save Changes</button>
       <a class="btn btn-back" href="index.html">👀 Preview Menu</a>

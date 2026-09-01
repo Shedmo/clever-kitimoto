@@ -909,7 +909,77 @@ footer {
 .order-panel-body {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
   -webkit-overflow-scrolling: touch;
+}
+.order-quick-add {
+  padding: 12px 16px 0;
+  border-bottom: 1px dashed var(--line-strong);
+  margin-bottom: 4px;
+}
+.order-quick-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--maroon);
+  margin-bottom: 8px;
+}
+.order-halfkg-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scrollbar-width: thin;
+}
+.order-halfkg-btn {
+  flex: 0 0 auto;
+  min-width: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, #fff 0%, var(--gold-soft) 100%);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.order-halfkg-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--maroon);
+  box-shadow: 0 4px 12px rgba(122, 21, 21, 0.12);
+}
+.order-halfkg-btn.in-cart {
+  border-color: var(--maroon);
+  background: linear-gradient(180deg, var(--gold-soft) 0%, #fff 100%);
+  box-shadow: inset 0 0 0 1px rgba(122, 21, 21, 0.15);
+}
+.order-halfkg-btn.in-cart .oh-size {
+  background: #1e7e34;
+}
+.order-halfkg-btn .oh-icon { font-size: 1.1rem; }
+.order-halfkg-btn .oh-name {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.2;
+}
+.order-halfkg-btn .oh-size {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--maroon);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+.order-halfkg-btn .oh-price {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--maroon);
 }
 .order-panel-body .order-panel-list {
   flex: none;

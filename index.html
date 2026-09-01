@@ -29,6 +29,9 @@
       <a href="#sides">Sides</a>
     </nav>
     <div class="nav-actions">
+      <button class="cart-nav-btn" id="openOrderPanel" type="button" aria-label="Angalia oda">
+        🛒 <span class="cart-nav-label">Oda</span> <span class="cart-badge" id="cartBadge" data-count="0">0</span>
+      </button>
       <a class="btn btn-ghost btn-sm" href="admin.html">Admin</a>
       <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">WhatsApp</a>
       <button class="menu-toggle" id="menuToggle" aria-label="Open menu">☰</button>
@@ -46,7 +49,9 @@
     <a href="#zege">Kisinia Zege</a>
     <a href="#sides">Chipsi & Sides</a>
     <a href="admin.html">Admin Panel</a>
+    <a href="#" id="mobileOpenOrder">🛒 Angalia Oda Yako</a>
     <a href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza" style="color:var(--whatsapp);margin-top:16px">📲 Order WhatsApp</a>
+    <a href="#" id="mobileSms" style="color:#2563eb;margin-top:8px">💬 Tuma SMS</a>
   </div>
 </div>
 
@@ -62,6 +67,7 @@
     </div>
     <div class="hero-actions">
       <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 Oda WhatsApp</a>
+      <a class="btn btn-sms" href="#" id="heroSms">💬 Tuma SMS</a>
       <a class="btn btn-ghost" href="#packages">Tazama Packages</a>
     </div>
   </div>
@@ -83,6 +89,7 @@
       <strong>🛵 TUNAFANYA DELIVERY</strong>
       <span> — Mahali popote ndani ya Dar es Salaam</span>
     </div>
+    <div class="delivery-note">⚠️ Bei ya delivery ni kwa mteja</div>
     <div>
       <strong>📞 0683 497 330</strong> · <strong>0794 607 335</strong>
     </div>
@@ -468,12 +475,16 @@
   <div>
     <div class="kicker">Ready to Order?</div>
     <h2>Agiza sasa.</h2>
-    <p>Call au WhatsApp:<br>
+    <p>Call, WhatsApp au SMS:<br>
       <span class="phone" id="phoneCopy" title="Click to copy">0683 497 330</span> ·
       <span class="phone" id="phoneCopy2" title="Click to copy">0794 607 335</span>
     </p>
+    <p class="delivery-note-inline">🛵 Delivery DSM — <strong>bei ya delivery ni kwa mteja</strong></p>
   </div>
-  <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 WhatsApp Order</a>
+  <div class="order-banner-actions">
+    <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 WhatsApp</a>
+    <a class="btn btn-sms" href="#" id="orderSms">💬 Tuma SMS</a>
+  </div>
 </div>
 
 </main>
@@ -483,18 +494,46 @@
 </div>
 
 <div class="cart-bar" id="cartBar">
-  <div class="cart-inner">
-    <div class="cart-info">
-      <div class="cart-count" id="cartCount">0 items</div>
-      <div class="cart-items-preview" id="cartPreview"></div>
+  <button class="cart-bar-tap" id="cartBarTap" type="button">
+    <div class="cart-inner">
+      <div class="cart-info">
+        <div class="cart-count" id="cartCount">0 items</div>
+        <div class="cart-items-preview" id="cartPreview"></div>
+      </div>
+      <div class="cart-total" id="cartTotal">JUMLA: TSH 0</div>
+      <span class="cart-open-hint">Angalia oda →</span>
     </div>
-    <div class="cart-total" id="cartTotal">JUMLA: TSH 0</div>
-    <div class="cart-actions">
-      <button class="btn btn-ghost btn-sm" id="cartClear">Clear</button>
-      <button class="btn btn-primary btn-sm" id="cartSend">📲 Send Order</button>
+  </button>
+</div>
+
+<div class="order-panel" id="orderPanel" aria-hidden="true">
+  <div class="order-panel-backdrop" id="orderPanelBackdrop"></div>
+  <div class="order-panel-sheet" role="dialog" aria-labelledby="orderPanelTitle">
+    <div class="order-panel-handle"></div>
+    <div class="order-panel-head">
+      <div>
+        <h2 id="orderPanelTitle">Oda Yako</h2>
+        <p id="orderPanelSubtitle">Chagua menu na uongeze hapa</p>
+      </div>
+      <button class="order-panel-close" id="orderPanelClose" type="button" aria-label="Funga">✕</button>
+    </div>
+    <div class="order-panel-list" id="orderPanelList"></div>
+    <div class="order-panel-foot">
+      <div class="order-summary">
+        <div class="summary-row"><span>Jumla ya menu</span><strong id="orderSubtotal">TSH 0</strong></div>
+        <div class="summary-row muted"><span>🛵 Delivery</span><span>Bei ni kwa mteja</span></div>
+        <div class="summary-row total"><span>JUMLA</span><strong id="orderGrandTotal">TSH 0</strong></div>
+      </div>
+      <div class="order-panel-actions">
+        <button class="btn btn-ghost" id="cartClear" type="button">Futa zote</button>
+        <button class="btn btn-sms" id="cartSms" type="button">💬 SMS</button>
+        <button class="btn btn-primary" id="cartSend" type="button">📲 WhatsApp</button>
+      </div>
     </div>
   </div>
 </div>
+
+<div class="order-toast" id="orderToast" aria-live="polite"></div>
 
 <script src="assets/js/app.js"></script>
 </body>

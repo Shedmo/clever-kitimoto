@@ -1,74 +1,479 @@
 <!doctype html>
 <html lang="sw">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Clever Kitimoto | Digital Menu</title>
 <meta name="description" content="Kisinia Clever Kitimoto — Choma, Choma ya Foil, Rosti, Kavu na Packages. Oda 0683 497 7330.">
-<style>
-:root{--bg:#f7f2ea;--card:#fffdf9;--ink:#17120f;--muted:#766a61;--line:#e8ddd1;--red:#8d2c17;--gold:#c79a52;--dark:#211610}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif}header{position:sticky;top:0;z-index:5;background:#f7f2eaf2;backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}.nav{max-width:1180px;margin:auto;padding:15px 20px;display:flex;align-items:center;gap:22px;justify-content:space-between}.brand{font-family:Georgia,serif;font-size:23px;font-weight:700;white-space:nowrap}.brand span{color:var(--red)}nav{display:flex;gap:5px;overflow:auto}nav a{color:var(--ink);text-decoration:none;font-size:13px;padding:9px 12px;border-radius:20px;white-space:nowrap}nav a:hover{background:#eadfd3}.hero{max-width:1180px;margin:auto;padding:65px 20px 35px;display:grid;grid-template-columns:1.1fr .9fr;gap:45px;align-items:center}.eyebrow{color:var(--red);font-size:11px;letter-spacing:.18em;font-weight:800}.hero h1{font:800 clamp(48px,7vw,86px)/.92 Georgia,serif;letter-spacing:-3px;margin:12px 0 20px}.hero p{color:var(--muted);font-size:17px;line-height:1.7;max-width:600px}.buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.btn{display:inline-block;padding:13px 18px;border-radius:30px;text-decoration:none;font-weight:700;font-size:14px;border:1px solid var(--line)}.primary{background:var(--red);color:white;border-color:var(--red)}.hero-img{height:430px;border-radius:28px;overflow:hidden;background:#b87943}.hero-img img{width:100%;height:100%;object-fit:cover}main{max-width:1180px;margin:auto;padding:10px 20px 70px}.section{padding:38px 0 8px;scroll-margin-top:85px}.head{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:18px}.head h2{font:700 37px Georgia,serif;margin:5px 0}.head p{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:21px;overflow:hidden;transition:.2s}.card:hover{transform:translateY(-3px);box-shadow:0 16px 40px #3d241418}.photo{height:225px;overflow:hidden;background:#dfc8ad}.photo img{width:100%;height:100%;object-fit:cover}.body{padding:17px}.tag{font-size:10px;color:var(--red);font-weight:800;letter-spacing:.14em;text-transform:uppercase}.body h3{font:700 25px Georgia,serif;margin:7px 0}.desc{color:var(--muted);font-size:13px;line-height:1.55;min-height:39px}.prices{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:14px}.prices div{text-align:center;border:1px solid var(--line);border-radius:11px;padding:9px 3px}.prices b{display:block;font-size:12px}.prices span{font-size:11px;color:var(--red);font-weight:800}.bigprice{font-size:17px;font-weight:800;margin-top:13px}.sides .card{min-height:130px}.order{margin-top:55px;background:var(--dark);color:white;border-radius:27px;padding:38px 30px;display:flex;align-items:center;justify-content:space-between;gap:20px}.order h2{font:700 38px Georgia,serif;margin:7px 0}.order p{color:#d6c9bf}.order .btn{background:white;color:var(--dark);border-color:white}footer{text-align:center;padding:25px;color:var(--muted);font-size:12px}@media(max-width:850px){.hero{grid-template-columns:1fr;padding-top:42px}.hero-img{height:330px}.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.nav{padding:12px 14px}.brand{font-size:18px}nav a{font-size:11px;padding:8px}.hero,main{padding-left:14px;padding-right:14px}.hero-img{height:280px}.grid{grid-template-columns:1fr}.head{display:block}.order{display:block}.prices{grid-template-columns:repeat(2,1fr)}}
-</style></head>
+<meta name="theme-color" content="#0f0c09">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
 <body>
-<header><div class="nav"><div class="brand">🐷 <span>Clever</span> Kitimoto</div><nav><a href="#kitimoto">Kitimoto</a><a href="admin.html">Admin</a><a href="#foil">Foil</a><a href="#rosti">Rosti</a><a href="#kavu">Kavu</a><a href="#mixed">Mixed</a><a href="#packages">Packages</a><a href="#zege">Zege</a><a href="#sides">Sides</a></nav></div></header>
-<section class="hero"><div><div class="eyebrow">KISINIA CHA LADHA</div><h1>Kitimoto.<br>Made Clever.</h1><p>Choma, Choma ya Foil, Rosti, Kavu na Kisinia Packages — served hot, fresh and ready to enjoy.</p><div class="buttons"><a class="btn primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 ODA WHATSAPP</a><a class="btn" href="#packages">Tazama Packages</a></div></div><div class="hero-img"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=85" alt="Kitimoto"></div></section>
-<main>
-<section class="section" id="kitimoto"><div class="head"><div><div class="eyebrow">OUR CLASSICS</div><h2>Kitimoto</h2></div><p>Chagua unachopenda.</p></div><div class="grid">
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="Choma"></div><div class="body"><div class="tag">Classic</div><h3>Choma</h3><div class="desc">Kitimoto choma, fresh na moto.</div><div class="prices"><div><b>½ KG</b><span>9,000</span></div><div><b>1 KG</b><span>18,000</span></div><div><b>1½ KG</b><span>27,000</span></div><div><b>2 KG</b><span>36,000</span></div></div></div></article>
-<article class="card" id="foil"><div class="photo"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=85" alt="Choma ya Foil"></div><div class="body"><div class="tag">Signature</div><h3>Choma ya Foil</h3><div class="desc">Kitimoto yenye ladha iliyopikwa ndani ya foil.</div><div class="prices"><div><b>½ KG</b><span>9,000</span></div><div><b>1 KG</b><span>18,000</span></div><div><b>1½ KG</b><span>27,000</span></div><div><b>2 KG</b><span>36,000</span></div></div></div></article>
-<article class="card" id="rosti"><div class="photo"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=85" alt="Rosti"></div><div class="body"><div class="tag">Favourite</div><h3>Rosti</h3><div class="desc">Rosti yenye viungo na ladha ya Kisinia.</div><div class="prices"><div><b>½ KG</b><span>8,500</span></div><div><b>1 KG</b><span>17,000</span></div><div><b>1½ KG</b><span>25,500</span></div><div><b>2 KG</b><span>34,000</span></div></div></div></article>
-<article class="card" id="kavu"><div class="photo"><img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="Kavu"></div><div class="body"><div class="tag">Spicy</div><h3>Kavu</h3><div class="desc">Kitimoto kavu chenye viungo maalum.</div><div class="prices"><div><b>½ KG</b><span>8,500</span></div><div><b>1 KG</b><span>17,000</span></div><div><b>1½ KG</b><span>25,500</span></div><div><b>2 KG</b><span>34,000</span></div></div></div></article>
-</div></section>
-<section class="section" id="mixed"><div class="head"><div><div class="eyebrow">THE KISINIA MIX</div><h2>Mixed Kitimoto</h2></div><p>Choma • Rosti • Kavu</p></div><div class="grid">
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=85" alt="Half kilo mixed kitimoto"></div><div class="body"><div class="tag">Popular</div><h3>½ KG Mix</h3><div class="desc">Choma + Rosti + Kavu, pamoja na Ndizi 2, Ugali 1 na Kachumbari.</div><div class="bigprice">TSH 25,000</div></div></article>
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="One kilo mixed kitimoto"></div><div class="body"><div class="tag">Best Seller</div><h3>1 KG Mix</h3><div class="desc">Choma + Rosti + Kavu, pamoja na Ndizi 4, Ugali 2 na Kachumbari.</div><div class="bigprice">TSH 35,000</div></div></article>
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=85" alt="Two kilo mixed kitimoto"></div><div class="body"><div class="tag">Big Feast</div><h3>2 KG Mix Special</h3><div class="desc">Choma 1 KG + Rosti ½ KG + Kavu ½ KG, Ndizi 8, Ugali 4, Chipsi Yai 1 na Kachumbari.</div><div class="bigprice">TSH 65,000</div></div></article>
-</div></section>
-<section class="section" id="packages"><div class="head"><div><div class="eyebrow">SHARE THE GOODNESS</div><h2>Kisinia Packages</h2></div><p>Solo, couple na family.</p></div><div class="grid">
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="Kisinia Single"></div><div class="body"><div class="tag">Mtu 1</div><h3>Kisinia Single</h3><div class="desc">½ KG Mix + Ndizi 2 + Ugali 1 + Kachumbari.</div><div class="bigprice">TSH 20,000</div></div></article>
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=85" alt="Kisinia Couple"></div><div class="body"><div class="tag">Watu 2</div><h3>Kisinia Couple</h3><div class="desc">1 KG Mix + Ndizi 4 + Ugali 2 + Kachumbari.</div><div class="bigprice">TSH 35,000</div></div></article>
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="Kisinia Family"></div><div class="body"><div class="tag">Watu 4</div><h3>Kisinia Family</h3><div class="desc">2 KG Mix + Ndizi 8 + Ugali 4 + Chipsi Yai 1 + Kachumbari.</div><div class="bigprice">TSH 65,000</div></div></article>
-</div></section>
-<section class="section" id="zege"><div class="head"><div><div class="eyebrow">CRISPY & LOADED</div><h2>Kisinia Zege</h2></div><p>Kitimoto + chipsi</p></div><div class="grid">
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=900&q=85" alt="Zege Single"></div><div class="body"><div class="tag">Single</div><h3>Zege Single</h3><div class="desc">½ KG Kitimoto + Chipsi Kavu.</div><div class="bigprice">TSH 15,000</div></div></article>
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=900&q=85" alt="Zege Couple"></div><div class="body"><div class="tag">Couple</div><h3>Zege Couple</h3><div class="desc">1 KG Kitimoto + Chipsi Kavu + Kachumbari.</div><div class="bigprice">TSH 30,000</div></div></article>
-<article class="card"><div class="photo"><img src="https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=900&q=85" alt="Zege Special"></div><div class="body"><div class="tag">Special</div><h3>Zege Special</h3><div class="desc">1 KG Kitimoto + Chipsi Yai + Kachumbari.</div><div class="bigprice">TSH 35,000</div></div></article>
-</div></section>
-<section class="section sides" id="sides"><div class="head"><div><div class="eyebrow">ON THE SIDE</div><h2>Chipsi & Sides</h2></div></div><div class="grid"><article class="card"><div class="body"><div class="tag">Side</div><h3>Chipsi Kavu</h3><div class="bigprice">TSH 2,000</div></div></article><article class="card"><div class="body"><div class="tag">Side</div><h3>Chipsi Yai</h3><div class="bigprice">TSH 3,000</div></div></article><article class="card"><div class="body"><div class="tag">Side</div><h3>Ndizi</h3><div class="bigprice">TSH 500 <small>/ moja</small></div></div></article><article class="card"><div class="body"><div class="tag">Side</div><h3>Ugali</h3><div class="bigprice">TSH 1,000 <small>/ moja</small></div></div></article><article class="card"><div class="body"><div class="tag">Side</div><h3>Kachumbari</h3><div class="bigprice">TSH 1,000</div></div></article><article class="card"><div class="body"><div class="tag">Combo</div><h3>Ndizi 2</h3><div class="bigprice">TSH 1,000</div></div></article></div></section>
+<div class="noise"></div>
+<div class="wrap">
 
-<section class="section" id="customMenusSection" style="display:none">
-<div class="section-head"><div><div class="kicker">MORE TO LOVE</div><h2>Menu Mpya</h2></div><p>Special selections kutoka Clever Kitimoto.</p></div>
-<div class="grid" id="customMenuGrid"></div>
+<header class="header">
+  <div class="nav">
+    <a class="brand" href="#">
+      <div class="brand-icon">🐷</div>
+      <div class="brand-text">Clever Kitimoto<span>Kisinia cha Ladha</span></div>
+    </a>
+    <nav class="nav-links">
+      <a href="#kitimoto">Kitimoto</a>
+      <a href="#mixed">Mixed</a>
+      <a href="#packages">Packages</a>
+      <a href="#zege">Zege</a>
+      <a href="#sides">Sides</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-ghost btn-sm" href="admin.html">Admin</a>
+      <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">WhatsApp</a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">☰</button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-drawer" id="mobileDrawer">
+  <div class="mobile-panel">
+    <button class="mobile-close" id="mobileClose" aria-label="Close">✕</button>
+    <div style="margin:48px 0 24px;font-family:var(--font-display);font-size:1.4rem;font-weight:800">Menu</div>
+    <a href="#kitimoto">Kitimoto</a>
+    <a href="#mixed">Mixed Kitimoto</a>
+    <a href="#packages">Kisinia Packages</a>
+    <a href="#zege">Kisinia Zege</a>
+    <a href="#sides">Chipsi & Sides</a>
+    <a href="admin.html">Admin Panel</a>
+    <a href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza" style="color:var(--whatsapp);margin-top:16px">📲 Order WhatsApp</a>
+  </div>
+</div>
+
+<section class="hero">
+  <div>
+    <div class="hero-badge"><span class="hero-badge-dot"></span> Fresh Daily · Open Now</div>
+    <h1>Kitimoto.<br><em>Made Clever.</em></h1>
+    <p class="hero-desc">Choma, Choma ya Foil, Rosti, Kavu na Kisinia Packages — served hot, fresh and ready to enjoy.</p>
+    <div class="hero-stats">
+      <div class="stat"><strong>4+</strong><span>Signature styles</span></div>
+      <div class="stat"><strong>9</strong><span>Package combos</span></div>
+      <div class="stat"><strong>📲</strong><span>WhatsApp orders</span></div>
+    </div>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 Oda WhatsApp</a>
+      <a class="btn btn-ghost" href="#packages">Tazama Packages</a>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="hero-ring"></div>
+    <div class="hero-img-wrap">
+      <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=85" alt="Kitimoto choma">
+    </div>
+    <div class="hero-float">
+      <b>From TSH 8,500</b>
+      <span>½ KG · Fresh & hot</span>
+    </div>
+  </div>
 </section>
-<div class="order"><div><div class="eyebrow" style="color:#d6a85e">READY TO ORDER?</div><h2>Agiza sasa.</h2><p>Call au WhatsApp: <strong>0683 497 7330</strong></p></div><a class="btn" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 WhatsApp Order</a></div>
-</main><footer>© 2026 Clever Kitimoto • Choma • Foil • Rosti • Kavu</footer>
-<script>
-const CK_KEY='cleverKitimotoMenuV1';
-const defaults={
- choma:{half:'9,000',one:'18,000',onehalf:'27,000',two:'36,000'},
- foil:{half:'9,000',one:'18,000',onehalf:'27,000',two:'36,000'},
- rosti:{half:'8,500',one:'17,000',onehalf:'25,500',two:'34,000'},
- kavu:{half:'8,500',one:'17,000',onehalf:'25,500',two:'34,000'},
- single:'20,000',couple:'35,000',family:'65,000',
- mixedhalf:'25,000',mixedone:'35,000',mixedtwo:'65,000',
- zegeSingle:'15,000',zegeCouple:'30,000',zegeSpecial:'35,000',
- chipsiKavu:'2,000',chipsiYai:'3,000',ndizi:'500',ugali:'1,000',kachumbari:'1,000'
-};
-function ckGet(){try{return {...defaults,...JSON.parse(localStorage.getItem(CK_KEY)||'{}')}}catch(e){return {...defaults}}}
-function ckApply(){const d=ckGet();
- document.querySelectorAll('[data-price]').forEach(el=>{const k=el.dataset.price;if(d[k]!=null)el.textContent='TSH '+d[k]});
-}
-window.addEventListener('DOMContentLoaded',ckApply);
-</script>
-<script>
-(function(){
- const CK='cleverKitimotoCustomMenusV1', PK='cleverKitimotoMenuV1';
- function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
- function render(){
-  let custom=[];try{custom=JSON.parse(localStorage.getItem(CK)||'[]')}catch(e){}
-  const sec=document.getElementById('customMenusSection'), grid=document.getElementById('customMenuGrid');
-  if(!custom.length){sec.style.display='none';return} sec.style.display='block';
-  grid.innerHTML=custom.filter(x=>x.active!==false).map(x=>`<div class="card"><div class="card-img">${x.image?`<img src="${esc(x.image)}" alt="${esc(x.name)}">`:'<div style="height:100%;display:grid;place-items:center;font-size:55px">🐷</div>'}</div><div class="card-body"><div class="tag">${esc(x.category)}</div><h3>${esc(x.name)}</h3><div class="desc">${esc(x.desc||'Clever Kitimoto — served hot.')}</div><div class="price">TSH ${esc(x.price)} ${x.size?`<small>· ${esc(x.size)}</small>`:''}</div></div></div>`).join('');
- }
- render(); window.addEventListener('storage',render);
-})();
-</script>
-</body></html>
+
+<div class="toolbar">
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input type="search" id="menuSearch" placeholder="Tafuta menu... (Choma, Zege, Ndizi...)">
+  </div>
+  <div class="filter-pills">
+    <button class="filter-pill active" data-filter="all">All</button>
+    <button class="filter-pill" data-filter="kitimoto">Kitimoto</button>
+    <button class="filter-pill" data-filter="mixed">Mixed</button>
+    <button class="filter-pill" data-filter="packages">Packages</button>
+    <button class="filter-pill" data-filter="zege">Zege</button>
+    <button class="filter-pill" data-filter="sides">Sides</button>
+  </div>
+</div>
+
+<main>
+
+<section class="section" id="kitimoto" data-category="kitimoto">
+  <div class="section-head">
+    <div><div class="kicker">Our Classics</div><h2>Kitimoto</h2></div>
+    <p>Chagua style yako — kila aina inapatikana kwa ½ KG hadi 2 KG.</p>
+  </div>
+  <div class="grid">
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="Choma" loading="lazy">
+        <span class="card-tag">Classic</span>
+      </div>
+      <div class="card-body">
+        <h3>Choma</h3>
+        <p class="card-desc">Kitimoto choma, fresh na moto — ladha ya asili.</p>
+        <div class="price-grid">
+          <div class="price-cell"><b>½ KG</b><span data-price="choma">9,000</span></div>
+          <div class="price-cell"><b>1 KG</b><span data-price="choma1">18,000</span></div>
+          <div class="price-cell"><b>1½ KG</b><span data-price="choma15">27,000</span></div>
+          <div class="price-cell"><b>2 KG</b><span data-price="choma2">36,000</span></div>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Choma" data-detail="1 KG" data-price-val="18,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Choma%201%20KG">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" id="foil" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=900&q=85" alt="Choma ya Foil" loading="lazy">
+        <span class="card-tag">Signature</span>
+      </div>
+      <div class="card-body">
+        <h3>Choma ya Foil</h3>
+        <p class="card-desc">Kitimoto yenye ladha iliyopikwa ndani ya foil — juicy & tender.</p>
+        <div class="price-grid">
+          <div class="price-cell"><b>½ KG</b><span data-price="foil">9,000</span></div>
+          <div class="price-cell"><b>1 KG</b><span data-price="foil1">18,000</span></div>
+          <div class="price-cell"><b>1½ KG</b><span data-price="foil15">27,000</span></div>
+          <div class="price-cell"><b>2 KG</b><span data-price="foil2">36,000</span></div>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Choma ya Foil" data-detail="1 KG" data-price-val="18,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Choma%20ya%20Foil%201%20KG">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" id="rosti" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1603360946369-dc9bb6258143?auto=format&fit=crop&w=900&q=85" alt="Rosti" loading="lazy">
+        <span class="card-tag">Favourite</span>
+      </div>
+      <div class="card-body">
+        <h3>Rosti</h3>
+        <p class="card-desc">Rosti yenye viungo na ladha ya Kisinia — customer favourite.</p>
+        <div class="price-grid">
+          <div class="price-cell"><b>½ KG</b><span data-price="rosti">8,500</span></div>
+          <div class="price-cell"><b>1 KG</b><span data-price="rosti1">17,000</span></div>
+          <div class="price-cell"><b>1½ KG</b><span data-price="rosti15">25,500</span></div>
+          <div class="price-cell"><b>2 KG</b><span data-price="rosti2">34,000</span></div>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Rosti" data-detail="1 KG" data-price-val="17,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Rosti%201%20KG">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" id="kavu" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1432139556950-7f43bb7150ed?auto=format&fit=crop&w=900&q=85" alt="Kavu" loading="lazy">
+        <span class="card-tag">Spicy</span>
+      </div>
+      <div class="card-body">
+        <h3>Kavu</h3>
+        <p class="card-desc">Kitimoto kavu chenye viungo maalum — bold & crispy.</p>
+        <div class="price-grid">
+          <div class="price-cell"><b>½ KG</b><span data-price="kavu">8,500</span></div>
+          <div class="price-cell"><b>1 KG</b><span data-price="kavu1">17,000</span></div>
+          <div class="price-cell"><b>1½ KG</b><span data-price="kavu15">25,500</span></div>
+          <div class="price-cell"><b>2 KG</b><span data-price="kavu2">34,000</span></div>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Kavu" data-detail="1 KG" data-price-val="17,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Kavu%201%20KG">Order</a>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section class="section" id="mixed" data-category="mixed">
+  <div class="section-head">
+    <div><div class="kicker">The Kisinia Mix</div><h2>Mixed Kitimoto</h2></div>
+    <p>Choma + Rosti + Kavu — pamoja na sides.</p>
+  </div>
+  <div class="grid">
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=85" alt="Half kilo mixed" loading="lazy">
+        <span class="card-tag">Popular</span>
+      </div>
+      <div class="card-body">
+        <h3>½ KG Mix</h3>
+        <p class="card-desc">Choma + Rosti + Kavu, pamoja na Ndizi 2, Ugali 1 na Kachumbari.</p>
+        <div class="price-main" data-price="mixedhalf" data-price-prefix="tsh">TSH 25,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="½ KG Mix" data-detail="" data-price-val="25,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20%C2%BD%20KG%20Mix">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="One kilo mixed" loading="lazy">
+        <span class="card-tag">Best Seller</span>
+      </div>
+      <div class="card-body">
+        <h3>1 KG Mix</h3>
+        <p class="card-desc">Choma + Rosti + Kavu, pamoja na Ndizi 4, Ugali 2 na Kachumbari.</p>
+        <div class="price-main" data-price="mixedone" data-price-prefix="tsh">TSH 35,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="1 KG Mix" data-detail="" data-price-val="35,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%201%20KG%20Mix">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=900&q=85" alt="Two kilo mixed special" loading="lazy">
+        <span class="card-tag">Big Feast</span>
+      </div>
+      <div class="card-body">
+        <h3>2 KG Mix Special</h3>
+        <p class="card-desc">Choma 1 KG + Rosti ½ KG + Kavu ½ KG, Ndizi 8, Ugali 4, Chipsi Yai 1 na Kachumbari.</p>
+        <div class="price-main" data-price="mixedtwo" data-price-prefix="tsh">TSH 65,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="2 KG Mix Special" data-detail="" data-price-val="65,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%202%20KG%20Mix%20Special">Order</a>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section class="section" id="packages" data-category="packages">
+  <div class="section-head">
+    <div><div class="kicker">Share the Goodness</div><h2>Kisinia Packages</h2></div>
+    <p>Solo, couple na family — ready to serve.</p>
+  </div>
+  <div class="grid">
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=85" alt="Kisinia Single" loading="lazy">
+        <span class="card-tag">Mtu 1</span>
+      </div>
+      <div class="card-body">
+        <h3>Kisinia Single</h3>
+        <p class="card-desc">½ KG Mix + Ndizi 2 + Ugali 1 + Kachumbari.</p>
+        <div class="price-main" data-price="single" data-price-prefix="tsh">TSH 20,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Kisinia Single" data-detail="Mtu 1" data-price-val="20,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Kisinia%20Single">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=85" alt="Kisinia Couple" loading="lazy">
+        <span class="card-tag">Watu 2</span>
+      </div>
+      <div class="card-body">
+        <h3>Kisinia Couple</h3>
+        <p class="card-desc">1 KG Mix + Ndizi 4 + Ugali 2 + Kachumbari.</p>
+        <div class="price-main" data-price="couple" data-price-prefix="tsh">TSH 35,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Kisinia Couple" data-detail="Watu 2" data-price-val="35,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Kisinia%20Couple">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=900&q=85" alt="Kisinia Family" loading="lazy">
+        <span class="card-tag">Watu 4</span>
+      </div>
+      <div class="card-body">
+        <h3>Kisinia Family</h3>
+        <p class="card-desc">2 KG Mix + Ndizi 8 + Ugali 4 + Chipsi Yai 1 + Kachumbari.</p>
+        <div class="price-main" data-price="family" data-price-prefix="tsh">TSH 65,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Kisinia Family" data-detail="Watu 4" data-price-val="65,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Kisinia%20Family">Order</a>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section class="section" id="zege" data-category="zege">
+  <div class="section-head">
+    <div><div class="kicker">Crispy & Loaded</div><h2>Kisinia Zege</h2></div>
+    <p>Kitimoto + chipsi — the ultimate combo.</p>
+  </div>
+  <div class="grid">
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=900&q=85" alt="Zege Single" loading="lazy">
+        <span class="card-tag">Single</span>
+      </div>
+      <div class="card-body">
+        <h3>Zege Single</h3>
+        <p class="card-desc">½ KG Kitimoto + Chipsi Kavu.</p>
+        <div class="price-main" data-price="zegeSingle" data-price-prefix="tsh">TSH 15,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Zege Single" data-detail="" data-price-val="15,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Zege%20Single">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=900&q=85" alt="Zege Couple" loading="lazy">
+        <span class="card-tag">Couple</span>
+      </div>
+      <div class="card-body">
+        <h3>Zege Couple</h3>
+        <p class="card-desc">1 KG Kitimoto + Chipsi Kavu + Kachumbari.</p>
+        <div class="price-main" data-price="zegeCouple" data-price-prefix="tsh">TSH 30,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Zege Couple" data-detail="" data-price-val="30,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Zege%20Couple">Order</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card" data-searchable>
+      <div class="card-photo">
+        <img src="https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=900&q=85" alt="Zege Special" loading="lazy">
+        <span class="card-tag">Special</span>
+      </div>
+      <div class="card-body">
+        <h3>Zege Special</h3>
+        <p class="card-desc">1 KG Kitimoto + Chipsi Yai + Kachumbari.</p>
+        <div class="price-main" data-price="zegeSpecial" data-price-prefix="tsh">TSH 35,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Zege Special" data-detail="" data-price-val="35,000">+ Add</button>
+          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Zege%20Special">Order</a>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section class="section" id="sides" data-category="sides">
+  <div class="section-head">
+    <div><div class="kicker">On the Side</div><h2>Chipsi & Sides</h2></div>
+    <p>Complete your feast.</p>
+  </div>
+  <div class="grid">
+
+    <article class="card side-card" data-searchable>
+      <div class="card-body">
+        <span class="card-tag" style="position:static;display:inline-block;margin-bottom:10px">Side</span>
+        <h3>Chipsi Kavu</h3>
+        <div class="price-main" data-price="chipsiKavu" data-price-prefix="tsh">TSH 2,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Chipsi Kavu" data-price-val="2,000">+ Add</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="card side-card" data-searchable>
+      <div class="card-body">
+        <span class="card-tag" style="position:static;display:inline-block;margin-bottom:10px">Side</span>
+        <h3>Chipsi Yai</h3>
+        <div class="price-main" data-price="chipsiYai" data-price-prefix="tsh">TSH 3,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Chipsi Yai" data-price-val="3,000">+ Add</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="card side-card" data-searchable>
+      <div class="card-body">
+        <span class="card-tag" style="position:static;display:inline-block;margin-bottom:10px">Side</span>
+        <h3>Ndizi</h3>
+        <div class="price-main" data-price="ndizi" data-price-prefix="tsh">TSH 500 <small>/ moja</small></div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Ndizi" data-detail="1" data-price-val="500">+ Add</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="card side-card" data-searchable>
+      <div class="card-body">
+        <span class="card-tag" style="position:static;display:inline-block;margin-bottom:10px">Side</span>
+        <h3>Ugali</h3>
+        <div class="price-main" data-price="ugali" data-price-prefix="tsh">TSH 1,000 <small>/ moja</small></div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Ugali" data-detail="1" data-price-val="1,000">+ Add</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="card side-card" data-searchable>
+      <div class="card-body">
+        <span class="card-tag" style="position:static;display:inline-block;margin-bottom:10px">Side</span>
+        <h3>Kachumbari</h3>
+        <div class="price-main" data-price="kachumbari" data-price-prefix="tsh">TSH 1,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Kachumbari" data-price-val="1,000">+ Add</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="card side-card" data-searchable>
+      <div class="card-body">
+        <span class="card-tag" style="position:static;display:inline-block;margin-bottom:10px">Combo</span>
+        <h3>Ndizi 2</h3>
+        <div class="price-main">TSH 1,000</div>
+        <div class="card-actions">
+          <button class="btn btn-add btn-sm" data-item="Ndizi 2" data-price-val="1,000">+ Add</button>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section class="section" id="customMenusSection" data-category="custom" style="display:none">
+  <div class="section-head">
+    <div><div class="kicker">More to Love</div><h2>Menu Mpya</h2></div>
+    <p>Special selections kutoka Clever Kitimoto.</p>
+  </div>
+  <div class="grid" id="customMenuGrid"></div>
+</section>
+
+<div class="order-banner">
+  <div>
+    <div class="kicker">Ready to Order?</div>
+    <h2>Agiza sasa.</h2>
+    <p>Call au WhatsApp: <span class="phone" id="phoneCopy" title="Click to copy">0683 497 7330</span></p>
+  </div>
+  <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 WhatsApp Order</a>
+</div>
+
+</main>
+
+<footer>© 2026 Clever Kitimoto · Choma · Foil · Rosti · Kavu · Made with ❤️ in Tanzania</footer>
+
+</div>
+
+<div class="cart-bar" id="cartBar">
+  <div class="cart-inner">
+    <div class="cart-info">
+      <div class="cart-count" id="cartCount">0 items</div>
+      <div class="cart-items-preview" id="cartPreview"></div>
+    </div>
+    <div class="cart-actions">
+      <button class="btn btn-ghost btn-sm" id="cartClear">Clear</button>
+      <button class="btn btn-primary btn-sm" id="cartSend">📲 Send Order</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>

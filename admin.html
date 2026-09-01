@@ -71,6 +71,7 @@
       </div>
       <div class="report-actions">
         <button class="btn btn-back btn-sm" type="button" id="exportOrdersBtn">⬇ Oda CSV</button>
+        <button class="btn btn-back btn-sm" type="button" id="exportUsersBtn">⬇ Wateja CSV</button>
         <button class="btn btn-back btn-sm" type="button" id="exportVisitsBtn">⬇ Wageni CSV</button>
         <button class="btn btn-save btn-sm" type="button" id="printReportBtn">🖨 Ripoti</button>
       </div>
@@ -82,12 +83,29 @@
     <div class="panel-head-row">
       <h2>📋 Ripoti</h2>
       <div class="report-tabs" id="reportTabs">
-        <button type="button" class="report-tab active" data-tab="orders">Oda Zote</button>
+        <button type="button" class="report-tab active" data-tab="users">Wateja</button>
+        <button type="button" class="report-tab" data-tab="orders">Oda Zote</button>
         <button type="button" class="report-tab" data-tab="visits">Wageni</button>
       </div>
     </div>
 
-    <div class="report-pane active" id="ordersPane">
+    <div class="report-pane active" id="usersPane">
+      <div class="report-summary" id="usersSummary"></div>
+      <div class="user-toolbar">
+        <div class="user-search-wrap">
+          <span class="user-search-icon">🔍</span>
+          <input type="search" id="userSearch" class="user-search" placeholder="Tafuta simu, mgeni, mahali...">
+        </div>
+        <div class="user-filters" id="userFilters">
+          <button type="button" class="user-filter active" data-filter="all">Wote</button>
+          <button type="button" class="user-filter" data-filter="customer">Waliagiza</button>
+          <button type="button" class="user-filter" data-filter="visitor">Wageni tu</button>
+        </div>
+      </div>
+      <div id="usersList" class="users-list"></div>
+    </div>
+
+    <div class="report-pane" id="ordersPane">
       <div class="report-summary" id="ordersSummary"></div>
       <div class="panel-head-row report-toolbar">
         <p class="panel-note panel-note-tight">Oda zilizotumwa kupitia WhatsApp/SMS</p>

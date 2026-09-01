@@ -13,6 +13,8 @@
 
   let attempts = 0;
   let lockedUntil = 0;
+  let userFilter = 'all';
+  let userQuery = '';
 
   const groups = {
     'Choma': [['choma','½ KG','9,000'],['choma1','1 KG','18,000'],['choma15','1½ KG','27,000'],['choma2','2 KG','36,000']],
@@ -59,6 +61,7 @@
     $('app')?.classList.remove('hidden');
     render();
     renderDashboard();
+    renderUsers();
     renderOrders();
     renderVisits();
   }
@@ -227,6 +230,7 @@
     const todayOrders = orders.filter(o => isToday(o.at));
     const todayVisits = visits.filter(v => isToday(v.at));
     const uniqueVisitors = new Set(visits.map(v => v.visitorId)).size;
+    const uniqueCustomers = new Set(orders.map(o => (o.phone || '').trim()).filter(Boolean)).size;
     const whatsapp = orders.filter(o => o.channel === 'whatsapp').length;
     const sms = orders.filter(o => o.channel === 'sms').length;
 
@@ -238,6 +242,7 @@
       visitCount: visits.length,
       todayVisitCount: todayVisits.length,
       uniqueVisitors,
+      uniqueCustomers,
       whatsapp,
       sms
     };
@@ -259,9 +264,14 @@
         <span class="stat-sub">Leo: ${s.todayOrderCount} · WhatsApp ${s.whatsapp} · SMS ${s.sms}</span>
       </article>
       <article class="stat-card">
-        <span class="stat-label">Wageni</span>
+        <span class="stat-label">Wateja</span>
+        <strong class="stat-value">${s.uniqueCustomers + s.uniqueVisitors}</strong>
+        <span class="stat-sub">${s.uniqueCustomers} waliagiza · ${s.uniqueVisitors} wageni</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Ziara</span>
         <strong class="stat-value">${s.visitCount}</strong>
-        <span class="stat-sub">Leo: ${s.todayVisitCount} · Unique: ${s.uniqueVisitors}</span>
+        <span class="stat-sub">Leo: ${s.todayVisitCount}</span>
       </article>
       <article class="stat-card">
         <span class="stat-label">Wastani kwa Oda</span>
@@ -304,6 +314,193 @@
     } catch {
       return ref.slice(0, 40);
     }
+  }
+
+  function normalizePhone(phone) {
+    const d = String(phone || '').replace(/\D/g, '');
+    if (!d) return '';
+    if (d.startsWith('255')) return d;
+    if (d.startsWith('0')) return '255' + d.slice(1);
+    return d;
+  }
+
+  function buildUserList() {
+    const orders = getOrders();
+    const visits = getVisits();
+    const map = new Map();
+
+    orders.forEach(o => {
+      const phone = (o.phone || '').trim();
+      if (!phone) return;
+      const key = 'c:' + phone;
+      if (!map.has(key)) {
+        map.set(key, {
+          type: 'customer',
+          phone,
+          orderCount: 0,
+          totalSpent: 0,
+          lastAt: o.at,
+          lastAddress: o.address || '',
+          lastChannel: o.channel || '',
+          channels: new Set()
+        });
+      }
+      const u = map.get(key);
+      u.orderCount += 1;
+      u.totalSpent += Number(o.subtotal) || 0;
+      if (o.channel) u.channels.add(o.channel);
+      if (new Date(o.at) >= new Date(u.lastAt)) {
+        u.lastAt = o.at;
+        u.lastAddress = o.address || u.lastAddress;
+        u.lastChannel = o.channel || u.lastChannel;
+      }
+    });
+
+    visits.forEach(v => {
+      const id = v.visitorId || 'unknown';
+      const key = 'v:' + id;
+      if (!map.has(key)) {
+        map.set(key, {
+          type: 'visitor',
+          visitorId: id,
+          visitCount: 0,
+          lastAt: v.at,
+          device: v.device || '—',
+          lastReferrer: v.referrer || 'Direct',
+          firstAt: v.at
+        });
+      }
+      const u = map.get(key);
+      u.visitCount += 1;
+      if (new Date(v.at) >= new Date(u.lastAt)) {
+        u.lastAt = v.at;
+        u.device = v.device || u.device;
+        u.lastReferrer = v.referrer || u.lastReferrer;
+      }
+      if (new Date(v.at) <= new Date(u.firstAt)) u.firstAt = v.at;
+    });
+
+    return Array.from(map.values()).sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt));
+  }
+
+  function userMatchesFilter(u) {
+    if (userFilter === 'customer' && u.type !== 'customer') return false;
+    if (userFilter === 'visitor' && u.type !== 'visitor') return false;
+    if (!userQuery) return true;
+    const q = userQuery.toLowerCase();
+    if (u.type === 'customer') {
+      return [u.phone, u.lastAddress, u.lastChannel].some(v => String(v || '').toLowerCase().includes(q));
+    }
+    return [u.visitorId, u.device, u.lastReferrer].some(v => String(v || '').toLowerCase().includes(q));
+  }
+
+  function renderUsersSummary(list) {
+    const el = $('usersSummary');
+    if (!el) return;
+    const customers = list.filter(u => u.type === 'customer');
+    const visitors = list.filter(u => u.type === 'visitor');
+    const revenue = customers.reduce((s, u) => s + u.totalSpent, 0);
+    el.innerHTML = `
+      <div class="summary-chip"><span>Wateja wote</span><b>${list.length}</b></div>
+      <div class="summary-chip"><span>Waliagiza</span><b>${customers.length}</b></div>
+      <div class="summary-chip"><span>Wageni</span><b>${visitors.length}</b></div>
+      <div class="summary-chip highlight"><span>Mapato (wateja)</span><b>TSH ${formatMoney(revenue)}</b></div>
+    `;
+  }
+
+  function renderUsers() {
+    const el = $('usersList');
+    if (!el) return;
+    const all = buildUserList();
+    const list = all.filter(userMatchesFilter);
+    renderUsersSummary(all);
+
+    if (!list.length) {
+      el.innerHTML = '<div class="empty">Hakuna wateja bado. Wateja wataonekana baada ya kuagiza au kufungua menu.</div>';
+      return;
+    }
+
+    el.innerHTML = list.map(u => {
+      if (u.type === 'customer') {
+        const wa = normalizePhone(u.phone);
+        const channels = [...u.channels].join(', ') || '—';
+        return `
+          <article class="user-card user-customer">
+            <div class="user-avatar customer">📱</div>
+            <div class="user-body">
+              <div class="user-head">
+                <div>
+                  <strong class="user-title">${escapeHtml(u.phone)}</strong>
+                  <span class="user-badge customer">Mteja · ${u.orderCount} oda</span>
+                </div>
+                <strong class="user-spent">TSH ${formatMoney(u.totalSpent)}</strong>
+              </div>
+              <div class="user-meta">
+                <span>🕐 ${escapeHtml(formatOrderDate(u.lastAt))}</span>
+                ${u.lastAddress ? '<span>📍 ' + escapeHtml(u.lastAddress) + '</span>' : ''}
+                <span>📲 ${escapeHtml(channels)}</span>
+              </div>
+            </div>
+            <div class="user-actions">
+              <a class="btn btn-save btn-sm" href="https://wa.me/${escapeHtml(wa)}" target="_blank" rel="noopener">WhatsApp</a>
+              <a class="btn btn-back btn-sm" href="sms:${escapeHtml(wa)}">SMS</a>
+            </div>
+          </article>
+        `;
+      }
+
+      return `
+        <article class="user-card user-visitor">
+          <div class="user-avatar visitor">${u.device === 'Mobile' ? '📱' : '💻'}</div>
+          <div class="user-body">
+            <div class="user-head">
+              <div>
+                <strong class="user-title">Mgeni <code>${escapeHtml((u.visitorId || '').slice(-8))}</code></strong>
+                <span class="user-badge visitor">${u.visitCount} ziara</span>
+              </div>
+            </div>
+            <div class="user-meta">
+              <span>🕐 ${escapeHtml(formatOrderDate(u.lastAt))}</span>
+              <span>${escapeHtml(u.device || '—')}</span>
+              <span>↗ ${escapeHtml(shortReferrer(u.lastReferrer))}</span>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  function exportUsersCsv() {
+    const list = buildUserList();
+    if (!list.length) { alert('Hakuna wateja wa kupakua.'); return; }
+    const header = ['Aina', 'Simu/ID', 'Oda', 'Ziara', 'Jumla TSH', 'Mwisho', 'Mahali/Kifaa', 'Channel/Chanzo'];
+    const rows = [header.join(',')];
+    list.forEach(u => {
+      if (u.type === 'customer') {
+        rows.push([
+          csvEscape('Mteja'),
+          csvEscape(u.phone),
+          csvEscape(u.orderCount),
+          csvEscape(''),
+          csvEscape(u.totalSpent),
+          csvEscape(formatOrderDate(u.lastAt)),
+          csvEscape(u.lastAddress),
+          csvEscape([...u.channels].join(', '))
+        ].join(','));
+      } else {
+        rows.push([
+          csvEscape('Mgeni'),
+          csvEscape(u.visitorId),
+          csvEscape(''),
+          csvEscape(u.visitCount),
+          csvEscape(''),
+          csvEscape(formatOrderDate(u.lastAt)),
+          csvEscape(u.device),
+          csvEscape(u.lastReferrer)
+        ].join(','));
+      }
+    });
+    downloadCsv('clever-kitimoto-wateja-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
   }
 
   function renderVisits() {
@@ -442,6 +639,7 @@
     document.querySelectorAll('.report-tab').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tab);
     });
+    $('usersPane')?.classList.toggle('active', tab === 'users');
     $('ordersPane')?.classList.toggle('active', tab === 'orders');
     $('visitsPane')?.classList.toggle('active', tab === 'visits');
   }
@@ -475,6 +673,7 @@
     if (!el) return;
     renderOrdersSummary();
     renderDashboard();
+    renderUsers();
     const orders = getOrders();
     if (!orders.length) {
       el.innerHTML = '<div class="empty">Hakuna oda bado. Oda zitaonekana hapa baada ya wateja kutuma WhatsApp/SMS.</div>';
@@ -511,12 +710,14 @@
     if (!confirm('Futa historia yote ya oda?')) return;
     localStorage.removeItem(ORDER_HISTORY_KEY);
     renderOrders();
+    renderUsers();
   }
 
   function clearVisits() {
     if (!confirm('Futa historia yote ya wageni?')) return;
     localStorage.removeItem(VISIT_LOG_KEY);
     renderVisits();
+    renderUsers();
     renderDashboard();
   }
 
@@ -530,8 +731,20 @@
     $('clearOrdersBtn')?.addEventListener('click', clearOrders);
     $('clearVisitsBtn')?.addEventListener('click', clearVisits);
     $('exportOrdersBtn')?.addEventListener('click', exportOrdersCsv);
+    $('exportUsersBtn')?.addEventListener('click', exportUsersCsv);
     $('exportVisitsBtn')?.addEventListener('click', exportVisitsCsv);
     $('printReportBtn')?.addEventListener('click', printReport);
+    $('userSearch')?.addEventListener('input', e => {
+      userQuery = e.target.value.trim();
+      renderUsers();
+    });
+    document.querySelectorAll('.user-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        userFilter = btn.dataset.filter || 'all';
+        document.querySelectorAll('.user-filter').forEach(b => b.classList.toggle('active', b === btn));
+        renderUsers();
+      });
+    });
     document.querySelectorAll('.report-tab').forEach(btn => {
       btn.addEventListener('click', () => switchReportTab(btn.dataset.tab));
     });

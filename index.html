@@ -36,6 +36,7 @@
       <a href="#packages">Packages</a>
       <a href="#zege">Zege</a>
       <a href="#sides">Sides</a>
+      <a href="#myHistory">Historia</a>
     </nav>
     <div class="nav-actions">
       <button class="cart-nav-btn" id="openOrderPanel" type="button" aria-label="Angalia oda">
@@ -59,6 +60,7 @@
     <a href="#packages">Kisinia Packages</a>
     <a href="#zege">Kisinia Zege</a>
     <a href="#sides">Chipsi & Sides</a>
+    <a href="#myHistory">Historia Yako</a>
     <a href="admin.html">Admin Panel</a>
     <a href="#" id="mobileOpenOrder">🛒 Angalia Oda Yako</a>
     <a href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza" style="color:var(--whatsapp);margin-top:16px">📲 Order WhatsApp</a>
@@ -108,8 +110,30 @@
   <div class="info-card"><span>🕐</span><div><b>Fungua</b><small id="hoursText">10:00 – 23:00 kila siku</small></div></div>
   <div class="info-card"><span>📱</span><div><b>Lipa namba</b><small>Airtel · Yas · Vodacom</small></div></div>
   <div class="info-card"><span>📍</span><div><b>Eneo</b><small>Dar es Salaam, Tanzania</small></div></div>
+  <button class="info-card info-action" type="button" id="openHistoryBtn"><span>📊</span><div><b>Historia Yako</b><small id="historyQuickStat">Oda zako na Kitimoto</small></div></button>
   <button class="info-card info-action" type="button" id="reorderBtn" hidden><span>🔁</span><div><b>Agiza tena</b><small>Oda yako ya mwisho</small></div></button>
 </div>
+
+<section class="history-section" id="myHistory">
+  <div class="section-head compact">
+    <div>
+      <div class="kicker">Smart Tracker</div>
+      <h2>Historia Yako — Clever Kitimoto</h2>
+    </div>
+    <p id="historyIntro">Angalia oda zako, jumla uliyoagiza, na Kitimoto uliyoagiza kwetu.</p>
+  </div>
+  <div class="history-stats" id="historyStats"></div>
+  <div class="history-panel">
+    <div class="history-panel-head">
+      <h3>Oda zako</h3>
+      <div class="history-panel-actions">
+        <button type="button" class="btn btn-primary btn-sm" id="reorderLastBtn" hidden>🔁 Rudia oda ya mwisho</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="clearMyHistoryBtn" hidden>Futa historia</button>
+      </div>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</section>
 
 <section class="popular-section" id="popular">
   <div class="section-head compact">
@@ -597,6 +621,10 @@
       <button class="order-panel-close" id="orderPanelClose" type="button" aria-label="Funga">✕</button>
     </div>
     <div class="order-panel-body">
+      <div class="order-repeat-strip" id="orderRepeatStrip" hidden>
+        <div class="order-quick-label">🔁 Rudia oda yako</div>
+        <div class="order-repeat-list" id="orderRepeatList"></div>
+      </div>
       <div class="order-quick-add" id="orderQuickAdd">
         <div class="order-quick-label">⚡ Ongeza 0.5 KG haraka</div>
         <div class="order-halfkg-strip" id="orderHalfKgStrip"></div>
@@ -662,6 +690,7 @@
       </div>
       <div class="order-panel-actions">
         <button class="btn btn-ghost" id="cartClear" type="button">Futa zote</button>
+        <button class="btn btn-ghost" id="orderRepeatLastBtn" type="button" hidden>🔁 Rudia oda</button>
         <button class="btn btn-sms" id="cartSms" type="button">💬 SMS</button>
         <button class="btn btn-primary" id="cartSend" type="button">📲 WhatsApp</button>
       </div>

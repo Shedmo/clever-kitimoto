@@ -347,7 +347,335 @@
     history.unshift(record);
     if (history.length > 200) history.length = 200;
     localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history));
+    renderMyHistory();
     return record;
+  }
+
+  function parseKgFromDetail(detail) {
+    const d = (detail || '').toLowerCase().replace(/\s+/g, ' ');
+    if (!d) return 0;
+    if (d.includes('0.5') || d.includes('½') || d.includes('nusu')) return 0.5;
+    if (d.includes('1½') || d.includes('1.5')) return 1.5;
+    const m = d.match(/(\d+(?:\.\d+)?)\s*kg/);
+    if (m) return parseFloat(m[1]);
+    return 0;
+  }
+
+  function computeHistoryStats(history) {
+    const stats = {
+      orderCount: history.length,
+      totalSpent: 0,
+      totalItems: 0,
+      totalKg: 0,
+      topItem: null,
+      topItemQty: 0,
+      lastOrderAt: null,
+      itemCounts: {}
+    };
+
+    history.forEach(order => {
+      stats.totalSpent += order.subtotal || 0;
+      if (!stats.lastOrderAt) stats.lastOrderAt = order.at;
+      (order.items || []).forEach(item => {
+        const qty = item.qty || 0;
+        stats.totalItems += qty;
+        const kg = parseKgFromDetail(item.detail);
+        if (kg > 0) stats.totalKg += kg * qty;
+        const key = item.name + (item.detail ? ' (' + item.detail + ')' : '');
+        stats.itemCounts[key] = (stats.itemCounts[key] || 0) + qty;
+      });
+    });
+
+    Object.entries(stats.itemCounts).forEach(([name, qty]) => {
+      if (qty > stats.topItemQty) {
+        stats.topItemQty = qty;
+        stats.topItem = name;
+      }
+    });
+
+    stats.totalKg = Math.round(stats.totalKg * 10) / 10;
+    return stats;
+  }
+
+  function formatRelativeDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startThat = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const days = Math.round((startToday - startThat) / 86400000);
+    const time = d.toLocaleTimeString('sw-TZ', { hour: '2-digit', minute: '2-digit' });
+    if (days === 0) return 'Leo · ' + time;
+    if (days === 1) return 'Jana · ' + time;
+    if (days < 7) return days + ' siku zilizopita';
+    return d.toLocaleDateString('sw-TZ', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function summarizeOrderItems(items) {
+    if (!items?.length) return 'Hakuna vitu';
+    const lines = items.slice(0, 3).map(i =>
+      (i.qty > 1 ? i.qty + '× ' : '') + i.name + (i.detail ? ' (' + i.detail + ')' : '')
+    );
+    const extra = items.length > 3 ? ' · na ' + (items.length - 3) + ' zaidi' : '';
+    return lines.join(' · ') + extra;
+  }
+
+  function reorderFromHistory(orderId) {
+    const order = loadOrderHistory().find(o => o.id === orderId);
+    applyOrderToCart(order);
+  }
+
+  function getLastOrder() {
+    const history = loadOrderHistory();
+    if (history.length) return history[0];
+    try {
+      const items = JSON.parse(localStorage.getItem(LAST_ORDER_KEY) || '[]');
+      if (!items.length) return null;
+      return { id: 'last-cart', items, at: null };
+    } catch {
+      return null;
+    }
+  }
+
+  function applyCheckoutFromOrder(order) {
+    if (!order) return;
+    const set = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.value = v || '';
+    };
+    if (order.phone) set('custPhone', order.phone);
+    if (order.address) set('custAddress', order.address);
+    if (order.notes) set('custNotes', order.notes);
+    if (order.fulfillment) setPillActive('fulfillmentPills', order.fulfillment);
+    if (order.payment) setPillActive('paymentPills', order.payment);
+    toggleAddressField();
+    toggleLipaPanel();
+    saveCheckout();
+  }
+
+  function applyOrderToCart(order, opts = {}) {
+    const { restoreCheckout = true, openPanel = true } = opts;
+    if (!order?.items?.length) {
+      showToast('Imeshindwa kupakia oda hii');
+      return false;
+    }
+    if (cart.length && !confirm('Oda yako ya sasa itabadilishwa na oda hii. Endelea?')) {
+      return false;
+    }
+    cart = order.items.map(i => ({
+      id: cartId(i.name, i.detail),
+      name: i.name,
+      detail: i.detail || '',
+      price: i.price || '',
+      qty: i.qty || 1
+    }));
+    saveCart();
+    if (restoreCheckout) applyCheckoutFromOrder(order);
+    updateCartUI();
+    showToast('🔁 Oda imerudiwa — angalia na tuma tena!');
+    if (openPanel) openOrderPanel();
+    return true;
+  }
+
+  function reorderLast() {
+    const order = getLastOrder();
+    if (!order) {
+      showToast('Hakuna oda ya kurudia');
+      return;
+    }
+    applyOrderToCart(order);
+  }
+
+  function updateReorderButtons() {
+    const order = getLastOrder();
+    const hasHistory = !!loadOrderHistory().length;
+    const reorderBtn = document.getElementById('reorderBtn');
+    const reorderLastBtn = document.getElementById('reorderLastBtn');
+    const orderRepeatLastBtn = document.getElementById('orderRepeatLastBtn');
+
+    if (reorderBtn) {
+      if (order) {
+        reorderBtn.removeAttribute('hidden');
+        const sub = reorderBtn.querySelector('small');
+        if (sub) {
+          const summary = summarizeOrderItems(order.items);
+          sub.textContent = summary.length > 42 ? summary.slice(0, 42) + '…' : summary;
+        }
+      } else {
+        reorderBtn.setAttribute('hidden', '');
+      }
+    }
+
+    reorderLastBtn?.toggleAttribute('hidden', !hasHistory);
+    orderRepeatLastBtn?.toggleAttribute('hidden', !order);
+  }
+
+  function renderOrderRepeatStrip() {
+    const wrap = document.getElementById('orderRepeatStrip');
+    const list = document.getElementById('orderRepeatList');
+    if (!wrap || !list) return;
+
+    const history = loadOrderHistory().slice(0, 5);
+    if (!history.length) {
+      wrap.hidden = true;
+      return;
+    }
+
+    wrap.hidden = false;
+    list.innerHTML = history.map(order => {
+      const summary = summarizeOrderItems(order.items);
+      const short = summary.length > 36 ? summary.slice(0, 36) + '…' : summary;
+      return `
+        <button type="button" class="order-repeat-btn" data-reorder-id="${esc(order.id)}"
+          title="Rudia: ${esc(summary)}">
+          <span class="or-top">
+            <span class="or-date">${esc(formatRelativeDate(order.at))}</span>
+            <span class="or-total">${order.subtotal ? 'TSH ' + formatMoney(order.subtotal) : ''}</span>
+          </span>
+          <span class="or-items">${esc(short)}</span>
+          <span class="or-cta">🔁 Rudia oda hii</span>
+        </button>`;
+    }).join('');
+  }
+
+  function clearMyHistory() {
+    if (!confirm('Futa historia yako ya oda kwenye kifaa hiki?')) return;
+    localStorage.removeItem(ORDER_HISTORY_KEY);
+    localStorage.removeItem(LAST_ORDER_KEY);
+    document.getElementById('reorderBtn')?.setAttribute('hidden', '');
+    renderMyHistory();
+    updateReorderButtons();
+    showToast('Historia imefutwa');
+  }
+
+  function renderMyHistory() {
+    const history = loadOrderHistory();
+    const statsEl = document.getElementById('historyStats');
+    const listEl = document.getElementById('historyList');
+    const quickEl = document.getElementById('historyQuickStat');
+    const introEl = document.getElementById('historyIntro');
+    const clearBtn = document.getElementById('clearMyHistoryBtn');
+    if (!statsEl || !listEl) return;
+
+    const stats = computeHistoryStats(history);
+
+    if (quickEl) {
+      quickEl.textContent = stats.orderCount
+        ? stats.orderCount + (stats.orderCount === 1 ? ' oda' : ' oda') +
+          ' · TSH ' + formatMoney(stats.totalSpent)
+        : 'Bado hujafanya oda';
+    }
+
+    if (introEl) {
+      introEl.textContent = stats.orderCount
+        ? 'Umefanya oda ' + stats.orderCount + ' kwa Clever Kitimoto. Jumla uliyoagiza: TSH ' +
+          formatMoney(stats.totalSpent) + (stats.totalKg > 0 ? ' · ~' + stats.totalKg + ' KG Kitimoto' : '') + '.'
+        : 'Oda zako zitaonekana hapa baada ya kutuma kupitia WhatsApp au SMS.';
+    }
+
+    if (clearBtn) clearBtn.toggleAttribute('hidden', !stats.orderCount);
+    updateReorderButtons();
+
+    if (!stats.orderCount) {
+      statsEl.innerHTML = `
+        <div class="history-stat highlight">
+          <span class="history-stat-icon">🛒</span>
+          <span class="history-stat-label">Anza oda yako</span>
+          <strong class="history-stat-value">0</strong>
+          <span class="history-stat-sub">Chagua menu na tuma oda</span>
+        </div>`;
+      listEl.innerHTML = `
+        <div class="history-empty">
+          <div class="icon">📋</div>
+          <b>Hakuna historia bado</b>
+          <p>Baada ya kutuma oda yako, utaona jumla hapa na utaweza <strong>rudia oda</strong> kwa kubonyeza moja tu.</p>
+        </div>`;
+      return;
+    }
+
+    statsEl.innerHTML = `
+      <div class="history-stat highlight">
+        <span class="history-stat-icon">🛒</span>
+        <span class="history-stat-label">Jumla ya Oda</span>
+        <strong class="history-stat-value">${stats.orderCount}</strong>
+        <span class="history-stat-sub">${stats.lastOrderAt ? 'Mwisho: ' + formatRelativeDate(stats.lastOrderAt) : ''}</span>
+      </div>
+      <div class="history-stat">
+        <span class="history-stat-icon">💰</span>
+        <span class="history-stat-label">Uliyoagiza</span>
+        <strong class="history-stat-value">TSH ${formatMoney(stats.totalSpent)}</strong>
+        <span class="history-stat-sub">Jumla ya thamani (bila delivery)</span>
+      </div>
+      <div class="history-stat">
+        <span class="history-stat-icon">🍽️</span>
+        <span class="history-stat-label">Vitu Vilivyoagizwa</span>
+        <strong class="history-stat-value">${stats.totalItems}</strong>
+        <span class="history-stat-sub">Vipengele vyote kwenye oda</span>
+      </div>
+      <div class="history-stat">
+        <span class="history-stat-icon">🥩</span>
+        <span class="history-stat-label">Kitimoto (KG)</span>
+        <strong class="history-stat-value">${stats.totalKg > 0 ? '~' + stats.totalKg + ' KG' : '—'}</strong>
+        <span class="history-stat-sub">Kutoka ukubwa wa oda</span>
+      </div>
+      <div class="history-stat">
+        <span class="history-stat-icon">⭐</span>
+        <span class="history-stat-label">Unayopenda</span>
+        <strong class="history-stat-value" style="font-size:0.88rem">${esc(stats.topItem || '—')}</strong>
+        <span class="history-stat-sub">${stats.topItemQty ? '×' + stats.topItemQty + ' mara' : 'Bado haijulikani'}</span>
+      </div>`;
+
+    listEl.innerHTML = history.slice(0, 20).map(order => {
+      const channel = order.channel === 'sms' ? 'sms' : 'whatsapp';
+      const channelLabel = channel === 'sms' ? 'SMS' : 'WhatsApp';
+      const meta = [
+        order.fulfillment === 'pickup' ? 'Pickup' : 'Delivery',
+        paymentLabel(order.payment)
+      ];
+      if (order.phone) meta.push(order.phone);
+      return `
+        <article class="history-card history-repeatable" data-reorder-id="${esc(order.id)}"
+          role="button" tabindex="0" title="Bonyeza kurudia oda hii">
+          <div class="history-card-main">
+            <div class="history-card-top">
+              <span class="history-date">${esc(formatRelativeDate(order.at))}</span>
+              <span class="history-channel ${channel}">${channelLabel}</span>
+            </div>
+            <p class="history-card-items">${esc(summarizeOrderItems(order.items))}</p>
+            <div class="history-card-meta">${esc(meta.join(' · '))}</div>
+          </div>
+          <div class="history-card-side">
+            <span class="history-card-total">${order.subtotal ? 'TSH ' + formatMoney(order.subtotal) : '—'}</span>
+            <button type="button" class="btn-reorder" data-reorder-id="${esc(order.id)}">🔁 Rudia oda</button>
+          </div>
+        </article>`;
+    }).join('');
+    renderOrderRepeatStrip();
+  }
+
+  function bindHistoryEvents() {
+    document.getElementById('openHistoryBtn')?.addEventListener('click', () => {
+      document.getElementById('myHistory')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    document.getElementById('clearMyHistoryBtn')?.addEventListener('click', clearMyHistory);
+    document.getElementById('reorderLastBtn')?.addEventListener('click', reorderLast);
+
+    const repeatOrder = e => {
+      const target = e.target.closest('[data-reorder-id]');
+      if (!target) return;
+      e.preventDefault();
+      reorderFromHistory(target.dataset.reorderId);
+    };
+
+    document.getElementById('historyList')?.addEventListener('click', repeatOrder);
+    document.getElementById('historyList')?.addEventListener('keydown', e => {
+      const card = e.target.closest('.history-repeatable');
+      if (!card || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      reorderFromHistory(card.dataset.reorderId);
+    });
+    document.getElementById('orderRepeatList')?.addEventListener('click', repeatOrder);
+    document.getElementById('orderRepeatLastBtn')?.addEventListener('click', reorderLast);
   }
 
   function buildCartMessage() {
@@ -520,6 +848,7 @@
     if (subtotalEl) subtotalEl.textContent = moneyTotal > 0 ? 'TSH ' + formatMoney(moneyTotal) : '—';
     if (grandEl) grandEl.textContent = moneyTotal > 0 ? 'TSH ' + formatMoney(moneyTotal) : '—';
     renderOrderHalfKgStrip();
+    renderOrderRepeatStrip();
   }
 
   function renderOrderHalfKgStrip() {
@@ -791,18 +1120,6 @@
     if (dot) dot.style.display = open ? '' : 'none';
   }
 
-  function reorderLast() {
-    try {
-      const last = JSON.parse(localStorage.getItem(LAST_ORDER_KEY) || '[]');
-      if (!last.length) { showToast('Hakuna oda ya mwisho'); return; }
-      cart = last.map(i => ({ ...i, id: i.id || cartId(i.name, i.detail) }));
-      saveCart();
-      updateCartUI();
-      showToast('Oda ya mwisho imeongezwa!');
-      openOrderPanel();
-    } catch { showToast('Imeshindwa kupakia oda ya mwisho'); }
-  }
-
   async function shareMenu() {
     const url = window.location.href.split('#')[0];
     const text = 'Angalia menu ya Clever Kitimoto — Kitimoto Bora, Bei Poa! 🐷';
@@ -840,6 +1157,7 @@
     if (localStorage.getItem(LAST_ORDER_KEY)) {
       document.getElementById('reorderBtn')?.removeAttribute('hidden');
     }
+    updateReorderButtons();
   }
 
   function initScrollTop() {
@@ -994,6 +1312,8 @@
     bindReveal();
     bindPhoneCopy();
     renderCustomMenus();
+    renderMyHistory();
+    bindHistoryEvents();
     updateOpenStatus();
     initScrollTop();
   });

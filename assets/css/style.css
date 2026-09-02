@@ -1537,6 +1537,8 @@ footer {
 }
 @media (max-width: 520px) {
   .halfkg-grid { grid-template-columns: 1fr; }
+  .kisinia-diner-pills { flex-direction: column; }
+  .kisinia-diner-pill { width: 100%; justify-content: center; }
 }
 
 /* Clever Kisinia quick order */
@@ -1544,6 +1546,135 @@ footer {
   max-width: 1240px;
   margin: 0 auto 28px;
   padding: 0 24px;
+}
+.kisinia-smart {
+  background: linear-gradient(160deg, #fff 0%, var(--gold-soft) 100%);
+  border: 2px solid var(--maroon);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+.kisinia-smart-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.kisinia-smart-icon {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+}
+.kisinia-smart-head strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--maroon);
+  margin-bottom: 4px;
+}
+.kisinia-smart-head p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.kisinia-diner-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.kisinia-diner-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 2px solid var(--line-strong);
+  background: #fff;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.kisinia-diner-pill:hover {
+  border-color: var(--maroon);
+  transform: translateY(-1px);
+}
+.kisinia-diner-pill.active {
+  border-color: var(--maroon);
+  background: var(--maroon);
+  color: #fff;
+}
+.kisinia-diner-pill .kdp-icon { font-size: 1rem; }
+.kisinia-recommend {
+  border-top: 1px dashed var(--line-strong);
+  padding-top: 14px;
+}
+.kisinia-rec-body { display: flex; flex-direction: column; gap: 8px; }
+.kisinia-rec-top {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kisinia-rec-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--maroon);
+}
+.kisinia-rec-top strong {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--ink);
+}
+.kisinia-rec-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.kisinia-includes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kisinia-includes li {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+}
+.kisinia-includes-inline {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.kisinia-rec-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.kisinia-rec-price {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--maroon);
+}
+.kisinia-card.kisinia-pick {
+  border-color: var(--maroon);
+  background: linear-gradient(180deg, var(--gold-soft) 0%, #fff 100%);
+  box-shadow: 0 0 0 2px rgba(122, 21, 21, 0.15);
 }
 .kisinia-group {
   margin-bottom: 22px;

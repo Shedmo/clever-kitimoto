@@ -1186,20 +1186,6 @@
     document.querySelectorAll('.report-tab').forEach(btn => {
       btn.addEventListener('click', () => switchReportTab(btn.dataset.tab));
     });
-    document.querySelectorAll('.credential-card').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const userEl = $('username');
-        const passEl = $('password');
-        if (userEl) userEl.value = btn.dataset.user || '';
-        if (passEl) {
-          passEl.value = btn.dataset.pass || '';
-          passEl.type = 'text';
-          $('togglePass').textContent = '🙈';
-        }
-        setError('');
-        passEl?.focus();
-      });
-    });
   }
 
   document.addEventListener('DOMContentLoaded', () => {

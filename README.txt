@@ -6,20 +6,10 @@ Files:
 
 ADMIN LOGIN — Open admin.html
 
-  ┌──────────┬─────────────────┬──────────────────────────────────────┐
-  │ Jukumu   │ Username        │ Password                             │
-  ├──────────┼─────────────────┼──────────────────────────────────────┤
-  │ Admin    │ clever          │ Clever@2026                          │
-  │ Meneja   │ manager         │ Manager@2026                         │
-  │ Muuzaji  │ seller          │ Seller@2026                          │
-  └──────────┴─────────────────┴──────────────────────────────────────┘
-
-  Admin   = full access (bei, menu, mauzo, futa data)
-  Meneja  = bei, menu, rekodi mauzo (bila kufuta)
-  Muuzaji = rekodi mauzo na angalia ripoti tu
+  Contact the restaurant admin for your username and password.
+  Roles: Admin · Meneja · Muuzaji
 
   Session lasts 8 hours in the same browser tab. Use "Toka" to logout.
-  On the login page, tap an account card to auto-fill username and password.
 
 IMPORTANT FOR PRODUCTION:
 For price changes and sales to sync across ALL devices, connect to a shared

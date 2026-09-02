@@ -588,91 +588,6 @@ body {
 }
 .login-roles strong { color: var(--maroon); }
 
-.login-credentials {
-  margin: 0 0 18px;
-  padding: 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px dashed rgba(122, 21, 21, 0.25);
-  text-align: left;
-}
-.login-credentials-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-.login-credentials-head strong {
-  font-size: 0.78rem;
-  color: var(--maroon);
-}
-.login-credentials-note {
-  font-size: 0.68rem;
-  color: var(--muted);
-  font-weight: 600;
-}
-.credential-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.credential-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid var(--line-strong);
-  background: #fff;
-  cursor: pointer;
-  font-family: var(--font-body);
-  text-align: left;
-  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-.credential-card:hover {
-  border-color: var(--maroon);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(122, 21, 21, 0.1);
-}
-.credential-card:focus-visible {
-  outline: 2px solid var(--maroon);
-  outline-offset: 2px;
-}
-.credential-role {
-  font-size: 0.6rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px 6px;
-  border-radius: 999px;
-}
-.credential-role.role-admin {
-  background: rgba(122, 21, 21, 0.12);
-  color: var(--maroon);
-}
-.credential-role.role-manager {
-  background: rgba(255, 204, 0, 0.3);
-  color: #7a5c00;
-}
-.credential-role.role-seller {
-  background: rgba(30, 126, 52, 0.12);
-  color: #1e7e34;
-}
-.credential-user {
-  font-size: 0.82rem;
-  font-weight: 800;
-  color: var(--ink);
-}
-.credential-pass {
-  font-size: 0.68rem;
-  color: var(--muted);
-  font-weight: 600;
-  font-family: ui-monospace, monospace;
-}
-
 .btn-logout {
   background: rgba(192, 57, 43, 0.08);
   color: var(--danger);
@@ -818,7 +733,6 @@ body {
   .grid, .add-grid, .sales-record-grid { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .sales-breakdown-grid { grid-template-columns: 1fr; }
-  .credential-cards { grid-template-columns: 1fr; }
   .full { grid-column: auto; }
   .top { flex-direction: column; align-items: flex-start; }
   .report-actions { width: 100%; }

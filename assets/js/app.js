@@ -40,32 +40,59 @@
   const KISINIA_GROUPS = [
     {
       title: 'Kisinia Packages',
-      subtitle: 'Single · Couple · Family',
+      subtitle: 'Kula Kitimoto kwenye kisinia',
       items: [
-        { name: 'Kisinia Single', detail: 'Mtu 1', priceKey: 'single', icon: '👤', tag: 'Solo', desc: '½ KG Mix + Ndizi 2 + Ugali 1 + Kachumbari' },
-        { name: 'Kisinia Couple', detail: 'Watu 2', priceKey: 'couple', icon: '👫', tag: 'Couple', desc: '1 KG Mix + Ndizi 4 + Ugali 2 + Kachumbari' },
-        { name: 'Kisinia Family', detail: 'Watu 4', priceKey: 'family', icon: '👨‍👩‍👧‍👦', tag: 'Family', desc: '2 KG Mix + Ndizi 8 + Ugali 4 + Chipsi Yai + Kachumbari' }
+        { name: 'Kisinia Single', detail: 'Mtu 1', priceKey: 'single', icon: '👤', tag: 'Solo', diners: 1,
+          desc: 'Kula peke yako — ½ KG Kitimoto (nguruwe) + sides',
+          includes: ['½ KG Mix — Choma, Rosti, Kavu', 'Ndizi 2', 'Ugali 1', 'Kachumbari'] },
+        { name: 'Kisinia Couple', detail: 'Watu 2', priceKey: 'couple', icon: '👫', tag: 'Couple', diners: 2,
+          desc: 'Kula wawili — 1 KG Kitimoto + sides',
+          includes: ['1 KG Mix — Choma, Rosti, Kavu', 'Ndizi 4', 'Ugali 2', 'Kachumbari'] },
+        { name: 'Kisinia Family', detail: 'Watu 4', priceKey: 'family', icon: '👨‍👩‍👧‍👦', tag: 'Family', diners: 4,
+          desc: 'Kula familia — 2 KG Kitimoto + sides kubwa',
+          includes: ['2 KG Mix — Choma, Rosti, Kavu', 'Ndizi 8', 'Ugali 4', 'Chipsi Yai', 'Kachumbari'] }
       ]
     },
     {
       title: 'Mixed Kitimoto',
-      subtitle: 'Choma + Rosti + Kavu',
+      subtitle: 'Nyama mchanganyiko — kula pamoja',
       items: [
-        { name: '½ KG Mix', detail: '', priceKey: 'mixedhalf', icon: '🍽️', tag: 'Mix', desc: 'Choma + Rosti + Kavu + Ndizi 2 + Ugali 1 + Kachumbari' },
-        { name: '1 KG Mix', detail: '', priceKey: 'mixedone', icon: '⭐', tag: 'Best', desc: 'Choma + Rosti + Kavu + Ndizi 4 + Ugali 2 + Kachumbari' },
-        { name: '2 KG Mix Special', detail: '', priceKey: 'mixedtwo', icon: '🎉', tag: 'Feast', desc: 'Choma 1 KG + Rosti ½ + Kavu ½ + sides' }
+        { name: '½ KG Mix', detail: '', priceKey: 'mixedhalf', icon: '🍽️', tag: 'Mix', diners: 1,
+          desc: 'Kitimoto mix — kiasi cha mtu 1',
+          includes: ['Choma + Rosti + Kavu', 'Ndizi 2', 'Ugali 1', 'Kachumbari'] },
+        { name: '1 KG Mix', detail: '', priceKey: 'mixedone', icon: '⭐', tag: 'Best', diners: 2,
+          desc: 'Mix bora — watu 2 au zaidi',
+          includes: ['Choma + Rosti + Kavu', 'Ndizi 4', 'Ugali 2', 'Kachumbari'] },
+        { name: '2 KG Mix Special', detail: '', priceKey: 'mixedtwo', icon: '🎉', tag: 'Feast', diners: 5,
+          desc: 'Sherehe — nyama nyingi kwa kikundi',
+          includes: ['Choma 1 KG + Rosti ½ + Kavu ½', 'Sides kamili'] }
       ]
     },
     {
       title: 'Kisinia Zege',
-      subtitle: 'Kitimoto + Chipsi',
+      subtitle: 'Kitimoto + chipsi — ladha ya zege',
       items: [
-        { name: 'Zege Single', detail: '', priceKey: 'zegeSingle', icon: '🍟', tag: 'Single', desc: '½ KG Kitimoto + Chipsi Kavu' },
-        { name: 'Zege Couple', detail: '', priceKey: 'zegeCouple', icon: '🍟', tag: 'Couple', desc: '1 KG Kitimoto + Chipsi Kavu + Kachumbari' },
-        { name: 'Zege Special', detail: '', priceKey: 'zegeSpecial', icon: '🍟', tag: 'Special', desc: '1½ KG Kitimoto + sides' }
+        { name: 'Zege Single', detail: '', priceKey: 'zegeSingle', icon: '🍟', tag: 'Single', diners: 1,
+          desc: 'Kula peke yako — Kitimoto na chipsi',
+          includes: ['½ KG Kitimoto', 'Chipsi Kavu'] },
+        { name: 'Zege Couple', detail: '', priceKey: 'zegeCouple', icon: '🍟', tag: 'Couple', diners: 2,
+          desc: 'Wawili — Kitimoto + chipsi + kachumbari',
+          includes: ['1 KG Kitimoto', 'Chipsi Kavu', 'Kachumbari'] },
+        { name: 'Zege Special', detail: '', priceKey: 'zegeSpecial', icon: '🍟', tag: 'Special', diners: 3,
+          desc: 'Zege kubwa — nyama nyingi na sides',
+          includes: ['1½ KG Kitimoto', 'Chipsi + sides'] }
       ]
     }
   ];
+
+  const KISINIA_EAT_OPTIONS = [
+    { diners: 1, label: 'Mtu 1', icon: '👤', priceKey: 'single', name: 'Kisinia Single', detail: 'Mtu 1' },
+    { diners: 2, label: 'Watu 2', icon: '👫', priceKey: 'couple', name: 'Kisinia Couple', detail: 'Watu 2' },
+    { diners: 4, label: 'Familia 3–4', icon: '👨‍👩‍👧‍👦', priceKey: 'family', name: 'Kisinia Family', detail: 'Watu 4' },
+    { diners: 5, label: 'Watu 5+', icon: '🎉', priceKey: 'mixedtwo', name: '2 KG Mix Special', detail: '' }
+  ];
+
+  let kisiniaDinerPick = 2;
 
   const defaults = {
     choma: '9,000', choma1: '18,000', choma15: '27,000', choma2: '36,000',
@@ -240,6 +267,7 @@
     renderPopularPicks();
     renderHalfKgQuickOrder();
     renderKisiniaQuickOrder();
+    renderKisiniaSmartPicker();
     renderOrderHalfKgStrip();
   }
 
@@ -1047,6 +1075,81 @@
     }).join('');
   }
 
+  function findKisiniaItem(priceKey) {
+    for (const group of KISINIA_GROUPS) {
+      const item = group.items.find(i => i.priceKey === priceKey);
+      if (item) return item;
+    }
+    return null;
+  }
+
+  function pickKisiniaForDiners(count) {
+    if (count <= 1) return KISINIA_EAT_OPTIONS[0];
+    if (count === 2) return KISINIA_EAT_OPTIONS[1];
+    if (count <= 4) return KISINIA_EAT_OPTIONS[2];
+    return KISINIA_EAT_OPTIONS[3];
+  }
+
+  function highlightKisiniaCards(priceKey) {
+    document.querySelectorAll('.kisinia-card').forEach(card => {
+      card.classList.toggle('kisinia-pick', card.dataset.priceKey === priceKey);
+    });
+  }
+
+  function renderKisiniaSmartPicker() {
+    const pillsEl = document.getElementById('kisiniaDinerPills');
+    const recEl = document.getElementById('kisiniaRecommend');
+    if (!pillsEl || !recEl) return;
+
+    pillsEl.innerHTML = KISINIA_EAT_OPTIONS.map(opt => `
+      <button type="button" class="kisinia-diner-pill${kisiniaDinerPick === opt.diners ? ' active' : ''}"
+        data-diners="${opt.diners}" aria-pressed="${kisiniaDinerPick === opt.diners}">
+        <span class="kdp-icon">${opt.icon}</span>
+        <span class="kdp-label">${esc(opt.label)}</span>
+      </button>
+    `).join('');
+
+    const pick = pickKisiniaForDiners(kisiniaDinerPick);
+    const item = findKisiniaItem(pick.priceKey);
+    const price = formatPrice(pick.priceKey);
+
+    if (!item) {
+      recEl.hidden = true;
+      return;
+    }
+
+    recEl.hidden = false;
+    recEl.innerHTML = `
+      <div class="kisinia-rec-body">
+        <div class="kisinia-rec-top">
+          <span class="kisinia-rec-badge">🥩 Pendekezo lako</span>
+          <strong>${esc(pick.name)}${pick.detail ? ' · ' + esc(pick.detail) : ''}</strong>
+        </div>
+        <p class="kisinia-rec-desc">${esc(item.desc)}</p>
+        <ul class="kisinia-includes">
+          ${(item.includes || []).map(x => '<li>' + esc(x) + '</li>').join('')}
+        </ul>
+        <div class="kisinia-rec-foot">
+          <span class="kisinia-rec-price">TSH ${esc(price)}</span>
+          <button type="button" class="btn btn-primary btn-sm kisinia-add"
+            data-item="${esc(pick.name)}" data-detail="${esc(pick.detail)}" data-price-key="${esc(pick.priceKey)}">
+            + Oda kisinia hii
+          </button>
+        </div>
+      </div>`;
+
+    highlightKisiniaCards(pick.priceKey);
+
+    if (pillsEl.dataset.bound) return;
+    pillsEl.dataset.bound = '1';
+    pillsEl.addEventListener('click', e => {
+      const btn = e.target.closest('[data-diners]');
+      if (!btn) return;
+      kisiniaDinerPick = parseInt(btn.dataset.diners, 10);
+      renderKisiniaSmartPicker();
+    });
+  }
+
   function renderKisiniaQuickOrder() {
     const root = document.getElementById('kisiniaRoot');
     if (!root) return;
@@ -1059,6 +1162,7 @@
         <div class="kisinia-grid">
           ${group.items.map(item => {
             const price = formatPrice(item.priceKey);
+            const includes = (item.includes || []).slice(0, 3).join(' · ');
             return `
               <article class="kisinia-card reveal"
                 data-item="${esc(item.name)}" data-detail="${esc(item.detail)}" data-price-key="${esc(item.priceKey)}">
@@ -1068,14 +1172,16 @@
                 </div>
                 <h4>${esc(item.name)}${item.detail ? ` <small>· ${esc(item.detail)}</small>` : ''}</h4>
                 <p>${esc(item.desc)}</p>
+                ${includes ? `<div class="kisinia-includes-inline">${esc(includes)}</div>` : ''}
                 <div class="kisinia-price">TSH ${esc(price)}</div>
-                <span class="kisinia-cta">+ Oda sasa</span>
+                <span class="kisinia-cta">+ Oda kula sasa</span>
               </article>
             `;
           }).join('')}
         </div>
       </div>
     `).join('');
+    highlightKisiniaCards(pickKisiniaForDiners(kisiniaDinerPick).priceKey);
   }
 
   function initKisiniaOrderCards() {
@@ -1324,5 +1430,6 @@
     renderPopularPicks();
     renderHalfKgQuickOrder();
     renderKisiniaQuickOrder();
+    renderKisiniaSmartPicker();
   });
 })();

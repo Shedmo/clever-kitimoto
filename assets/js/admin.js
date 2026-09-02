@@ -5,6 +5,8 @@
   const CUSTOM_KEY = 'cleverKitimotoCustomMenusV1';
   const ORDER_HISTORY_KEY = 'cleverKitimotoOrderHistoryV1';
   const VISIT_LOG_KEY = 'cleverKitimotoVisitLogV1';
+  const SALES_ITEMS_KEY = 'cleverKitimotoSalesItemsV1';
+  const SALES_LOG_KEY = 'cleverKitimotoSalesLogV1';
   const SESSION_KEY = 'cleverKitimotoAdminSession';
   const MAX_ATTEMPTS = 5;
   const LOCK_MS = 60000;
@@ -22,9 +24,9 @@
   ];
 
   const PERMS = {
-    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'reset', 'clear'],
-    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save'],
-    seller: ['dashboard', 'orders', 'users', 'visits', 'export']
+    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear'],
+    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'sales', 'sales_items'],
+    seller: ['dashboard', 'orders', 'users', 'visits', 'export', 'sales']
   };
 
   let attempts = 0;
@@ -100,6 +102,9 @@
     $('menuSection')?.classList.toggle('hidden', !hasPerm('menus'));
     $('customMenuSection')?.classList.toggle('hidden', !hasPerm('menus'));
     $('saveSection')?.classList.toggle('hidden', !hasPerm('save'));
+    $('salesPanel')?.classList.toggle('hidden', !hasPerm('sales'));
+    $('salesItemsSection')?.classList.toggle('hidden', !hasPerm('sales_items'));
+    $('clearSalesBtn')?.classList.toggle('hidden', !hasPerm('sales_clear'));
     $('resetBtn')?.classList.toggle('hidden', !hasPerm('reset'));
     $('clearOrdersBtn')?.classList.toggle('hidden', !hasPerm('clear'));
     $('clearVisitsBtn')?.classList.toggle('hidden', !hasPerm('clear'));
@@ -118,6 +123,10 @@
     renderUsers();
     renderOrders();
     renderVisits();
+    renderSales();
+    initSalesItems();
+    populateSaleItemSelect();
+    renderSalesItems();
   }
 
   function showLogin() {
@@ -257,6 +266,348 @@
     renderCustom();
   }
 
+  const DEFAULT_SALES_ITEMS = [
+    { name: 'Choma', category: 'Choma', unit: 'KG', price: 18000 },
+    { name: 'Choma ya Foil', category: 'Choma ya Foil', unit: 'KG', price: 18000 },
+    { name: 'Rosti', category: 'Rosti', unit: 'KG', price: 17000 },
+    { name: 'Kavu', category: 'Kavu', unit: 'KG', price: 17000 },
+    { name: '½ KG Mix', category: 'Mix', unit: 'Kifurushi', price: 25000 },
+    { name: '1 KG Mix', category: 'Mix', unit: 'Kifurushi', price: 35000 },
+    { name: 'Kisinia Single', category: 'Kisinia', unit: 'Kifurushi', price: 20000 },
+    { name: 'Kisinia Couple', category: 'Kisinia', unit: 'Kifurushi', price: 35000 },
+    { name: 'Kisinia Family', category: 'Kisinia', unit: 'Kifurushi', price: 65000 },
+    { name: 'Chipsi Kavu', category: 'Sides', unit: 'Sahani', price: 2000 },
+    { name: 'Chipsi Yai', category: 'Sides', unit: 'Sahani', price: 3000 },
+    { name: 'Ugali', category: 'Sides', unit: 'Kipande', price: 1000 },
+    { name: 'Ndizi', category: 'Sides', unit: 'Kipande', price: 500 }
+  ];
+
+  function getSalesItems() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SALES_ITEMS_KEY) || '[]');
+      return Array.isArray(saved) ? saved.filter(x => x.active !== false) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function getAllSalesItems() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SALES_ITEMS_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function initSalesItems() {
+    if (getAllSalesItems().length) return;
+    const items = DEFAULT_SALES_ITEMS.map((x, i) => ({
+      id: 'si-' + (Date.now() + i),
+      ...x,
+      active: true
+    }));
+    localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(items));
+  }
+
+  function getSalesLog() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SALES_LOG_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function addSalesItem() {
+    if (!hasPerm('sales_items')) return;
+    const name = $('salesItemName')?.value.trim();
+    const category = $('salesItemCategory')?.value || 'Nyingine';
+    const unit = $('salesItemUnit')?.value || 'KG';
+    const price = parseInt($('salesItemPrice')?.value, 10);
+    if (!name || !price) {
+      alert('Weka jina la bidhaa na bei.');
+      return;
+    }
+    const list = getAllSalesItems();
+    list.push({
+      id: 'si-' + Date.now(),
+      name,
+      category,
+      unit,
+      price,
+      active: true
+    });
+    localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(list));
+    ['salesItemName', 'salesItemPrice'].forEach(id => { if ($(id)) $(id).value = ''; });
+    renderSalesItems();
+    populateSaleItemSelect();
+    alert('Bidhaa imeongezwa.');
+  }
+
+  function deleteSalesItem(id) {
+    if (!hasPerm('sales_items')) return;
+    if (!confirm('Futa bidhaa hii?')) return;
+    const list = getAllSalesItems().map(x =>
+      x.id === id ? { ...x, active: false } : x
+    );
+    localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(list));
+    renderSalesItems();
+    populateSaleItemSelect();
+  }
+
+  function renderSalesItems() {
+    const el = $('salesItemsList');
+    if (!el) return;
+    const list = getSalesItems();
+    if (!list.length) {
+      el.innerHTML = '<div class="empty">Hakuna bidhaa. Ongeza bidhaa za mauzo hapo juu.</div>';
+      return;
+    }
+    el.innerHTML = list.map(x => `
+      <div class="custom-row">
+        <div>
+          <b>${escapeHtml(x.name)}</b>
+          <div class="mini">${escapeHtml(x.category)} · ${escapeHtml(x.unit)} · TSH ${formatMoney(x.price)} / ${escapeHtml(x.unit)}</div>
+        </div>
+        <button class="btn btn-delete" type="button" data-delete-sales="${escapeHtml(x.id)}">🗑 Futa</button>
+      </div>
+    `).join('');
+    el.querySelectorAll('[data-delete-sales]').forEach(btn => {
+      btn.addEventListener('click', () => deleteSalesItem(btn.dataset.deleteSales));
+    });
+  }
+
+  function populateSaleItemSelect() {
+    const sel = $('saleItemSelect');
+    if (!sel) return;
+    const items = getSalesItems();
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Chagua bidhaa...</option>' +
+      items.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)} — TSH ${formatMoney(x.price)}/${escapeHtml(x.unit)}</option>`).join('');
+    if (current && items.some(x => x.id === current)) sel.value = current;
+    updateSaleTotalPreview();
+    renderSaleQtyPresets();
+  }
+
+  function getSelectedSaleItem() {
+    const id = $('saleItemSelect')?.value;
+    return getSalesItems().find(x => x.id === id) || null;
+  }
+
+  function updateSaleTotalPreview() {
+    const item = getSelectedSaleItem();
+    const qty = parseFloat($('saleQty')?.value) || 0;
+    const hint = $('salePriceHint');
+    const totalEl = $('saleTotal');
+    if (!item) {
+      if (hint) hint.textContent = 'Chagua bidhaa kwanza';
+      return;
+    }
+    const unitPrice = Number(item.price) || 0;
+    const total = item.unit === 'KG'
+      ? Math.round(unitPrice * qty)
+      : Math.round(unitPrice * (qty || 1));
+    if (hint) {
+      hint.textContent = 'TSH ' + formatMoney(unitPrice) + ' / ' + item.unit +
+        (qty > 0 ? ' · Jumla: TSH ' + formatMoney(total) : '');
+    }
+    if (totalEl && qty > 0 && !totalEl.dataset.manual) {
+      totalEl.value = total;
+    }
+  }
+
+  function renderSaleQtyPresets() {
+    const wrap = $('saleQtyPresets');
+    const item = getSelectedSaleItem();
+    if (!wrap) return;
+    if (!item || item.unit !== 'KG') {
+      wrap.innerHTML = '';
+      wrap.hidden = true;
+      return;
+    }
+    wrap.hidden = false;
+    wrap.innerHTML = [0.5, 1, 1.5, 2].map(kg =>
+      `<button type="button" class="sales-qty-btn" data-qty="${kg}">${kg} KG</button>`
+    ).join('');
+    wrap.querySelectorAll('.sales-qty-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if ($('saleQty')) $('saleQty').value = btn.dataset.qty;
+        if ($('saleTotal')) delete $('saleTotal').dataset.manual;
+        updateSaleTotalPreview();
+      });
+    });
+  }
+
+  function recordSale() {
+    if (!hasPerm('sales')) return;
+    const item = getSelectedSaleItem();
+    const qty = parseFloat($('saleQty')?.value);
+    const total = parseInt($('saleTotal')?.value, 10);
+    const payment = $('salePayment')?.value || 'cash';
+    const phone = $('salePhone')?.value.trim() || '';
+    const notes = $('saleNotes')?.value.trim() || '';
+    const session = getSession();
+
+    if (!item) { alert('Chagua bidhaa.'); return; }
+    if (!qty || qty <= 0) { alert('Weka kiasi sahihi.'); return; }
+    if (!total || total <= 0) { alert('Weka bei ya mauzo.'); return; }
+
+    const sale = {
+      id: 'sale-' + Date.now(),
+      at: new Date().toISOString(),
+      itemId: item.id,
+      itemName: item.name,
+      category: item.category,
+      qty,
+      unit: item.unit,
+      unitPrice: item.price,
+      total,
+      payment,
+      phone,
+      notes,
+      seller: session?.user || 'staff'
+    };
+
+    const log = getSalesLog();
+    log.unshift(sale);
+    if (log.length > 500) log.length = 500;
+    localStorage.setItem(SALES_LOG_KEY, JSON.stringify(log));
+
+    ['saleQty', 'saleTotal', 'salePhone', 'saleNotes'].forEach(id => {
+      if ($(id)) {
+        $(id).value = '';
+        if (id === 'saleTotal') delete $(id).dataset.manual;
+      }
+    });
+    if ($('saleItemSelect')) $('saleItemSelect').value = '';
+    updateSaleTotalPreview();
+    renderSaleQtyPresets();
+    renderSales();
+    renderDashboard();
+    alert('Mauzo yamerekodiwa: ' + item.name + ' — TSH ' + formatMoney(total));
+  }
+
+  function computeSalesStats() {
+    const sales = getSalesLog();
+    const total = sales.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    const today = sales.filter(x => isToday(x.at));
+    const todayTotal = today.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    const kgSold = sales.reduce((s, x) => {
+      if (x.unit === 'KG') return s + (Number(x.qty) || 0);
+      return s;
+    }, 0);
+    const byItem = {};
+    sales.forEach(x => {
+      const key = x.itemName || 'Nyingine';
+      if (!byItem[key]) byItem[key] = { qty: 0, total: 0, unit: x.unit };
+      byItem[key].qty += Number(x.qty) || 0;
+      byItem[key].total += Number(x.total) || 0;
+    });
+    return {
+      count: sales.length,
+      total,
+      todayCount: today.length,
+      todayTotal,
+      kgSold: Math.round(kgSold * 10) / 10,
+      byItem
+    };
+  }
+
+  function renderSalesSummary() {
+    const el = $('salesSummary');
+    if (!el) return;
+    const s = computeSalesStats();
+    el.innerHTML = `
+      <div class="summary-chip highlight"><span>Jumla Mauzo</span><b>TSH ${formatMoney(s.total)}</b></div>
+      <div class="summary-chip"><span>Leo</span><b>TSH ${formatMoney(s.todayTotal)}</b></div>
+      <div class="summary-chip"><span>Mauzo</span><b>${s.count}</b></div>
+      <div class="summary-chip"><span>Leo</span><b>${s.todayCount}</b></div>
+      <div class="summary-chip"><span>KG iliyouzwa</span><b>${s.kgSold || '—'}</b></div>
+    `;
+  }
+
+  function renderSalesBreakdown() {
+    const el = $('salesBreakdown');
+    if (!el) return;
+    const { byItem } = computeSalesStats();
+    const entries = Object.entries(byItem).sort((a, b) => b[1].total - a[1].total);
+    if (!entries.length) {
+      el.innerHTML = '';
+      return;
+    }
+    el.innerHTML = `
+      <div class="sales-breakdown-head">Mauzo kwa bidhaa</div>
+      <div class="sales-breakdown-grid">
+        ${entries.slice(0, 8).map(([name, data]) => `
+          <div class="sales-breakdown-chip">
+            <b>${escapeHtml(name)}</b>
+            <span>${data.qty} ${escapeHtml(data.unit)} · TSH ${formatMoney(data.total)}</span>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
+  function renderSales() {
+    renderSalesSummary();
+    renderSalesBreakdown();
+    renderDashboard();
+    const el = $('salesList');
+    if (!el) return;
+    const sales = getSalesLog();
+    if (!sales.length) {
+      el.innerHTML = '<div class="empty">Hakuna mauzo bado. Rekodi mauzo kwenye sehemu ya Mauzo ya Nyama.</div>';
+      return;
+    }
+    el.innerHTML = sales.slice(0, 50).map(x => `
+      <article class="order-card sales-card">
+        <div class="order-card-head">
+          <div>
+            <strong>${escapeHtml(formatOrderDate(x.at))}</strong>
+            <span class="order-meta">${escapeHtml(x.category)} · ${escapeHtml(paymentLabel(x.payment))} · ${escapeHtml(x.seller || 'staff')}</span>
+          </div>
+          <strong class="order-total">TSH ${formatMoney(x.total)}</strong>
+        </div>
+        <div class="order-card-body">
+          <div class="order-row"><span>Bidhaa</span><b>${escapeHtml(x.itemName)}</b></div>
+          <div class="order-row"><span>Kiasi</span><b>${escapeHtml(String(x.qty))} ${escapeHtml(x.unit)}</b></div>
+          ${x.phone ? '<div class="order-row"><span>Simu</span><b>' + escapeHtml(x.phone) + '</b></div>' : ''}
+          ${x.notes ? '<div class="order-row"><span>Maelezo</span><b>' + escapeHtml(x.notes) + '</b></div>' : ''}
+        </div>
+      </article>
+    `).join('');
+  }
+
+  function exportSalesCsv() {
+    const sales = getSalesLog();
+    if (!sales.length) { alert('Hakuna mauzo ya kupakua.'); return; }
+    const header = ['Tarehe', 'Bidhaa', 'Aina', 'Kiasi', 'Kipimo', 'Bei/TSH', 'Jumla TSH', 'Malipo', 'Simu', 'Maelezo', 'Muuzaji'];
+    const rows = [header.join(',')];
+    sales.forEach(x => {
+      rows.push([
+        csvEscape(formatOrderDate(x.at)),
+        csvEscape(x.itemName),
+        csvEscape(x.category),
+        csvEscape(x.qty),
+        csvEscape(x.unit),
+        csvEscape(x.unitPrice),
+        csvEscape(x.total),
+        csvEscape(paymentLabel(x.payment)),
+        csvEscape(x.phone),
+        csvEscape(x.notes),
+        csvEscape(x.seller)
+      ].join(','));
+    });
+    downloadCsv('clever-kitimoto-mauzo-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
+  }
+
+  function clearSales() {
+    if (!hasPerm('sales_clear')) return;
+    if (!confirm('Futa historia yote ya mauzo?')) return;
+    localStorage.removeItem(SALES_LOG_KEY);
+    renderSales();
+  }
+
   function escapeHtml(v) {
     return String(v).replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
   }
@@ -290,6 +641,7 @@
     const uniqueCustomers = new Set(orders.map(o => (o.phone || '').trim()).filter(Boolean)).size;
     const whatsapp = orders.filter(o => o.channel === 'whatsapp').length;
     const sms = orders.filter(o => o.channel === 'sms').length;
+    const sales = computeSalesStats();
 
     return {
       orderCount: orders.length,
@@ -301,7 +653,12 @@
       uniqueVisitors,
       uniqueCustomers,
       whatsapp,
-      sms
+      sms,
+      salesCount: sales.count,
+      salesTotal: sales.total,
+      salesToday: sales.todayTotal,
+      salesTodayCount: sales.todayCount,
+      kgSold: sales.kgSold
     };
   }
 
@@ -312,8 +669,13 @@
     el.innerHTML = `
       <article class="stat-card stat-primary">
         <span class="stat-label">Jumla ya Mapato</span>
-        <strong class="stat-value">TSH ${formatMoney(s.totalRevenue)}</strong>
-        <span class="stat-sub">Leo: TSH ${formatMoney(s.todayRevenue)}</span>
+        <strong class="stat-value">TSH ${formatMoney(s.totalRevenue + s.salesTotal)}</strong>
+        <span class="stat-sub">Oda + Mauzo · Leo: TSH ${formatMoney(s.todayRevenue + s.salesToday)}</span>
+      </article>
+      <article class="stat-card stat-sales">
+        <span class="stat-label">Mauzo ya Nyama</span>
+        <strong class="stat-value">TSH ${formatMoney(s.salesTotal)}</strong>
+        <span class="stat-sub">Leo: TSH ${formatMoney(s.salesToday)} · ${s.salesCount} mauzo · ${s.kgSold || 0} KG</span>
       </article>
       <article class="stat-card">
         <span class="stat-label">Oda Zote</span>
@@ -698,6 +1060,7 @@
     });
     $('usersPane')?.classList.toggle('active', tab === 'users');
     $('ordersPane')?.classList.toggle('active', tab === 'orders');
+    $('salesPane')?.classList.toggle('active', tab === 'sales');
     $('visitsPane')?.classList.toggle('active', tab === 'visits');
   }
 
@@ -792,7 +1155,23 @@
     $('exportOrdersBtn')?.addEventListener('click', exportOrdersCsv);
     $('exportUsersBtn')?.addEventListener('click', exportUsersCsv);
     $('exportVisitsBtn')?.addEventListener('click', exportVisitsCsv);
+    $('exportSalesBtn')?.addEventListener('click', exportSalesCsv);
     $('printReportBtn')?.addEventListener('click', printReport);
+    $('recordSaleBtn')?.addEventListener('click', recordSale);
+    $('addSalesItemBtn')?.addEventListener('click', addSalesItem);
+    $('clearSalesBtn')?.addEventListener('click', clearSales);
+    $('saleItemSelect')?.addEventListener('change', () => {
+      if ($('saleTotal')) delete $('saleTotal').dataset.manual;
+      updateSaleTotalPreview();
+      renderSaleQtyPresets();
+    });
+    $('saleQty')?.addEventListener('input', () => {
+      if ($('saleTotal')) delete $('saleTotal').dataset.manual;
+      updateSaleTotalPreview();
+    });
+    $('saleTotal')?.addEventListener('input', () => {
+      if ($('saleTotal')) $('saleTotal').dataset.manual = '1';
+    });
     $('userSearch')?.addEventListener('input', e => {
       userQuery = e.target.value.trim();
       renderUsers();
@@ -806,6 +1185,20 @@
     });
     document.querySelectorAll('.report-tab').forEach(btn => {
       btn.addEventListener('click', () => switchReportTab(btn.dataset.tab));
+    });
+    document.querySelectorAll('.credential-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const userEl = $('username');
+        const passEl = $('password');
+        if (userEl) userEl.value = btn.dataset.user || '';
+        if (passEl) {
+          passEl.value = btn.dataset.pass || '';
+          passEl.type = 'text';
+          $('togglePass').textContent = '🙈';
+        }
+        setError('');
+        passEl?.focus();
+      });
     });
   }
 

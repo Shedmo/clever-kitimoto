@@ -19,7 +19,31 @@
     <div class="brand">Clever <span>Kitimoto</span></div>
     <p class="login-sub">Ingia kwa jukumu lako — Admin, Meneja, au Muuzaji</p>
     <div class="login-roles">
-      <strong>Jukumu:</strong> Admin (kila kitu) · Meneja (bei & menu, bila kufuta) · Muuzaji (angalia oda & ripoti tu)
+      <strong>Jukumu:</strong> Admin (kila kitu) · Meneja (bei, menu, mauzo) · Muuzaji (rekodi mauzo & angalia ripoti)
+    </div>
+
+    <div class="login-credentials" id="loginCredentials">
+      <div class="login-credentials-head">
+        <strong>🔑 Akaunti za Kuingia</strong>
+        <span class="login-credentials-note">Bonyeza kujaza fomu</span>
+      </div>
+      <div class="credential-cards">
+        <button type="button" class="credential-card" data-user="clever" data-pass="Clever@2026">
+          <span class="credential-role role-admin">Admin</span>
+          <span class="credential-user">clever</span>
+          <span class="credential-pass">Clever@2026</span>
+        </button>
+        <button type="button" class="credential-card" data-user="manager" data-pass="Manager@2026">
+          <span class="credential-role role-manager">Meneja</span>
+          <span class="credential-user">manager</span>
+          <span class="credential-pass">Manager@2026</span>
+        </button>
+        <button type="button" class="credential-card" data-user="seller" data-pass="Seller@2026">
+          <span class="credential-role role-seller">Muuzaji</span>
+          <span class="credential-user">seller</span>
+          <span class="credential-pass">Seller@2026</span>
+        </button>
+      </div>
     </div>
 
     <form id="loginForm" class="login-form" autocomplete="on">
@@ -76,10 +100,86 @@
         <button class="btn btn-back btn-sm" type="button" id="exportOrdersBtn">⬇ Oda CSV</button>
         <button class="btn btn-back btn-sm" type="button" id="exportUsersBtn">⬇ Wateja CSV</button>
         <button class="btn btn-back btn-sm" type="button" id="exportVisitsBtn">⬇ Wageni CSV</button>
+        <button class="btn btn-back btn-sm" type="button" id="exportSalesBtn">⬇ Mauzo CSV</button>
         <button class="btn btn-save btn-sm" type="button" id="printReportBtn">🖨 Ripoti</button>
       </div>
     </div>
     <div class="stats-grid" id="dashboardStats"></div>
+  </section>
+
+  <section class="panel sales-panel hidden" id="salesPanel">
+    <div class="panel-head-row">
+      <div>
+        <h2>🥩 Mauzo ya Nyama</h2>
+        <p class="panel-note panel-note-tight">Rekodi mauzo ya Kitimoto — chagua bidhaa, kiasi, na malipo</p>
+      </div>
+    </div>
+    <div class="sales-record-grid">
+      <div class="field">
+        <label>Bidhaa</label>
+        <select id="saleItemSelect"><option value="">Chagua bidhaa...</option></select>
+      </div>
+      <div class="field">
+        <label>Kiasi</label>
+        <input id="saleQty" type="number" min="0.01" step="0.01" placeholder="Mfano: 0.5 au 1">
+      </div>
+      <div class="field">
+        <label>Bei (TSH)</label>
+        <input id="saleTotal" type="number" min="0" placeholder="Inajazwa otomatiki">
+        <small class="field-hint" id="salePriceHint">Chagua bidhaa kwanza</small>
+      </div>
+      <div class="field">
+        <label>Malipo</label>
+        <select id="salePayment">
+          <option value="cash">Cash</option>
+          <option value="mpesa">M-Pesa</option>
+          <option value="lipa">Lipa namba</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Simu mteja (optional)</label>
+        <input id="salePhone" type="tel" placeholder="07XX XXX XXX">
+      </div>
+      <div class="field">
+        <label>Maelezo (optional)</label>
+        <input id="saleNotes" type="text" placeholder="Mfano: delivery, jina la mteja...">
+      </div>
+    </div>
+    <div class="sales-qty-presets" id="saleQtyPresets"></div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn btn-save" type="button" id="recordSaleBtn">✓ Rekodi Mauzo</button>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="salesItemsSection">
+    <div class="panel-head-row">
+      <div>
+        <h2>📦 Bidhaa za Mauzo</h2>
+        <p class="panel-note panel-note-tight">Ongeza au futa bidhaa za nyama na menu</p>
+      </div>
+    </div>
+    <div class="add-grid">
+      <div class="field"><label>Jina la bidhaa</label><input id="salesItemName" placeholder="Mfano: Choma"></div>
+      <div class="field"><label>Aina</label>
+        <select id="salesItemCategory">
+          <option>Choma</option><option>Choma ya Foil</option><option>Rosti</option><option>Kavu</option>
+          <option>Nyama</option><option>Kisinia</option><option>Mix</option><option>Zege</option><option>Sides</option><option>Nyingine</option>
+        </select>
+      </div>
+      <div class="field"><label>Kipimo</label>
+        <select id="salesItemUnit">
+          <option value="KG">KG (kilo)</option>
+          <option value="Kipande">Kipande</option>
+          <option value="Sahani">Sahani</option>
+          <option value="Kifurushi">Kifurushi</option>
+        </select>
+      </div>
+      <div class="field"><label>Bei kwa kipimo (TSH)</label><input id="salesItemPrice" type="number" min="0" placeholder="18000"></div>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn btn-save" type="button" id="addSalesItemBtn">➕ Ongeza Bidhaa</button>
+    </div>
+    <div id="salesItemsList" class="sales-items-list"></div>
   </section>
 
   <section class="panel reports-panel" id="reportsPanel">
@@ -88,6 +188,7 @@
       <div class="report-tabs" id="reportTabs">
         <button type="button" class="report-tab active" data-tab="users">Wateja</button>
         <button type="button" class="report-tab" data-tab="orders">Oda Zote</button>
+        <button type="button" class="report-tab" data-tab="sales">Mauzo</button>
         <button type="button" class="report-tab" data-tab="visits">Wageni</button>
       </div>
     </div>
@@ -115,6 +216,16 @@
         <button class="btn btn-reset btn-sm" type="button" id="clearOrdersBtn">Futa oda</button>
       </div>
       <div id="ordersList" class="orders-list"></div>
+    </div>
+
+    <div class="report-pane" id="salesPane">
+      <div class="report-summary" id="salesSummary"></div>
+      <div class="panel-head-row report-toolbar">
+        <p class="panel-note panel-note-tight">Mauzo yaliyorekodi na wafanyakazi</p>
+        <button class="btn btn-reset btn-sm hidden" type="button" id="clearSalesBtn">Futa mauzo</button>
+      </div>
+      <div id="salesBreakdown" class="sales-breakdown"></div>
+      <div id="salesList" class="sales-list"></div>
     </div>
 
     <div class="report-pane" id="visitsPane">

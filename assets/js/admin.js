@@ -202,12 +202,18 @@
   }
 
   function assignStaffBranch(user, branchId) {
-    if (!hasPerm('branches')) return false;
+    if (!hasPerm('branches') && !hasPerm('staff_manage')) return false;
     if (!getSellerAccounts().some(a => a.user === user)) return false;
     if (!getBranches().some(b => b.id === branchId)) return false;
     const map = getStaffBranchMap();
     map[user] = branchId;
     saveStaffBranchMap(map);
+    const list = getAllAccountsIncludingInactive();
+    const idx = list.findIndex(a => a.user === user && a.active !== false);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], branchId };
+      saveStaffAccountsRaw(list);
+    }
     return true;
   }
 
@@ -584,10 +590,21 @@
     toggleStaffAddBranchField();
   }
 
+  function changeStaffBranch(user, branchId) {
+    if (!assignStaffBranch(user, branchId)) {
+      showAdminToast('Imeshindwa kubadilisha tawi.', 'warn');
+      return;
+    }
+    renderStaffManagement();
+    renderStaffAssignments();
+    showAdminToast('✓ ' + user + ' sasa ni kwenye tawi: ' + (getBranchById(branchId)?.name || branchId));
+  }
+
   function renderStaffManagement() {
     const el = $('staffList');
     if (!el || !hasPerm('staff_manage')) return;
     populateStaffFormSelects();
+    const branches = getBranches();
     const staff = getAllAccounts().slice().sort((a, b) => {
       const order = { admin: 0, manager: 1, seller: 2 };
       return (order[a.role] ?? 9) - (order[b.role] ?? 9) || a.user.localeCompare(b.user);
@@ -597,7 +614,10 @@
       return;
     }
     el.innerHTML = staff.map(a => {
-      const branch = a.role === 'seller' ? getBranchById(getAssignedBranchId(a.user)) : null;
+      const branchId = a.role === 'seller' ? getAssignedBranchId(a.user) : '';
+      const branchOpts = branches.map(b =>
+        `<option value="${escapeHtml(b.id)}"${b.id === branchId ? ' selected' : ''}>${escapeHtml(b.name)}</option>`
+      ).join('');
       return `
         <article class="staff-card staff-role-${a.role}${a.protected ? ' staff-protected' : ''}">
           <div class="staff-card-main">
@@ -607,14 +627,21 @@
               ${a.protected ? '<span class="staff-tag">Imelindwa</span>' : ''}
             </div>
             <div class="staff-card-meta">
-              ${branch ? '🏪 ' + escapeHtml(branch.name) : a.role === 'manager' ? 'Meneja — matawi yote' : 'Admin kamili'}
+              ${a.role === 'seller'
+                ? `<label class="staff-branch-inline"><span>🏪 Tawi:</span><select class="staff-branch-select" data-staff-branch="${escapeHtml(a.user)}">${branchOpts}</select></label>`
+                : a.role === 'manager' ? 'Meneja — matawi yote' : 'Admin kamili'}
             </div>
           </div>
-          ${!a.protected ? `<button type="button" class="btn btn-delete btn-sm" data-delete-staff="${escapeHtml(a.user)}">Futa</button>` : ''}
+          <div class="staff-card-actions">
+            ${!a.protected ? `<button type="button" class="btn btn-delete btn-sm" data-delete-staff="${escapeHtml(a.user)}">Futa</button>` : ''}
+          </div>
         </article>`;
     }).join('');
     el.querySelectorAll('[data-delete-staff]').forEach(btn => {
       btn.addEventListener('click', () => deactivateStaffAccount(btn.dataset.deleteStaff));
+    });
+    el.querySelectorAll('[data-staff-branch]').forEach(sel => {
+      sel.addEventListener('change', () => changeStaffBranch(sel.dataset.staffBranch, sel.value));
     });
   }
 

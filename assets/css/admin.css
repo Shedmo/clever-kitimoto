@@ -2124,6 +2124,38 @@ body {
   color: var(--muted);
   font-weight: 600;
 }
+.staff-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.staff-branch-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.staff-branch-inline span {
+  color: var(--ink);
+  font-weight: 700;
+}
+.staff-branch-select {
+  min-width: 180px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--maroon);
+  cursor: pointer;
+}
+.staff-branch-select:focus {
+  outline: 2px solid var(--yellow);
+  border-color: var(--maroon);
+}
 .staff-tag {
   font-size: 0.68rem;
   font-weight: 800;
@@ -2150,6 +2182,7 @@ body {
   .dash-hero-kpi { text-align: left; width: 100%; }
   .dash-quick-actions { grid-template-columns: 1fr; }
   .staff-mgmt-grid { grid-template-columns: 1fr; }
+  .staff-branch-select { min-width: 0; width: 100%; }
   .dash-export-actions { width: 100%; }
   .dash-export-actions .btn { flex: 1; justify-content: center; }
   .sales-breakdown-grid { grid-template-columns: 1fr; }

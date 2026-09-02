@@ -29,8 +29,8 @@
   ];
 
   const PERMS = {
-    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add', 'branches', 'staff_manage'],
-    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'stock_add', 'branches'],
+    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add', 'branches', 'staff_manage', 'backup', 'eod'],
+    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'stock_add', 'branches', 'eod'],
     seller: ['dashboard', 'sales', 'stock_view']
   };
 
@@ -38,6 +38,23 @@
   let lockedUntil = 0;
   let userFilter = 'all';
   let userQuery = '';
+  let saleCart = [];
+
+  const ORDER_STATUSES = ['pending', 'preparing', 'ready', 'delivered', 'cancelled'];
+  const ORDER_STATUS_LABELS = {
+    pending: 'Mpya',
+    preparing: 'Inaandaliwa',
+    ready: 'Tayari',
+    delivered: 'Imewasilishwa',
+    cancelled: 'Imefutwa'
+  };
+  const STOCK_TYPE_LABELS = {
+    sale: 'Mauzo',
+    in: 'Ongezeko',
+    wastage: 'Uharibifu',
+    adjust: 'Marekebisho'
+  };
+  const BACKUP_PREFIX = 'cleverKitimoto';
 
   const groups = {
     'Choma': [['choma','½ KG','9,000'],['choma1','1 KG','18,000'],['choma15','1½ KG','27,000'],['choma2','2 KG','36,000']],
@@ -829,6 +846,9 @@
     $('clearVisitsBtn')?.classList.toggle('hidden', !hasPerm('clear'));
     $('branchPanel')?.classList.toggle('hidden', !hasPerm('branches'));
     $('staffPanel')?.classList.toggle('hidden', !hasPerm('staff_manage'));
+    $('toolsPanel')?.classList.toggle('hidden', !hasPerm('backup'));
+    $('printEodBtn')?.classList.toggle('hidden', !hasPerm('eod'));
+    $('dashNotice')?.classList.toggle('hidden', !hasPerm('branches') || getBranches().length <= 1);
     $('branchRegisterForm')?.classList.toggle('hidden', !hasPerm('branches'));
     $('registerBranchBtn')?.classList.toggle('hidden', !hasPerm('branches'));
     $('reportsPanel')?.classList.toggle('hidden', !hasPerm('reports'));
@@ -856,11 +876,13 @@
       switchSellerTab('salesPanel');
       updateSellerQuickUI();
       setSellerPayment($('salePayment')?.value || 'cash');
+      renderSaleCart();
     } else {
       if (salesTitle) salesTitle.textContent = '🥩 Mauzo ya Nyama';
       if (salesNote) salesNote.textContent = 'Rekodi mauzo kwa tawi lililochaguliwa — chagua bidhaa, kiasi, na malipo';
       document.querySelectorAll('.seller-optional').forEach(el => el.classList.remove('hidden'));
       $('recordSaleBtn').textContent = '✓ Rekodi Mauzo';
+      renderSaleCart();
     }
 
     document.querySelectorAll('#priceForms .panel').forEach(p => {
@@ -893,6 +915,7 @@
     renderStock();
     renderBranches();
     renderStaffManagement();
+    renderSaleCart();
   }
 
   function showLogin() {
@@ -1194,6 +1217,58 @@
     return updated;
   }
 
+  function recordWastage(itemId) {
+    if (!hasPerm('stock_add')) return;
+    const item = getAllSalesItems().find(x => x.id === itemId && x.active !== false);
+    if (!item) return;
+    const qtyStr = prompt('Kiasi cha uharibifu kwa ' + item.name + ' (' + item.unit + '):', item.unit === 'KG' ? '0.5' : '1');
+    if (qtyStr == null) return;
+    const qty = parseFloat(qtyStr);
+    if (!qty || qty <= 0) {
+      showAdminToast('Weka kiasi sahihi.', 'warn');
+      return;
+    }
+    const avail = Number(item.stock) || 0;
+    if (qty > avail) {
+      showAdminToast('Stock haitoshi. Ipo tu: ' + formatStockQty(avail, item.unit), 'warn');
+      return;
+    }
+    const reason = prompt('Sababu ya uharibifu (mfano: imeharibika, muda umeisha):', 'Uharibifu wa nyama') || 'Uharibifu';
+    const updated = updateItemStock(itemId, -qty, 'wastage', reason);
+    if (updated) {
+      populateSaleItemSelect();
+      renderSalesItems();
+      renderStock();
+      renderDashboard();
+      showAdminToast('✓ Uharibifu umerekodiwa: -' + formatStockQty(qty, item.unit) + ' ' + item.name);
+    }
+  }
+
+  function renderStockLog() {
+    const section = $('stockLogSection');
+    const el = $('stockLogList');
+    if (!section || !el) return;
+    const canView = hasPerm('stock_add');
+    section.classList.toggle('hidden', !canView);
+    if (!canView) return;
+    const log = getStockLog().slice(0, 40);
+    if (!log.length) {
+      el.innerHTML = '<div class="empty">Hakuna mabadiliko ya stock bado.</div>';
+      return;
+    }
+    el.innerHTML = log.map(entry => `
+      <article class="stock-log-row stock-log-${escapeHtml(entry.type || 'adjust')}">
+        <div class="stock-log-main">
+          <strong>${escapeHtml(entry.itemName || '—')}</strong>
+          <span class="stock-log-meta">${escapeHtml(STOCK_TYPE_LABELS[entry.type] || entry.type || '—')} · ${escapeHtml(formatOrderDate(entry.at))}</span>
+        </div>
+        <div class="stock-log-qty">${entry.delta < 0 ? '' : '+'}${escapeHtml(String(entry.delta))} ${escapeHtml(entry.unit || '')}</div>
+        <div class="stock-log-after">${escapeHtml(formatStockQty(entry.after, entry.unit))}</div>
+        <div class="stock-log-note">${escapeHtml(entry.note || entry.user || '—')}</div>
+      </article>
+    `).join('');
+  }
+
   function computeStockStats() {
     const items = getSalesItems().filter(x => x.trackStock !== false);
     let low = 0;
@@ -1238,6 +1313,7 @@
           </div>`;
       }
     }
+    renderStockLog();
   }
 
   function renderStockSummary() {
@@ -1320,6 +1396,7 @@
               <input type="number" min="0.01" step="0.01" placeholder="+" data-stock-input="${escapeHtml(x.id)}" aria-label="Ongeza stock ${escapeHtml(x.name)}">
               <button type="button" class="btn btn-back btn-sm" data-stock-custom="${escapeHtml(x.id)}">Ongeza</button>
             </div>
+            <button type="button" class="btn btn-reset btn-sm" data-stock-waste="${escapeHtml(x.id)}">− Uharibifu</button>
           </div>` : `
           <div class="stock-row-view">${x.trackStock === false ? 'Haifuatiliwi' : 'Angalia tu'}</div>`}
         </article>`;
@@ -1334,6 +1411,9 @@
         addStockToItem(btn.dataset.stockCustom, input?.value);
         if (input) input.value = '';
       });
+    });
+    el.querySelectorAll('[data-stock-waste]').forEach(btn => {
+      btn.addEventListener('click', () => recordWastage(btn.dataset.stockWaste));
     });
   }
 
@@ -1498,6 +1578,145 @@
         updateSaleTotalPreview();
       });
     });
+  }
+
+  function getSaleCartTotal() {
+    return saleCart.reduce((s, x) => s + (Number(x.total) || 0), 0);
+  }
+
+  function renderSaleCart() {
+    const wrap = $('saleCartWrap');
+    const list = $('saleCartList');
+    const totalEl = $('saleCartTotal');
+    const addBtn = $('addToSaleCartBtn');
+    if (!wrap || !list) return;
+    const showCart = hasPerm('sales') && !isSellerQuick();
+    wrap.classList.toggle('hidden', !showCart || !saleCart.length);
+    if (addBtn) addBtn.classList.toggle('hidden', !showCart);
+    if (!saleCart.length) return;
+    list.innerHTML = saleCart.map((line, idx) => `
+      <div class="sale-cart-line">
+        <div class="sale-cart-line-main">
+          <strong>${escapeHtml(line.itemName)}</strong>
+          <span>${escapeHtml(String(line.qty))} ${escapeHtml(line.unit)} · TSH ${formatMoney(line.total)}</span>
+        </div>
+        <button type="button" class="btn btn-delete btn-sm" data-cart-remove="${idx}">×</button>
+      </div>
+    `).join('');
+    if (totalEl) totalEl.textContent = 'TSH ' + formatMoney(getSaleCartTotal());
+    list.querySelectorAll('[data-cart-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        saleCart.splice(Number(btn.dataset.cartRemove), 1);
+        renderSaleCart();
+      });
+    });
+  }
+
+  function addToSaleCart() {
+    if (!hasPerm('sales')) return;
+    const item = getSelectedSaleItem();
+    const qty = parseFloat($('saleQty')?.value);
+    const total = parseInt($('saleTotal')?.value, 10);
+    if (!item) { showAdminToast('Chagua bidhaa kwanza.', 'warn'); return; }
+    if (!qty || qty <= 0) { showAdminToast('Weka kiasi sahihi.', 'warn'); return; }
+    if (!total || total <= 0) { showAdminToast('Weka bei ya mauzo.', 'warn'); return; }
+    if (item.trackStock !== false) {
+      const inCart = saleCart.filter(x => x.itemId === item.id).reduce((s, x) => s + x.qty, 0);
+      const avail = Number(item.stock) || 0;
+      if (inCart + qty > avail) {
+        showAdminToast('Stock haitoshi kwa risiti. Ipo: ' + formatStockQty(avail, item.unit), 'warn');
+        return;
+      }
+    }
+    saleCart.push({
+      itemId: item.id,
+      itemName: item.name,
+      category: item.category,
+      qty,
+      unit: item.unit,
+      unitPrice: item.price,
+      total,
+      trackStock: item.trackStock !== false
+    });
+    ['saleQty', 'saleTotal'].forEach(id => {
+      if ($(id)) {
+        $(id).value = '';
+        if (id === 'saleTotal') delete $(id).dataset.manual;
+      }
+    });
+    if ($('saleItemSelect')) $('saleItemSelect').value = '';
+    updateSaleTotalPreview();
+    renderSaleQtyPresets();
+    renderSaleCart();
+    showAdminToast('✓ Imeongezwa kwenye risiti');
+  }
+
+  function clearSaleCart() {
+    saleCart = [];
+    renderSaleCart();
+  }
+
+  function recordSaleCart() {
+    if (!hasPerm('sales') || !saleCart.length) return;
+    const payment = $('salePayment')?.value || 'cash';
+    const phone = $('salePhone')?.value.trim() || '';
+    const notes = $('saleNotes')?.value.trim() || '';
+    const session = getSession();
+    const branch = getCurrentBranch();
+    const receiptId = 'rcpt-' + Date.now();
+    const log = getSalesLog();
+    let grandTotal = 0;
+
+    for (const line of saleCart) {
+      const item = getAllSalesItems().find(x => x.id === line.itemId && x.active !== false);
+      if (!item) continue;
+      if (item.trackStock !== false) {
+        const avail = Number(item.stock) || 0;
+        if (line.qty > avail) {
+          showAdminToast('Stock haitoshi kwa ' + item.name + '. Angalia risiti.', 'warn');
+          return;
+        }
+      }
+    }
+
+    const lineCount = saleCart.length;
+    saleCart.forEach(line => {
+      const sale = {
+        id: 'sale-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        receiptId,
+        at: new Date().toISOString(),
+        itemId: line.itemId,
+        itemName: line.itemName,
+        category: line.category,
+        qty: line.qty,
+        unit: line.unit,
+        unitPrice: line.unitPrice,
+        total: line.total,
+        payment,
+        phone,
+        notes,
+        seller: session?.user || 'staff',
+        branchId: branch?.id || '',
+        branchName: branch?.name || ''
+      };
+      log.unshift(sale);
+      grandTotal += line.total;
+      if (line.trackStock !== false) {
+        updateItemStock(line.itemId, -line.qty, 'sale', 'Mauzo (risiti)', sale.id);
+      }
+    });
+    if (log.length > 500) log.length = 500;
+    saveBranchData(SALES_LOG_KEY, log);
+
+    saleCart = [];
+    ['salePhone', 'saleNotes'].forEach(id => { if ($(id)) $(id).value = ''; });
+    renderSaleCart();
+    renderSales();
+    renderStock();
+    renderDashboard();
+    populateSaleItemSelect();
+    updateSellerQuickUI();
+    showAdminToast('✓ Risiti imerekodiwa — ' + lineCount + ' bidhaa · TSH ' + formatMoney(grandTotal));
   }
 
   function recordSale() {
@@ -2232,6 +2451,8 @@
             ${hasPerm('reports') ? '<button type="button" class="dash-action-btn" data-dash-scroll="reportsPanel"><span>📋</span> Ripoti Zote</button>' : ''}
             ${hasPerm('branches') ? '<button type="button" class="dash-action-btn" data-dash-scroll="branchPanel"><span>🏪</span> Dhibiti Matawi</button>' : ''}
             ${hasPerm('staff_manage') ? '<button type="button" class="dash-action-btn" data-dash-scroll="staffPanel"><span>👥</span> Wafanyakazi</button>' : ''}
+            ${hasPerm('backup') ? '<button type="button" class="dash-action-btn" data-dash-scroll="toolsPanel"><span>🔧</span> Backup</button>' : ''}
+            ${hasPerm('eod') ? '<button type="button" class="dash-action-btn" id="dashEodBtn"><span>📅</span> Funga Siku</button>' : ''}
             <button type="button" class="dash-action-btn" id="dashRefreshBtn"><span>🔄</span> Onyesha Upya</button>
           </div>
           <p class="dash-action-note">Data inasasishwa otomatiki unaporekodi mauzo, stock, au oda.</p>
@@ -2245,8 +2466,12 @@
     if (!el) return;
     const orders = getOrders();
     const total = orders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0);
+    const pending = orders.filter(o => getOrderStatus(o) === 'pending').length;
+    const preparing = orders.filter(o => getOrderStatus(o) === 'preparing').length;
     el.innerHTML = `
       <div class="summary-chip"><span>Oda</span><b>${orders.length}</b></div>
+      <div class="summary-chip warn"><span>Mpya</span><b>${pending}</b></div>
+      <div class="summary-chip"><span>Inaandaliwa</span><b>${preparing}</b></div>
       <div class="summary-chip highlight"><span>Jumla ya Mapato</span><b>TSH ${formatMoney(total)}</b></div>
     `;
   }
@@ -2544,6 +2769,8 @@
     const branch = getCurrentBranch();
     const orders = getOrders();
     const visits = getVisits();
+    const salesStats = computeSalesStats();
+    const eod = computeEodReport();
     const w = window.open('', '_blank');
     if (!w) { alert('Ruhusu pop-ups kuchapisha ripoti.'); return; }
     const orderRows = orders.slice(0, 50).map(o => `
@@ -2578,10 +2805,12 @@
       <h1>Clever Kitimoto — Ripoti</h1>
       <p class="meta">Imetengenezwa: ${escapeHtml(new Date().toLocaleString('sw-TZ'))}${branch ? ' · Tawi: ' + escapeHtml(branch.name) : ''}</p>
       <div class="stats">
-        <div class="stat"><span>Jumla Mapato</span><b>TSH ${formatMoney(s.totalRevenue)}</b></div>
+        <div class="stat"><span>Jumla Mapato (Oda)</span><b>TSH ${formatMoney(s.totalRevenue)}</b></div>
+        <div class="stat"><span>Mauzo Leo (POS)</span><b>TSH ${formatMoney(eod.totalSales)}</b></div>
+        <div class="stat"><span>KG Leo</span><b>${eod.kgSold || '—'}</b></div>
         <div class="stat"><span>Oda Zote</span><b>${s.orderCount}</b></div>
         <div class="stat"><span>Wageni</span><b>${s.visitCount}</b></div>
-        <div class="stat"><span>Unique Wageni</span><b>${s.uniqueVisitors}</b></div>
+        <div class="stat"><span>Rekodi Mauzo</span><b>${salesStats.count}</b></div>
       </div>
       <h2>Oda (50 za mwisho)</h2>
       <table><thead><tr><th>Tarehe</th><th>Simu</th><th>Channel</th><th>Jumla</th></tr></thead>
@@ -2612,6 +2841,202 @@
     } catch {
       return [];
     }
+  }
+
+  function saveOrders(list) {
+    localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(list));
+  }
+
+  function getOrderStatus(order) {
+    const s = order?.status || 'pending';
+    return ORDER_STATUSES.includes(s) ? s : 'pending';
+  }
+
+  function orderStatusLabel(status) {
+    return ORDER_STATUS_LABELS[status] || status || 'Mpya';
+  }
+
+  function updateOrderStatus(orderId, status) {
+    if (!hasPerm('orders')) return;
+    if (!ORDER_STATUSES.includes(status)) return;
+    const orders = getOrders();
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx < 0) return;
+    orders[idx] = {
+      ...orders[idx],
+      status,
+      statusAt: new Date().toISOString(),
+      statusBy: getSession()?.user || 'staff'
+    };
+    saveOrders(orders);
+    renderOrders();
+    renderDashboard();
+    showAdminToast('✓ Oda: ' + orderStatusLabel(status));
+  }
+
+  function renderOrderStatusActions(order) {
+    if (!hasPerm('orders')) return '';
+    const status = getOrderStatus(order);
+    if (status === 'delivered' || status === 'cancelled') return '';
+    const actions = {
+      pending: [
+        { status: 'preparing', label: 'Anza Kuandaa' },
+        { status: 'cancelled', label: 'Ghairi', danger: true }
+      ],
+      preparing: [
+        { status: 'ready', label: 'Tayari' },
+        { status: 'cancelled', label: 'Ghairi', danger: true }
+      ],
+      ready: [
+        { status: 'delivered', label: 'Imewasilishwa' },
+        { status: 'cancelled', label: 'Ghairi', danger: true }
+      ]
+    }[status] || [];
+    return actions.map(a =>
+      `<button type="button" class="btn btn-sm ${a.danger ? 'btn-delete' : 'btn-save'}" data-order-status="${escapeHtml(order.id)}" data-status="${a.status}">${escapeHtml(a.label)}</button>`
+    ).join('');
+  }
+
+  function computeEodReport() {
+    const sales = getSalesLog().filter(x => isToday(x.at));
+    const orders = getOrders().filter(o => isToday(o.at));
+    const stock = computeStockStats();
+    const payMix = { cash: 0, mpesa: 0, lipa: 0 };
+    sales.forEach(x => {
+      const p = x.payment || 'cash';
+      if (payMix[p] != null) payMix[p] += Number(x.total) || 0;
+    });
+    const kgSold = sales.reduce((s, x) => x.unit === 'KG' ? s + (Number(x.qty) || 0) : s, 0);
+    const pendingOrders = orders.filter(o => getOrderStatus(o) === 'pending').length;
+    const byItem = {};
+    sales.forEach(x => {
+      const key = x.itemName || 'Nyingine';
+      if (!byItem[key]) byItem[key] = { qty: 0, total: 0, unit: x.unit };
+      byItem[key].qty += Number(x.qty) || 0;
+      byItem[key].total += Number(x.total) || 0;
+    });
+    const topItems = Object.entries(byItem).sort((a, b) => b[1].total - a[1].total).slice(0, 8);
+    const totalSales = sales.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    const wastage = getStockLog().filter(x => isToday(x.at) && x.type === 'wastage');
+    const wastageKg = wastage.reduce((s, x) => x.unit === 'KG' ? s + (Number(x.qty) || 0) : s, 0);
+    return {
+      sales,
+      orders,
+      stock,
+      payMix,
+      kgSold: Math.round(kgSold * 10) / 10,
+      pendingOrders,
+      topItems,
+      totalSales,
+      salesCount: sales.length,
+      ordersCount: orders.length,
+      wastageKg: Math.round(wastageKg * 10) / 10,
+      wastageCount: wastage.length
+    };
+  }
+
+  function printEodReport() {
+    if (!hasPerm('eod')) return;
+    const branch = getCurrentBranch();
+    const session = getSession();
+    const d = computeEodReport();
+    const w = window.open('', '_blank');
+    if (!w) { alert('Ruhusu pop-ups kuchapisha ripoti.'); return; }
+    const itemRows = d.topItems.map(([name, data]) =>
+      `<tr><td>${escapeHtml(name)}</td><td>${data.qty} ${escapeHtml(data.unit)}</td><td>TSH ${formatMoney(data.total)}</td></tr>`
+    ).join('');
+    w.document.write(`<!DOCTYPE html><html><head><title>Funga Siku — Clever Kitimoto</title>
+      <style>
+        body{font-family:system-ui,sans-serif;padding:24px;color:#2d1a12;max-width:720px;margin:0 auto}
+        h1{color:#7a1515;margin:0 0 4px} .meta{color:#6b5344;font-size:14px;margin-bottom:24px}
+        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px}
+        .stat{border:1px solid #ddd;border-radius:10px;padding:12px;background:#fff8e7}
+        .stat span{display:block;font-size:10px;text-transform:uppercase;color:#6b5344}
+        .stat b{font-size:18px;color:#7a1515}
+        h2{font-size:15px;color:#7a1515;margin:20px 0 8px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left}
+        th{background:#7a1515;color:#fff}
+        .foot{margin-top:28px;font-size:12px;color:#6b5344;border-top:1px dashed #ccc;padding-top:12px}
+      </style></head><body>
+      <h1>📅 Ripoti ya Kufunga Siku</h1>
+      <p class="meta">${escapeHtml(new Date().toLocaleDateString('sw-TZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}${branch ? ' · ' + escapeHtml(branch.name) : ''} · ${escapeHtml(session?.user || 'staff')}</p>
+      <div class="stats">
+        <div class="stat"><span>Mapato ya Mauzo</span><b>TSH ${formatMoney(d.totalSales)}</b></div>
+        <div class="stat"><span>Rekodi za Mauzo</span><b>${d.salesCount}</b></div>
+        <div class="stat"><span>KG Iliyouzwa</span><b>${d.kgSold || '—'}</b></div>
+        <div class="stat"><span>Cash</span><b>TSH ${formatMoney(d.payMix.cash)}</b></div>
+        <div class="stat"><span>M-Pesa</span><b>TSH ${formatMoney(d.payMix.mpesa)}</b></div>
+        <div class="stat"><span>Lipa Namba</span><b>TSH ${formatMoney(d.payMix.lipa)}</b></div>
+        <div class="stat"><span>Oda za Leo</span><b>${d.ordersCount}</b></div>
+        <div class="stat"><span>Oda Mpya</span><b>${d.pendingOrders}</b></div>
+        <div class="stat"><span>Uharibifu (KG)</span><b>${d.wastageKg || '—'}</b></div>
+      </div>
+      <h2>Stock — Muhtasari</h2>
+      <div class="stats">
+        <div class="stat"><span>Salama</span><b>${d.stock.ok}</b></div>
+        <div class="stat"><span>Chini</span><b>${d.stock.low}</b></div>
+        <div class="stat"><span>Imeisha</span><b>${d.stock.out}</b></div>
+      </div>
+      <h2>Bidhaa Zilizouzwa Zaidi Leo</h2>
+      <table><thead><tr><th>Bidhaa</th><th>Kiasi</th><th>Mapato</th></tr></thead>
+      <tbody>${itemRows || '<tr><td colspan="3">Hakuna mauzo leo</td></tr>'}</tbody></table>
+      <p class="foot">Clever Kitimoto · Ripoti ya kufunga siku · ${escapeHtml(new Date().toLocaleString('sw-TZ'))}</p>
+      </body></html>`);
+    w.document.close();
+    w.focus();
+    w.print();
+  }
+
+  function getAllBackupKeys() {
+    return Object.keys(localStorage).filter(k => k.startsWith(BACKUP_PREFIX));
+  }
+
+  function exportBackup() {
+    if (!hasPerm('backup')) return;
+    const data = {
+      version: 1,
+      app: 'Clever Kitimoto',
+      exportedAt: new Date().toISOString(),
+      keys: {}
+    };
+    getAllBackupKeys().forEach(k => { data.keys[k] = localStorage.getItem(k); });
+    downloadJson('clever-kitimoto-backup-' + new Date().toISOString().slice(0, 10) + '.json', data);
+    showAdminToast('✓ Backup imepakuliwa');
+  }
+
+  function importBackupFile(file) {
+    if (!hasPerm('backup') || !file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data?.keys || typeof data.keys !== 'object') {
+          showAdminToast('Faili si backup sahihi.', 'warn');
+          return;
+        }
+        const count = Object.keys(data.keys).length;
+        if (!confirm('Rudisha backup ya vitufe ' + count + '? Data ya sasa itaandikwa juu.')) return;
+        Object.entries(data.keys).forEach(([k, v]) => {
+          if (k.startsWith(BACKUP_PREFIX) && typeof v === 'string') localStorage.setItem(k, v);
+        });
+        saleCart = [];
+        showApp();
+        showAdminToast('✓ Backup imerudishwa — onyesha upya ukurasa ikiwa ni lazima');
+      } catch {
+        showAdminToast('Faili haijasomwa. Hakikisha ni JSON sahihi.', 'warn');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function downloadJson(filename, obj) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   function formatOrderDate(iso) {
@@ -2646,12 +3071,15 @@
           (i.price ? ' @ TSH ' + i.price : '')) + '</li>'
       ).join('');
       const sub = o.subtotal ? 'TSH ' + Number(o.subtotal).toLocaleString('en-US') : '—';
+      const status = getOrderStatus(o);
+      const statusActions = renderOrderStatusActions(o);
       return `
-        <article class="order-card">
+        <article class="order-card order-status-${status}">
           <div class="order-card-head">
             <div>
               <strong>${escapeHtml(formatOrderDate(o.at))}</strong>
               <span class="order-meta">${escapeHtml(o.channel || '—')} · ${escapeHtml(paymentLabel(o.payment))}</span>
+              <span class="order-status-badge status-${status}">${escapeHtml(orderStatusLabel(status))}</span>
             </div>
             <strong class="order-total">${escapeHtml(sub)}</strong>
           </div>
@@ -2662,9 +3090,13 @@
             ${o.notes ? '<div class="order-row"><span>Maelezo</span><b>' + escapeHtml(o.notes) + '</b></div>' : ''}
           </div>
           ${items ? '<ul class="order-items">' + items + '</ul>' : ''}
+          ${statusActions ? '<div class="order-status-actions">' + statusActions + '</div>' : ''}
         </article>
       `;
     }).join('');
+    el.querySelectorAll('[data-order-status]').forEach(btn => {
+      btn.addEventListener('click', () => updateOrderStatus(btn.dataset.orderStatus, btn.dataset.status));
+    });
   }
 
   function clearOrders() {
@@ -2703,6 +3135,7 @@
         renderDashboard();
         showAdminToast('✓ Dashboard imesasishwa');
       }
+      if (e.target.closest('#dashEodBtn')) printEodReport();
     });
     document.querySelectorAll('.seller-tab').forEach(btn => {
       btn.addEventListener('click', () => switchSellerTab(btn.dataset.sellerTab));
@@ -2731,6 +3164,16 @@
     $('exportVisitsBtn')?.addEventListener('click', exportVisitsCsv);
     $('exportSalesBtn')?.addEventListener('click', exportSalesCsv);
     $('printReportBtn')?.addEventListener('click', printReport);
+    $('printEodBtn')?.addEventListener('click', printEodReport);
+    $('exportBackupBtn')?.addEventListener('click', exportBackup);
+    $('importBackupInput')?.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (file) importBackupFile(file);
+      e.target.value = '';
+    });
+    $('addToSaleCartBtn')?.addEventListener('click', addToSaleCart);
+    $('recordSaleCartBtn')?.addEventListener('click', recordSaleCart);
+    $('clearSaleCartBtn')?.addEventListener('click', clearSaleCart);
     $('recordSaleBtn')?.addEventListener('click', recordSale);
     $('addSalesItemBtn')?.addEventListener('click', addSalesItem);
     $('clearSalesBtn')?.addEventListener('click', clearSales);

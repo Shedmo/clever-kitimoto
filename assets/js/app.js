@@ -369,7 +369,8 @@
       fulfillment: c.fulfillment,
       payment: c.payment,
       subtotal: getCartTotal(),
-      items
+      items,
+      status: 'pending'
     };
     const history = loadOrderHistory();
     history.unshift(record);

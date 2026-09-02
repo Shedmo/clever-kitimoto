@@ -166,6 +166,7 @@
         <button class="btn btn-back btn-sm" type="button" id="exportUsersBtn">⬇ Wateja</button>
         <button class="btn btn-back btn-sm" type="button" id="exportVisitsBtn">⬇ Wageni</button>
         <button class="btn btn-back btn-sm" type="button" id="exportSalesBtn">⬇ Mauzo</button>
+        <button class="btn btn-back btn-sm" type="button" id="printEodBtn">📅 Funga Siku</button>
         <button class="btn btn-save btn-sm" type="button" id="printReportBtn">🖨 Ripoti</button>
       </div>
     </div>
@@ -223,7 +224,19 @@
     </div>
     <div class="sales-qty-presets" id="saleQtyPresets"></div>
     <button type="button" class="seller-more-toggle hidden" id="sellerMoreToggle">+ Simu / Maelezo (hiari)</button>
+    <div class="sale-cart-wrap hidden" id="saleCartWrap">
+      <div class="sale-cart-head">
+        <h3>🧾 Risiti ya Mauzo</h3>
+        <button type="button" class="btn btn-reset btn-sm" id="clearSaleCartBtn">Futa</button>
+      </div>
+      <div id="saleCartList" class="sale-cart-list"></div>
+      <div class="sale-cart-footer">
+        <div class="sale-cart-total"><span>Jumla Risiti</span><strong id="saleCartTotal">TSH 0</strong></div>
+        <button class="btn btn-save" type="button" id="recordSaleCartBtn">✓ Rekodi Risiti</button>
+      </div>
+    </div>
     <div class="actions seller-record-actions">
+      <button class="btn btn-back seller-add-cart-btn hidden" type="button" id="addToSaleCartBtn">+ Ongeza kwenye Risiti</button>
       <button class="btn btn-save seller-record-btn" type="button" id="recordSaleBtn">✓ Rekodi Mauzo</button>
     </div>
   </section>
@@ -271,6 +284,13 @@
     <div class="report-summary" id="stockSummary"></div>
     <div id="stockAlerts" class="stock-alerts"></div>
     <div id="stockList" class="stock-list"></div>
+    <div class="stock-log-section hidden" id="stockLogSection">
+      <div class="panel-head-row stock-log-head">
+        <h3>📋 Historia ya Stock</h3>
+        <p class="panel-note panel-note-tight">Mauzo, ongezeko, na uharibifu — mabadiliko yote ya stoo</p>
+      </div>
+      <div id="stockLogList" class="stock-log-list"></div>
+    </div>
   </section>
 
   <section class="panel reports-panel" id="reportsPanel">
@@ -381,6 +401,30 @@
       <a class="btn btn-back" href="index.html">👀 Preview Menu</a>
     </div>
   </div>
+
+  <section class="panel hidden" id="toolsPanel">
+    <div class="panel-head-row">
+      <div>
+        <h2>🔧 Zana za Mfumo / Tools</h2>
+        <p class="panel-note panel-note-tight">Chelezo data, rudisha nakala, na usalama wa biashara</p>
+      </div>
+    </div>
+    <div class="tools-grid">
+      <article class="tools-card">
+        <h3>💾 Chelezo Data (Backup)</h3>
+        <p>Pakua nakala kamili ya mauzo, stock, oda, matawi, na wafanyakazi.</p>
+        <button class="btn btn-save btn-sm" type="button" id="exportBackupBtn">⬇ Pakua Backup JSON</button>
+      </article>
+      <article class="tools-card">
+        <h3>📂 Rudisha Data (Restore)</h3>
+        <p>Rejesha data kutoka faili ya backup. <b>Itaandika juu ya data ya sasa.</b></p>
+        <label class="tools-file-label">
+          <input type="file" id="importBackupInput" accept=".json,application/json" hidden>
+          <span class="btn btn-back btn-sm">📂 Chagua Faili ya Backup</span>
+        </label>
+      </article>
+    </div>
+  </section>
 
   <nav class="seller-quick-bar hidden" id="sellerQuickBar" aria-label="Mauzo haraka">
     <button type="button" class="seller-tab active" data-seller-tab="salesPanel">

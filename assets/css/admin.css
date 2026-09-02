@@ -640,6 +640,61 @@ body {
   line-height: 1.45;
 }
 
+/* Muuzaji — simplified dashboard */
+.dashboard-root-seller .dash-kpi-grid-seller {
+  grid-template-columns: 1fr 1fr;
+}
+.dash-main-grid-seller {
+  grid-template-columns: 1fr 1fr;
+}
+.dash-seller-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.dash-seller-stat {
+  padding: 16px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  text-align: center;
+}
+.dash-seller-stat span {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.dash-seller-stat b {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--maroon);
+  line-height: 1.15;
+}
+.dash-card-stats-seller { grid-column: auto; }
+.dash-quick-actions-seller {
+  grid-template-columns: 1fr;
+}
+.dash-bottom-grid-seller {
+  grid-template-columns: 1.2fr 0.8fr;
+}
+
+@media (max-width: 960px) {
+  .dash-main-grid-seller,
+  .dash-bottom-grid-seller {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .dash-seller-stats { grid-template-columns: 1fr; }
+  .dashboard-root-seller .dash-kpi-grid-seller { grid-template-columns: 1fr; }
+}
+
 /* Legacy stat cards (reports) */
 .stats-grid {
   display: grid;

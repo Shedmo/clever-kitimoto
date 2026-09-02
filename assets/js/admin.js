@@ -1375,7 +1375,7 @@
         payment: o.payment,
         seller: o.channel
       }))
-    ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 10);
+    ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 3);
 
     const insights = [];
     if (s.stockOut > 0) {

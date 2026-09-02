@@ -62,9 +62,42 @@
     </div>
   </div>
 
-  <div class="notice notice-compact">
-    <b>Dashboard:</b> Angalia oda, mapato, na wageni. Ripoti zinaweza kupakuliwa (CSV). Data ya browser hii tu — kwa production tumia database.
+  <div class="branch-bar" id="branchBar">
+    <div class="branch-bar-left">
+      <span class="branch-bar-icon" aria-hidden="true">🏪</span>
+      <div>
+        <div class="branch-bar-label">Tawi la kazi</div>
+        <div class="branch-bar-name" id="currentBranchLabel">—</div>
+        <div class="branch-bar-sub" id="branchBarSub">Chagua tawi la kufanya kazi</div>
+      </div>
+    </div>
+    <div class="branch-bar-right">
+      <label class="sr-only" for="branchSelect">Chagua tawi</label>
+      <select id="branchSelect" class="branch-select"></select>
+    </div>
   </div>
+
+  <div class="notice notice-compact">
+    <b>Dashboard:</b> Angalia oda, mapato, na wageni. Mauzo na stock huhifadhiwa kwa <b>kila tawi</b>. Ripoti zinaweza kupakuliwa (CSV).
+  </div>
+
+  <section class="panel hidden" id="branchPanel">
+    <div class="panel-head-row">
+      <div>
+        <h2>🏪 Matawi / Branches</h2>
+        <p class="panel-note panel-note-tight">Sajili matawi mapya — kila tawi lina mauzo, stock, na bidhaa zake</p>
+      </div>
+    </div>
+    <div class="add-grid branch-register-grid" id="branchRegisterForm">
+      <div class="field"><label>Jina la tawi</label><input id="branchName" placeholder="Mfano: Clever Kitimoto — Mbezi"></div>
+      <div class="field"><label>Mahali</label><input id="branchLocation" placeholder="Mfano: Dar es Salaam, Mbezi"></div>
+      <div class="field"><label>Simu</label><input id="branchPhone" type="tel" placeholder="07XX XXX XXX"></div>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn btn-save" type="button" id="registerBranchBtn">➕ Sajili Tawi</button>
+    </div>
+    <div id="branchesList" class="branches-list"></div>
+  </section>
 
   <section class="panel dashboard-panel" id="dashboardPanel">
     <div class="panel-head-row">
@@ -87,7 +120,7 @@
     <div class="panel-head-row">
       <div>
         <h2>🥩 Mauzo ya Nyama</h2>
-        <p class="panel-note panel-note-tight">Rekodi mauzo ya Kitimoto — chagua bidhaa, kiasi, na malipo</p>
+        <p class="panel-note panel-note-tight">Rekodi mauzo kwa tawi lililochaguliwa — chagua bidhaa, kiasi, na malipo</p>
       </div>
     </div>
     <div class="sales-record-grid">

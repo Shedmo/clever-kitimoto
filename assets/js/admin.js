@@ -8,6 +8,8 @@
   const SALES_ITEMS_KEY = 'cleverKitimotoSalesItemsV1';
   const SALES_LOG_KEY = 'cleverKitimotoSalesLogV1';
   const STOCK_LOG_KEY = 'cleverKitimotoStockLogV1';
+  const BRANCHES_KEY = 'cleverKitimotoBranchesV1';
+  const CURRENT_BRANCH_KEY = 'cleverKitimotoCurrentBranchV1';
   const SESSION_KEY = 'cleverKitimotoAdminSession';
   const MAX_ATTEMPTS = 5;
   const LOCK_MS = 60000;
@@ -25,8 +27,8 @@
   ];
 
   const PERMS = {
-    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add'],
-    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'sales', 'sales_items', 'stock_add'],
+    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add', 'branches'],
+    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'sales', 'sales_items', 'stock_add', 'branches'],
     seller: ['dashboard', 'orders', 'users', 'visits', 'export', 'sales']
   };
 
@@ -49,6 +51,252 @@
   const defaults = Object.fromEntries(Object.values(groups).flat().map(x => [x[0], x[2]]));
 
   function $(id) { return document.getElementById(id); }
+
+  function getAllBranches() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(BRANCHES_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function getBranches() {
+    return getAllBranches().filter(b => b.active !== false);
+  }
+
+  function getBranchById(id) {
+    return getAllBranches().find(b => b.id === id) || null;
+  }
+
+  function initBranches() {
+    if (getAllBranches().length) return;
+    const main = {
+      id: 'br-main',
+      name: 'Clever Kitimoto — Main',
+      location: 'Dar es Salaam',
+      phone: '0683 497 330',
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+    localStorage.setItem(BRANCHES_KEY, JSON.stringify([main]));
+    setCurrentBranchId(main.id);
+  }
+
+  function migrateBranchData() {
+    const branches = getBranches();
+    if (!branches.length) return;
+    const mainId = branches[0].id;
+    [SALES_ITEMS_KEY, SALES_LOG_KEY, STOCK_LOG_KEY].forEach(base => {
+      const legacy = localStorage.getItem(base);
+      const mainKey = branchStorageKey(base, mainId);
+      if (legacy && !localStorage.getItem(mainKey)) {
+        localStorage.setItem(mainKey, legacy);
+      }
+    });
+    if (!getCurrentBranchId()) setCurrentBranchId(mainId);
+  }
+
+  function branchStorageKey(baseKey, branchId) {
+    return baseKey + '__' + (branchId || getCurrentBranchId() || 'default');
+  }
+
+  function getCurrentBranchId() {
+    const id = sessionStorage.getItem(CURRENT_BRANCH_KEY) || localStorage.getItem(CURRENT_BRANCH_KEY);
+    if (id && getBranches().some(b => b.id === id)) return id;
+    return getBranches()[0]?.id || '';
+  }
+
+  function getCurrentBranch() {
+    return getBranchById(getCurrentBranchId());
+  }
+
+  function setCurrentBranchId(id) {
+    if (!id) return;
+    sessionStorage.setItem(CURRENT_BRANCH_KEY, id);
+    localStorage.setItem(CURRENT_BRANCH_KEY, id);
+  }
+
+  function loadBranchData(baseKey, fallback, branchId) {
+    return loadBranchDataFor(baseKey, branchId || getCurrentBranchId(), fallback);
+  }
+
+  function loadBranchDataFor(baseKey, branchId, fallback) {
+    try {
+      const raw = localStorage.getItem(branchStorageKey(baseKey, branchId));
+      if (raw != null) return JSON.parse(raw);
+      if (fallback !== undefined) return typeof fallback === 'string' ? JSON.parse(fallback) : fallback;
+      return [];
+    } catch {
+      return fallback !== undefined && typeof fallback !== 'string' ? fallback : [];
+    }
+  }
+
+  function saveBranchData(baseKey, data, branchId) {
+    localStorage.setItem(branchStorageKey(baseKey, branchId), JSON.stringify(data));
+  }
+
+  function switchBranch(branchId) {
+    if (!getBranchById(branchId)) return;
+    setCurrentBranchId(branchId);
+    populateBranchSelect();
+    updateBranchBar();
+    refreshBranchViews();
+    showAdminToast('🏪 Tawi: ' + (getCurrentBranch()?.name || branchId));
+  }
+
+  function refreshBranchViews() {
+    render();
+    renderDashboard();
+    renderUsers();
+    renderOrders();
+    renderVisits();
+    renderSales();
+    migrateStockFields();
+    populateSaleItemSelect();
+    renderSalesItems();
+    renderStock();
+    renderBranches();
+  }
+
+  function populateBranchSelect() {
+    const sel = $('branchSelect');
+    if (!sel) return;
+    const branches = getBranches();
+    const current = getCurrentBranchId();
+    sel.innerHTML = branches.map(b =>
+      `<option value="${escapeHtml(b.id)}"${b.id === current ? ' selected' : ''}>${escapeHtml(b.name)}</option>`
+    ).join('');
+  }
+
+  function updateBranchBar() {
+    const b = getCurrentBranch();
+    const label = $('currentBranchLabel');
+    const sub = $('branchBarSub');
+    if (label) label.textContent = b?.name || '—';
+    if (sub && b) {
+      sub.textContent = [b.location, b.phone].filter(Boolean).join(' · ') || 'Chagua tawi la kufanya kazi';
+    }
+  }
+
+  function registerBranch() {
+    if (!hasPerm('branches')) return;
+    const name = $('branchName')?.value.trim();
+    const location = $('branchLocation')?.value.trim();
+    const phone = $('branchPhone')?.value.trim();
+    if (!name) {
+      showAdminToast('Weka jina la tawi.', 'warn');
+      return;
+    }
+    const list = getAllBranches();
+    if (list.some(b => b.name.toLowerCase() === name.toLowerCase() && b.active !== false)) {
+      showAdminToast('Tawi lenye jina hili lipo tayari.', 'warn');
+      return;
+    }
+    const branch = {
+      id: 'br-' + Date.now(),
+      name,
+      location: location || '',
+      phone: phone || '',
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+    list.push(branch);
+    localStorage.setItem(BRANCHES_KEY, JSON.stringify(list));
+    initSalesItemsForBranch(branch.id);
+    ['branchName', 'branchLocation', 'branchPhone'].forEach(id => { if ($(id)) $(id).value = ''; });
+    populateBranchSelect();
+    renderBranches();
+    showAdminToast('✓ Tawi limeandikishwa: ' + name);
+  }
+
+  function initSalesItemsForBranch(branchId) {
+    const key = branchStorageKey(SALES_ITEMS_KEY, branchId);
+    if (localStorage.getItem(key)) return;
+    const mainId = getBranches()[0]?.id;
+    if (mainId && mainId !== branchId) {
+      const copy = localStorage.getItem(branchStorageKey(SALES_ITEMS_KEY, mainId));
+      if (copy) {
+        localStorage.setItem(key, copy);
+        return;
+      }
+    }
+    const items = DEFAULT_SALES_ITEMS.map((x, i) => ({
+      id: 'si-' + branchId + '-' + i,
+      ...x,
+      trackStock: true,
+      active: true
+    }));
+    localStorage.setItem(key, JSON.stringify(items));
+  }
+
+  function deactivateBranch(id) {
+    if (!hasPerm('branches')) return;
+    const branches = getBranches();
+    if (branches.length <= 1) {
+      showAdminToast('Huwezi kufuta tawi la mwisho.', 'warn');
+      return;
+    }
+    if (!confirm('Futa (zima) tawi hili? Data yake itabaki kwenye kifaa.')) return;
+    const list = getAllBranches().map(b =>
+      b.id === id ? { ...b, active: false } : b
+    );
+    localStorage.setItem(BRANCHES_KEY, JSON.stringify(list));
+    if (getCurrentBranchId() === id) {
+      setCurrentBranchId(getBranches()[0]?.id || '');
+    }
+    populateBranchSelect();
+    updateBranchBar();
+    renderBranches();
+    refreshBranchViews();
+  }
+
+  function renderBranches() {
+    const el = $('branchesList');
+    if (!el) return;
+    const list = getBranches();
+    if (!list.length) {
+      el.innerHTML = '<div class="empty">Hakuna matawi. Ongeza tawi la kwanza hapo juu.</div>';
+      return;
+    }
+    el.innerHTML = list.map(b => {
+      const isCurrent = b.id === getCurrentBranchId();
+      const sales = loadBranchDataFor(SALES_LOG_KEY, b.id, []);
+      const branchSales = Array.isArray(sales) ? sales : [];
+      const revenue = branchSales.reduce((s, x) => s + (Number(x.total) || 0), 0);
+      const items = loadBranchDataFor(SALES_ITEMS_KEY, b.id, []);
+      const stockItems = (Array.isArray(items) ? items : []).filter(x => x.trackStock !== false);
+      const low = stockItems.filter(x => getStockStatus(x) === 'low').length;
+      const out = stockItems.filter(x => getStockStatus(x) === 'out').length;
+      return `
+        <article class="branch-card${isCurrent ? ' branch-current' : ''}">
+          <div class="branch-card-main">
+            <div class="branch-card-head">
+              <strong>${escapeHtml(b.name)}</strong>
+              ${isCurrent ? '<span class="branch-now">Tawi la sasa</span>' : ''}
+            </div>
+            <div class="branch-meta">${escapeHtml([b.location, b.phone].filter(Boolean).join(' · ') || '—')}</div>
+            <div class="branch-stats-mini">
+              <span>Mauzo: ${branchSales.length}</span>
+              <span>Mapato: TSH ${formatMoney(revenue)}</span>
+              ${low ? `<span class="warn">Chini: ${low}</span>` : ''}
+              ${out ? `<span class="danger">Imeisha: ${out}</span>` : ''}
+            </div>
+          </div>
+          <div class="branch-card-actions">
+            ${!isCurrent ? `<button type="button" class="btn btn-save btn-sm" data-switch-branch="${escapeHtml(b.id)}">Fungua</button>` : ''}
+            ${hasPerm('branches') ? `<button type="button" class="btn btn-delete btn-sm" data-delete-branch="${escapeHtml(b.id)}">Futa</button>` : ''}
+          </div>
+        </article>`;
+    }).join('');
+
+    el.querySelectorAll('[data-switch-branch]').forEach(btn => {
+      btn.addEventListener('click', () => switchBranch(btn.dataset.switchBranch));
+    });
+    el.querySelectorAll('[data-delete-branch]').forEach(btn => {
+      btn.addEventListener('click', () => deactivateBranch(btn.dataset.deleteBranch));
+    });
+  }
 
   function setError(msg) {
     const el = $('err');
@@ -110,6 +358,9 @@
     $('resetBtn')?.classList.toggle('hidden', !hasPerm('reset'));
     $('clearOrdersBtn')?.classList.toggle('hidden', !hasPerm('clear'));
     $('clearVisitsBtn')?.classList.toggle('hidden', !hasPerm('clear'));
+    $('branchPanel')?.classList.toggle('hidden', !hasPerm('branches'));
+    $('branchRegisterForm')?.classList.toggle('hidden', !hasPerm('branches'));
+    $('registerBranchBtn')?.classList.toggle('hidden', !hasPerm('branches'));
 
     document.querySelectorAll('#priceForms .panel').forEach(p => {
       p.classList.toggle('hidden', !hasPerm('prices'));
@@ -117,9 +368,14 @@
   }
 
   function showApp() {
+    initBranches();
+    migrateBranchData();
+    getBranches().forEach(b => initSalesItemsForBranch(b.id));
     $('login')?.classList.add('hidden');
     $('app')?.classList.remove('hidden');
     applyRoleUI();
+    populateBranchSelect();
+    updateBranchBar();
     render();
     renderDashboard();
     renderUsers();
@@ -131,6 +387,7 @@
     populateSaleItemSelect();
     renderSalesItems();
     renderStock();
+    renderBranches();
   }
 
   function showLogin() {
@@ -288,7 +545,7 @@
 
   function getSalesItems() {
     try {
-      const saved = JSON.parse(localStorage.getItem(SALES_ITEMS_KEY) || '[]');
+      const saved = loadBranchData(SALES_ITEMS_KEY, '[]');
       return Array.isArray(saved) ? saved.filter(x => x.active !== false) : [];
     } catch {
       return [];
@@ -297,7 +554,7 @@
 
   function getAllSalesItems() {
     try {
-      const saved = JSON.parse(localStorage.getItem(SALES_ITEMS_KEY) || '[]');
+      const saved = loadBranchData(SALES_ITEMS_KEY, '[]');
       return Array.isArray(saved) ? saved : [];
     } catch {
       return [];
@@ -306,13 +563,7 @@
 
   function initSalesItems() {
     if (getAllSalesItems().length) return;
-    const items = DEFAULT_SALES_ITEMS.map((x, i) => ({
-      id: 'si-' + (Date.now() + i),
-      ...x,
-      trackStock: true,
-      active: true
-    }));
-    localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(items));
+    initSalesItemsForBranch(getCurrentBranchId());
   }
 
   function defaultStockForUnit(unit) {
@@ -335,12 +586,12 @@
         trackStock: x.trackStock !== false
       };
     });
-    if (changed) localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(migrated));
+    if (changed) saveSalesItemsList(migrated);
   }
 
   function getStockLog() {
     try {
-      const saved = JSON.parse(localStorage.getItem(STOCK_LOG_KEY) || '[]');
+      const saved = loadBranchData(STOCK_LOG_KEY, '[]');
       return Array.isArray(saved) ? saved : [];
     } catch {
       return [];
@@ -366,7 +617,7 @@
   }
 
   function saveSalesItemsList(list) {
-    localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(list));
+    saveBranchData(SALES_ITEMS_KEY, list);
   }
 
   function updateItemStock(itemId, delta, type, note, ref) {
@@ -383,6 +634,7 @@
 
     const session = getSession();
     const log = getStockLog();
+    const branch = getCurrentBranch();
     log.unshift({
       id: 'stk-' + Date.now(),
       at: new Date().toISOString(),
@@ -396,10 +648,12 @@
       after,
       note: note || '',
       ref: ref || '',
-      user: session?.user || 'staff'
+      user: session?.user || 'staff',
+      branchId: branch?.id || '',
+      branchName: branch?.name || ''
     });
     if (log.length > 500) log.length = 500;
-    localStorage.setItem(STOCK_LOG_KEY, JSON.stringify(log));
+    saveBranchData(STOCK_LOG_KEY, log);
 
     return list[idx];
   }
@@ -550,7 +804,7 @@
 
   function getSalesLog() {
     try {
-      const saved = JSON.parse(localStorage.getItem(SALES_LOG_KEY) || '[]');
+      const saved = loadBranchData(SALES_LOG_KEY, '[]');
       return Array.isArray(saved) ? saved : [];
     } catch {
       return [];
@@ -582,7 +836,7 @@
       trackStock: true,
       active: true
     });
-    localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(list));
+    saveSalesItemsList(list);
     ['salesItemName', 'salesItemPrice', 'salesItemStock', 'salesItemLowStock'].forEach(id => { if ($(id)) $(id).value = ''; });
     renderSalesItems();
     populateSaleItemSelect();
@@ -596,7 +850,7 @@
     const list = getAllSalesItems().map(x =>
       x.id === id ? { ...x, active: false } : x
     );
-    localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(list));
+    saveSalesItemsList(list);
     renderSalesItems();
     populateSaleItemSelect();
     renderStock();
@@ -729,6 +983,7 @@
       }
     }
 
+    const branch = getCurrentBranch();
     const sale = {
       id: 'sale-' + Date.now(),
       at: new Date().toISOString(),
@@ -742,13 +997,15 @@
       payment,
       phone,
       notes,
-      seller: session?.user || 'staff'
+      seller: session?.user || 'staff',
+      branchId: branch?.id || '',
+      branchName: branch?.name || ''
     };
 
     const log = getSalesLog();
     log.unshift(sale);
     if (log.length > 500) log.length = 500;
-    localStorage.setItem(SALES_LOG_KEY, JSON.stringify(log));
+    saveBranchData(SALES_LOG_KEY, log);
 
     let stockAfter = null;
     if (item.trackStock !== false) {
@@ -848,7 +1105,7 @@
         <div class="order-card-head">
           <div>
             <strong>${escapeHtml(formatOrderDate(x.at))}</strong>
-            <span class="order-meta">${escapeHtml(x.category)} · ${escapeHtml(paymentLabel(x.payment))} · ${escapeHtml(x.seller || 'staff')}</span>
+            <span class="order-meta">${escapeHtml(x.category)} · ${escapeHtml(paymentLabel(x.payment))} · ${escapeHtml(x.seller || 'staff')}${x.branchName ? ' · ' + escapeHtml(x.branchName) : ''}</span>
           </div>
           <strong class="order-total">TSH ${formatMoney(x.total)}</strong>
         </div>
@@ -864,12 +1121,14 @@
 
   function exportSalesCsv() {
     const sales = getSalesLog();
+    const branch = getCurrentBranch();
     if (!sales.length) { alert('Hakuna mauzo ya kupakua.'); return; }
-    const header = ['Tarehe', 'Bidhaa', 'Aina', 'Kiasi', 'Kipimo', 'Bei/TSH', 'Jumla TSH', 'Malipo', 'Simu', 'Maelezo', 'Muuzaji'];
+    const header = ['Tarehe', 'Tawi', 'Bidhaa', 'Aina', 'Kiasi', 'Kipimo', 'Bei/TSH', 'Jumla TSH', 'Malipo', 'Simu', 'Maelezo', 'Muuzaji'];
     const rows = [header.join(',')];
     sales.forEach(x => {
       rows.push([
         csvEscape(formatOrderDate(x.at)),
+        csvEscape(x.branchName || branch?.name || ''),
         csvEscape(x.itemName),
         csvEscape(x.category),
         csvEscape(x.qty),
@@ -882,13 +1141,16 @@
         csvEscape(x.seller)
       ].join(','));
     });
-    downloadCsv('clever-kitimoto-mauzo-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
+    const slug = (branch?.name || 'mauzo').replace(/[^\w\-]+/g, '-').slice(0, 24);
+    downloadCsv('clever-kitimoto-mauzo-' + slug + '-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
   }
 
   function clearSales() {
     if (!hasPerm('sales_clear')) return;
-    if (!confirm('Futa historia yote ya mauzo?')) return;
-    localStorage.removeItem(SALES_LOG_KEY);
+    const branch = getCurrentBranch();
+    const label = branch?.name || 'tawi hili';
+    if (!confirm('Futa historia yote ya mauzo kwa ' + label + '?')) return;
+    localStorage.removeItem(branchStorageKey(SALES_LOG_KEY));
     renderSales();
   }
 
@@ -936,7 +1198,7 @@
           <span class="ssd-check">✓</span>
         </div>
         <h3 class="ssd-title" id="adminDialogTitle">Mauzo Yamerekodiwa!</h3>
-        <p class="ssd-sub">Imehifadhiwa kwa mafanikio · ${escapeHtml(formatOrderDate(sale.at))}</p>
+        <p class="ssd-sub">Imehifadhiwa kwa mafanikio · ${escapeHtml(formatOrderDate(sale.at))}${sale.branchName ? ' · ' + escapeHtml(sale.branchName) : ''}</p>
         <div class="ssd-card">
           <div class="ssd-item-head">
             <span class="ssd-cat">${escapeHtml(sale.category || 'Bidhaa')}</span>
@@ -1028,16 +1290,18 @@
     const el = $('dashboardStats');
     if (!el) return;
     const s = computeStats();
+    const branch = getCurrentBranch();
+    const branchNote = branch ? escapeHtml(branch.name) : '—';
     el.innerHTML = `
       <article class="stat-card stat-primary">
         <span class="stat-label">Jumla ya Mapato</span>
         <strong class="stat-value">TSH ${formatMoney(s.totalRevenue + s.salesTotal)}</strong>
-        <span class="stat-sub">Oda + Mauzo · Leo: TSH ${formatMoney(s.todayRevenue + s.salesToday)}</span>
+        <span class="stat-sub">Oda + Mauzo · Leo: TSH ${formatMoney(s.todayRevenue + s.salesToday)} · ${branchNote}</span>
       </article>
       <article class="stat-card stat-sales">
         <span class="stat-label">Mauzo ya Nyama</span>
         <strong class="stat-value">TSH ${formatMoney(s.salesTotal)}</strong>
-        <span class="stat-sub">Leo: TSH ${formatMoney(s.salesToday)} · ${s.salesCount} mauzo · ${s.kgSold || 0} KG</span>
+        <span class="stat-sub">Leo: TSH ${formatMoney(s.salesToday)} · ${s.salesCount} mauzo · ${s.kgSold || 0} KG · ${branchNote}</span>
       </article>
       <article class="stat-card stat-stock${s.stockOut ? ' stat-stock-danger' : s.stockLow ? ' stat-stock-warn' : ''}">
         <span class="stat-label">Stock / Stoo</span>
@@ -1368,6 +1632,7 @@
 
   function printReport() {
     const s = computeStats();
+    const branch = getCurrentBranch();
     const orders = getOrders();
     const visits = getVisits();
     const w = window.open('', '_blank');
@@ -1402,7 +1667,7 @@
         th{background:#7a1515;color:#fff}
       </style></head><body>
       <h1>Clever Kitimoto — Ripoti</h1>
-      <p class="meta">Imetengenezwa: ${escapeHtml(new Date().toLocaleString('sw-TZ'))}</p>
+      <p class="meta">Imetengenezwa: ${escapeHtml(new Date().toLocaleString('sw-TZ'))}${branch ? ' · Tawi: ' + escapeHtml(branch.name) : ''}</p>
       <div class="stats">
         <div class="stat"><span>Jumla Mapato</span><b>TSH ${formatMoney(s.totalRevenue)}</b></div>
         <div class="stat"><span>Oda Zote</span><b>${s.orderCount}</b></div>
@@ -1511,6 +1776,10 @@
   }
 
   function bindEvents() {
+    $('registerBranchBtn')?.addEventListener('click', registerBranch);
+    $('branchSelect')?.addEventListener('change', e => {
+      if (e.target.value) switchBranch(e.target.value);
+    });
     $('loginForm')?.addEventListener('submit', e => { e.preventDefault(); login(); });
     $('togglePass')?.addEventListener('click', togglePassword);
     $('logoutBtn')?.addEventListener('click', logout);

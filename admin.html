@@ -47,41 +47,63 @@
 </div>
 
 <div id="app" class="wrap hidden">
-  <div class="top">
-    <div class="brand-row">
-      <img class="brand-logo" src="assets/logo.png" alt="Clever Kitimoto">
-      <div>
-        <div class="brand">Clever <span>Kitimoto</span></div>
-        <div class="brand-sub">Admin Panel · <span class="session-badge" id="sessionBadge">🔓 Imefunguliwa</span> <span id="roleBadge" class="role-badge"></span></div>
+  <header class="admin-header">
+    <div class="top">
+      <div class="brand-row">
+        <button type="button" class="admin-menu-toggle hidden" id="adminMenuToggle" aria-label="Fungua menyu">☰</button>
+        <img class="brand-logo" src="assets/logo.png" alt="Clever Kitimoto">
+        <div>
+          <div class="brand">Clever <span>Kitimoto</span></div>
+          <div class="brand-sub">Admin Panel · <span class="session-badge" id="sessionBadge">🔓 Imefunguliwa</span> <span id="roleBadge" class="role-badge"></span></div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn btn-back" href="index.html">← View Menu</a>
+        <button class="btn btn-reset hidden" type="button" id="resetBtn">Reset Prices</button>
+        <button class="btn btn-logout" type="button" id="logoutBtn">🚪 Toka</button>
       </div>
     </div>
-    <div class="actions">
-      <a class="btn btn-back" href="index.html">← View Menu</a>
-      <button class="btn btn-reset hidden" type="button" id="resetBtn">Reset Prices</button>
-      <button class="btn btn-logout" type="button" id="logoutBtn">🚪 Toka</button>
-    </div>
-  </div>
 
-  <div class="branch-bar" id="branchBar">
-    <div class="branch-bar-left">
-      <span class="branch-bar-icon" aria-hidden="true">🏪</span>
-      <div>
-        <div class="branch-bar-label">Tawi la kazi</div>
-        <div class="branch-bar-name" id="currentBranchLabel">—</div>
-        <div class="branch-bar-sub" id="branchBarSub">Chagua tawi la kufanya kazi</div>
+    <div class="branch-bar" id="branchBar">
+      <div class="branch-bar-left">
+        <span class="branch-bar-icon" aria-hidden="true">🏪</span>
+        <div>
+          <div class="branch-bar-label">Tawi la kazi</div>
+          <div class="branch-bar-name" id="currentBranchLabel">—</div>
+          <div class="branch-bar-sub" id="branchBarSub">Chagua tawi la kufanya kazi</div>
+        </div>
+      </div>
+      <div class="branch-bar-right" id="branchBarRight">
+        <label class="sr-only" for="branchSelect">Chagua tawi</label>
+        <select id="branchSelect" class="branch-select"></select>
       </div>
     </div>
-    <div class="branch-bar-right" id="branchBarRight">
-      <label class="sr-only" for="branchSelect">Chagua tawi</label>
-      <select id="branchSelect" class="branch-select"></select>
+
+    <div class="notice notice-compact hidden" id="dashNotice">
+      <b>Kidokezo:</b> Mauzo na stock huhifadhiwa kwa <b>kila tawi</b>. Chagua tawi juu kisha angalia ripoti.
     </div>
-  </div>
+  </header>
 
-  <div class="notice notice-compact hidden" id="dashNotice">
-    <b>Kidokezo:</b> Mauzo na stock huhifadhiwa kwa <b>kila tawi</b>. Chagua tawi juu kisha angalia ripoti.
-  </div>
+  <div id="sellerTodayStrip" class="seller-today-strip hidden" aria-live="polite"></div>
 
-  <section class="panel hidden" id="branchPanel">
+  <div class="admin-layout" id="adminLayout">
+    <aside class="admin-sidebar hidden" id="adminSidebar" aria-label="Menyu kuu">
+      <div class="admin-sidebar-head">
+        <span class="admin-sidebar-label">Menyu</span>
+      </div>
+      <nav class="admin-nav" id="adminNav"></nav>
+    </aside>
+
+    <main class="admin-main" id="adminMain">
+      <div class="admin-page-head hidden" id="adminPageHead">
+        <div>
+          <h1 class="admin-page-title" id="adminPageTitle">Dashboard</h1>
+          <p class="admin-page-sub" id="adminPageSub">Muhtasari wa biashara</p>
+        </div>
+      </div>
+
+      <div class="admin-views" id="adminViews">
+  <section class="panel admin-view hidden" id="branchPanel" data-view-title="Matawi" data-view-sub="Usimamizi wa matawi na muuzaji">
     <div class="panel-head-row">
       <div>
         <h2>🏪 Matawi / Branches</h2>
@@ -111,7 +133,7 @@
     <div id="branchesList" class="branches-list"></div>
   </section>
 
-  <section class="panel hidden" id="staffPanel">
+  <section class="panel admin-view hidden" id="staffPanel" data-view-title="Wafanyakazi" data-view-sub="Akaunti, nenosiri, na matawi">
     <div class="panel-head-row">
       <div>
         <h2>👥 Wafanyakazi / Staff</h2>
@@ -155,7 +177,7 @@
     </div>
   </section>
 
-  <section class="panel dashboard-panel" id="dashboardPanel">
+  <section class="panel dashboard-panel admin-view" id="dashboardPanel" data-view-title="Dashboard" data-view-sub="Muhtasari wa biashara — mauzo, stock, wateja">
     <div class="panel-head-row dash-panel-head">
       <div>
         <h2>📊 Smart Dashboard</h2>
@@ -173,9 +195,7 @@
     <div id="dashboardRoot" class="dashboard-root"></div>
   </section>
 
-  <div id="sellerTodayStrip" class="seller-today-strip hidden" aria-live="polite"></div>
-
-  <section class="panel sales-panel hidden" id="salesPanel">
+  <section class="panel sales-panel admin-view hidden" id="salesPanel" data-view-title="Mauzo" data-view-sub="Rekodi mauzo ya nyama kwa tawi">
     <div class="panel-head-row seller-panel-head">
       <div>
         <h2 id="salesPanelTitle">🥩 Mauzo ya Nyama</h2>
@@ -241,7 +261,7 @@
     </div>
   </section>
 
-  <section class="panel hidden" id="salesItemsSection">
+  <section class="panel admin-view hidden" id="salesItemsSection" data-view-title="Bidhaa za Mauzo" data-view-sub="Orodha ya bidhaa na bei za POS">
     <div class="panel-head-row">
       <div>
         <h2>📦 Bidhaa za Mauzo</h2>
@@ -274,7 +294,7 @@
     <div id="salesItemsList" class="sales-items-list"></div>
   </section>
 
-  <section class="panel hidden" id="stockPanel">
+  <section class="panel admin-view hidden" id="stockPanel" data-view-title="Stock" data-view-sub="Fuatilia na simamia stoo ya nyama">
     <div class="panel-head-row">
       <div>
         <h2>📦 Stoo / Stock</h2>
@@ -293,7 +313,7 @@
     </div>
   </section>
 
-  <section class="panel reports-panel" id="reportsPanel">
+  <section class="panel reports-panel admin-view hidden" id="reportsPanel" data-view-title="Ripoti" data-view-sub="Wateja, oda, mauzo, na wageni">
     <div class="panel-head-row">
       <h2>📋 Ripoti</h2>
       <div class="report-tabs" id="reportTabs">
@@ -362,6 +382,7 @@
     </div>
   </section>
 
+  <div class="admin-view-group hidden" id="menuView" data-view-title="Menu & Bei" data-view-sub="Bei za menu na bidhaa mpya">
   <div class="panel hidden" id="priceSection">
     <h2>💰 Bei za Menu</h2>
     <p class="panel-note">Badilisha bei kisha bonyeza Save Changes chini.</p>
@@ -401,8 +422,9 @@
       <a class="btn btn-back" href="index.html">👀 Preview Menu</a>
     </div>
   </div>
+  </div>
 
-  <section class="panel hidden" id="toolsPanel">
+  <section class="panel admin-view hidden" id="toolsPanel" data-view-title="Zana za Mfumo" data-view-sub="Backup na usalama wa data">
     <div class="panel-head-row">
       <div>
         <h2>🔧 Zana za Mfumo / Tools</h2>
@@ -425,6 +447,12 @@
       </article>
     </div>
   </section>
+
+      </div><!-- /.admin-views -->
+    </main>
+  </div><!-- /.admin-layout -->
+
+  <nav class="admin-mobile-nav hidden" id="adminMobileNav" aria-label="Menyu ya simu"></nav>
 
   <nav class="seller-quick-bar hidden" id="sellerQuickBar" aria-label="Mauzo haraka">
     <button type="button" class="seller-tab active" data-seller-tab="salesPanel">

@@ -56,6 +56,20 @@
   };
   const BACKUP_PREFIX = 'cleverKitimoto';
 
+  const ADMIN_VIEWS = [
+    { id: 'dashboardPanel', label: 'Dashboard', icon: '📊', perm: 'dashboard' },
+    { id: 'salesPanel', label: 'Mauzo', icon: '🥩', perm: 'sales' },
+    { id: 'stockPanel', label: 'Stock', icon: '📦', permAny: ['stock_add', 'stock_view'] },
+    { id: 'reportsPanel', label: 'Ripoti', icon: '📋', perm: 'reports' },
+    { id: 'salesItemsSection', label: 'Bidhaa', icon: '🏷️', perm: 'sales_items' },
+    { id: 'menuView', label: 'Menu & Bei', icon: '💰', permAny: ['prices', 'menus'] },
+    { id: 'branchPanel', label: 'Matawi', icon: '🏪', perm: 'branches' },
+    { id: 'staffPanel', label: 'Wafanyakazi', icon: '👥', perm: 'staff_manage' },
+    { id: 'toolsPanel', label: 'Zana', icon: '🔧', perm: 'backup' }
+  ];
+
+  let currentAdminView = 'dashboardPanel';
+
   const groups = {
     'Choma': [['choma','½ KG','9,000'],['choma1','1 KG','18,000'],['choma15','1½ KG','27,000'],['choma2','2 KG','36,000']],
     'Choma ya Foil': [['foil','½ KG','9,000'],['foil1','1 KG','18,000'],['foil15','1½ KG','27,000'],['foil2','2 KG','36,000']],
@@ -751,15 +765,139 @@
     });
   }
 
+  function canAccessView(view) {
+    if (view.perm) return hasPerm(view.perm);
+    if (view.permAny) return view.permAny.some(p => hasPerm(p));
+    return true;
+  }
+
+  function getAvailableViews() {
+    return ADMIN_VIEWS.filter(canAccessView);
+  }
+
+  function getViewMeta(viewId) {
+    return ADMIN_VIEWS.find(v => v.id === viewId) || { id: viewId, label: 'Admin', icon: '📌' };
+  }
+
+  function setViewElementsVisible(viewId, visible) {
+    if (viewId === 'menuView') {
+      $('menuView')?.classList.toggle('hidden', !visible);
+      if (visible) {
+        $('priceSection')?.classList.toggle('hidden', !hasPerm('prices'));
+        $('priceForms')?.classList.toggle('hidden', !hasPerm('prices'));
+        $('menuSection')?.classList.toggle('hidden', !hasPerm('menus'));
+        $('customMenuSection')?.classList.toggle('hidden', !hasPerm('menus'));
+        $('saveSection')?.classList.toggle('hidden', !hasPerm('save'));
+      }
+      return;
+    }
+    const el = $(viewId);
+    if (el) el.classList.toggle('hidden', !visible);
+  }
+
+  function hideAllAdminViews() {
+    ADMIN_VIEWS.forEach(v => setViewElementsVisible(v.id, false));
+    document.querySelectorAll('.admin-view, .admin-view-group').forEach(el => el.classList.remove('active'));
+  }
+
+  function switchAdminView(viewId, opts = {}) {
+    if (isSellerQuick()) {
+      if (viewId === 'salesPanel' || viewId === 'stockPanel') switchSellerTab(viewId);
+      return;
+    }
+    const views = getAvailableViews();
+    const target = views.find(v => v.id === viewId) ? viewId : views[0]?.id;
+    if (!target) return;
+
+    currentAdminView = target;
+    hideAllAdminViews();
+    setViewElementsVisible(target, true);
+    const activeEl = $(target);
+    activeEl?.classList.add('active');
+
+    const meta = getViewMeta(target);
+    const titleEl = $('adminPageTitle');
+    const subEl = $('adminPageSub');
+    const branch = getCurrentBranch();
+    if (titleEl) titleEl.textContent = (meta.icon ? meta.icon + ' ' : '') + meta.label;
+    if (subEl) {
+      const customSub = activeEl?.dataset?.viewSub || $('menuView')?.dataset?.viewSub;
+      subEl.textContent = customSub || meta.label + (branch ? ' · ' + branch.name : '');
+    }
+
+    document.querySelectorAll('.admin-nav-item').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.adminView === target);
+    });
+    document.querySelectorAll('.admin-mobile-item').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.adminView === target);
+    });
+
+    if (target === 'stockPanel') renderStock();
+    if (target === 'reportsPanel') renderOrders();
+    if (!opts.silent) {
+      $('adminMain')?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    if (window.innerWidth < 960) {
+      $('adminSidebar')?.classList.remove('open');
+      $('adminLayout')?.classList.remove('sidebar-open');
+    }
+  }
+
+  function renderAdminNav() {
+    const nav = $('adminNav');
+    const mobile = $('adminMobileNav');
+    const sidebar = $('adminSidebar');
+    const pageHead = $('adminPageHead');
+    const layout = $('adminLayout');
+    const menuToggle = $('adminMenuToggle');
+    const sellerQuick = isSellerQuick();
+    const views = getAvailableViews();
+
+    sidebar?.classList.toggle('hidden', sellerQuick);
+    mobile?.classList.toggle('hidden', sellerQuick || !views.length);
+    pageHead?.classList.toggle('hidden', sellerQuick);
+    layout?.classList.toggle('has-sidebar', !sellerQuick && views.length > 0);
+    $('app')?.classList.toggle('admin-shell-mode', !sellerQuick && views.length > 0);
+    menuToggle?.classList.toggle('hidden', sellerQuick);
+
+    const navHtml = views.map(v => `
+      <button type="button" class="admin-nav-item${currentAdminView === v.id ? ' active' : ''}" data-admin-view="${v.id}">
+        <span class="admin-nav-icon">${v.icon}</span>
+        <span class="admin-nav-label">${escapeHtml(v.label)}</span>
+      </button>
+    `).join('');
+
+    if (nav) {
+      nav.innerHTML = navHtml;
+      nav.querySelectorAll('.admin-nav-item').forEach(btn => {
+        btn.addEventListener('click', () => switchAdminView(btn.dataset.adminView));
+      });
+    }
+    if (mobile) {
+      mobile.innerHTML = views.map(v => `
+        <button type="button" class="admin-mobile-item${currentAdminView === v.id ? ' active' : ''}" data-admin-view="${v.id}">
+          <span>${v.icon}</span><small>${escapeHtml(v.label)}</small>
+        </button>
+      `).join('');
+      mobile.querySelectorAll('.admin-mobile-item').forEach(btn => {
+        btn.addEventListener('click', () => switchAdminView(btn.dataset.adminView));
+      });
+    }
+  }
+
   function switchSellerTab(tabId) {
-    if (!isSellerQuick()) return;
-    $('salesPanel')?.classList.toggle('hidden', tabId !== 'salesPanel');
-    $('stockPanel')?.classList.toggle('hidden', tabId !== 'stockPanel');
+    if (!isSellerQuick()) {
+      switchAdminView(tabId);
+      return;
+    }
+    hideAllAdminViews();
+    setViewElementsVisible(tabId, true);
+    $(tabId)?.classList.add('active');
     document.querySelectorAll('.seller-tab').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.sellerTab === tabId);
     });
     if (tabId === 'stockPanel') renderStock();
-    $(tabId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('adminMain')?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function updateSellerQuickUI() {
@@ -828,7 +966,7 @@
     $('menuSection')?.classList.toggle('hidden', !hasPerm('menus'));
     $('customMenuSection')?.classList.toggle('hidden', !hasPerm('menus'));
     $('saveSection')?.classList.toggle('hidden', !hasPerm('save'));
-    $('salesPanel')?.classList.toggle('hidden', !hasPerm('sales'));
+    $('menuView')?.classList.toggle('hidden', !hasPerm('prices') && !hasPerm('menus'));
     $('salesItemsSection')?.classList.toggle('hidden', !hasPerm('sales_items'));
     const canEditStock = hasPerm('stock_add');
     const canViewStock = hasPerm('stock_view');
@@ -852,6 +990,8 @@
     $('branchRegisterForm')?.classList.toggle('hidden', !hasPerm('branches'));
     $('registerBranchBtn')?.classList.toggle('hidden', !hasPerm('branches'));
     $('reportsPanel')?.classList.toggle('hidden', !hasPerm('reports'));
+    $('dashboardPanel')?.classList.toggle('hidden', !hasPerm('dashboard'));
+    $('salesPanel')?.classList.toggle('hidden', !hasPerm('sales'));
     document.querySelector('.dash-export-actions')?.classList.toggle('hidden', !hasPerm('export'));
 
     const sellerQuick = isSellerQuick();
@@ -888,6 +1028,17 @@
     document.querySelectorAll('#priceForms .panel').forEach(p => {
       p.classList.toggle('hidden', !hasPerm('prices'));
     });
+
+    renderAdminNav();
+    if (sellerQuick) {
+      switchSellerTab(currentAdminView === 'stockPanel' ? 'stockPanel' : 'salesPanel');
+    } else {
+      const views = getAvailableViews();
+      const preferred = views.find(v => v.id === currentAdminView) ? currentAdminView
+        : views.find(v => v.id === 'dashboardPanel')?.id
+        || views[0]?.id;
+      if (preferred) switchAdminView(preferred, { silent: true });
+    }
   }
 
   function showApp() {
@@ -2207,6 +2358,12 @@
   }
 
   function scrollToPanel(id) {
+    const viewMap = { priceSection: 'menuView', priceForms: 'menuView', menuSection: 'menuView', customMenuSection: 'menuView', saveSection: 'menuView' };
+    const viewId = viewMap[id] || id;
+    if ($(viewId) || ADMIN_VIEWS.some(v => v.id === viewId)) {
+      switchAdminView(viewId);
+      return;
+    }
     const el = $(id);
     if (!el) return;
     el.classList.remove('hidden');
@@ -3117,6 +3274,10 @@
   }
 
   function bindEvents() {
+    $('adminMenuToggle')?.addEventListener('click', () => {
+      $('adminSidebar')?.classList.toggle('open');
+      $('adminLayout')?.classList.toggle('sidebar-open');
+    });
     $('registerBranchBtn')?.addEventListener('click', registerBranch);
     $('saveStaffBranchBtn')?.addEventListener('click', saveStaffBranchAssignment);
     $('addStaffBtn')?.addEventListener('click', addStaffAccount);

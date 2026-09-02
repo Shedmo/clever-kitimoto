@@ -71,7 +71,7 @@
         <div class="branch-bar-sub" id="branchBarSub">Chagua tawi la kufanya kazi</div>
       </div>
     </div>
-    <div class="branch-bar-right">
+    <div class="branch-bar-right" id="branchBarRight">
       <label class="sr-only" for="branchSelect">Chagua tawi</label>
       <select id="branchSelect" class="branch-select"></select>
     </div>
@@ -96,7 +96,63 @@
     <div class="actions" style="margin-top:14px">
       <button class="btn btn-save" type="button" id="registerBranchBtn">➕ Sajili Tawi</button>
     </div>
+    <div class="staff-branch-section" id="staffBranchSection">
+      <h3 class="staff-branch-title">👤 Weka Muuzaji kwa Tawi</h3>
+      <p class="panel-note panel-note-tight">Kila muuzaji anaingia kwenye tawi alilopewa tu</p>
+      <div class="add-grid staff-assign-grid">
+        <div class="field"><label>Muuzaji</label><select id="staffAssignUser"></select></div>
+        <div class="field"><label>Tawi</label><select id="staffAssignBranch"></select></div>
+      </div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn btn-save btn-sm" type="button" id="saveStaffBranchBtn">💾 Hifadhi Tawi la Muuzaji</button>
+      </div>
+      <div id="staffBranchList" class="staff-branch-list-wrap"></div>
+    </div>
     <div id="branchesList" class="branches-list"></div>
+  </section>
+
+  <section class="panel hidden" id="staffPanel">
+    <div class="panel-head-row">
+      <div>
+        <h2>👥 Wafanyakazi / Staff</h2>
+        <p class="panel-note panel-note-tight">Ongeza meneja au muuzaji, badilisha nenosiri — Admin pekee</p>
+      </div>
+    </div>
+    <div class="staff-mgmt-grid">
+      <div class="staff-form-card">
+        <h3 class="staff-form-title">➕ Ongeza Akaunti</h3>
+        <div class="add-grid staff-add-grid">
+          <div class="field"><label>Jina la mtumiaji</label><input id="staffAddUser" autocomplete="off" placeholder="mfano: john"></div>
+          <div class="field"><label>Jukumu</label>
+            <select id="staffAddRole">
+              <option value="seller">Muuzaji</option>
+              <option value="manager">Meneja</option>
+            </select>
+          </div>
+          <div class="field"><label>Nenosiri</label><input id="staffAddPass" type="password" autocomplete="new-password" placeholder="Angalau herufi 6"></div>
+          <div class="field"><label>Rudia nenosiri</label><input id="staffAddPass2" type="password" autocomplete="new-password" placeholder="Rudia nenosiri"></div>
+          <div class="field hidden" id="staffAddBranchField"><label>Tawi (muuzaji)</label><select id="staffAddBranch"></select></div>
+        </div>
+        <div class="actions" style="margin-top:12px">
+          <button class="btn btn-save btn-sm" type="button" id="addStaffBtn">➕ Ongeza Akaunti</button>
+        </div>
+      </div>
+      <div class="staff-form-card">
+        <h3 class="staff-form-title">🔑 Badilisha Nenosiri</h3>
+        <div class="add-grid staff-change-grid">
+          <div class="field"><label>Mtumiaji</label><select id="staffChangeUser"></select></div>
+          <div class="field"><label>Nenosiri jipya</label><input id="staffNewPass" type="password" autocomplete="new-password" placeholder="Angalau herufi 6"></div>
+          <div class="field"><label>Rudia nenosiri</label><input id="staffNewPass2" type="password" autocomplete="new-password" placeholder="Rudia nenosiri"></div>
+        </div>
+        <div class="actions" style="margin-top:12px">
+          <button class="btn btn-save btn-sm" type="button" id="changeStaffPassBtn">💾 Hifadhi Nenosiri</button>
+        </div>
+      </div>
+    </div>
+    <div class="staff-list-section">
+      <h3 class="staff-form-title">Orodha ya Wafanyakazi</h3>
+      <div id="staffList" class="staff-list"></div>
+    </div>
   </section>
 
   <section class="panel dashboard-panel" id="dashboardPanel">

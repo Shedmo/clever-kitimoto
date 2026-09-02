@@ -9,6 +9,8 @@
   const SALES_LOG_KEY = 'cleverKitimotoSalesLogV1';
   const STOCK_LOG_KEY = 'cleverKitimotoStockLogV1';
   const BRANCHES_KEY = 'cleverKitimotoBranchesV1';
+  const STAFF_BRANCHES_KEY = 'cleverKitimotoStaffBranchesV1';
+  const STAFF_ACCOUNTS_KEY = 'cleverKitimotoStaffAccountsV1';
   const CURRENT_BRANCH_KEY = 'cleverKitimotoCurrentBranchV1';
   const SESSION_KEY = 'cleverKitimotoAdminSession';
   const MAX_ATTEMPTS = 5;
@@ -20,14 +22,14 @@
     seller: 'Muuzaji'
   };
 
-  const ACCOUNTS = [
-    { user: 'clever', pass: 'Clever@2026', role: 'admin' },
+  const DEFAULT_ACCOUNTS = [
+    { user: 'clever', pass: 'Clever@2026', role: 'admin', protected: true },
     { user: 'manager', pass: 'Manager@2026', role: 'manager' },
-    { user: 'seller', pass: 'Seller@2026', role: 'seller' }
+    { user: 'seller', pass: 'Seller@2026', role: 'seller', branchId: 'br-main' }
   ];
 
   const PERMS = {
-    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add', 'branches'],
+    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add', 'branches', 'staff_manage'],
     manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'stock_add', 'branches'],
     seller: ['dashboard', 'sales', 'stock_view']
   };
@@ -101,7 +103,133 @@
     return baseKey + '__' + (branchId || getCurrentBranchId() || 'default');
   }
 
+  function getStaffAccountsRaw() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STAFF_ACCOUNTS_KEY) || 'null');
+      return Array.isArray(saved) ? saved : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveStaffAccountsRaw(list) {
+    localStorage.setItem(STAFF_ACCOUNTS_KEY, JSON.stringify(list));
+  }
+
+  function initStaffAccounts() {
+    if (getStaffAccountsRaw()) return;
+    saveStaffAccountsRaw(DEFAULT_ACCOUNTS.map(a => ({
+      ...a,
+      active: true,
+      protected: a.role === 'admin' || a.protected === true,
+      createdAt: new Date().toISOString()
+    })));
+  }
+
+  function getAllAccountsIncludingInactive() {
+    initStaffAccounts();
+    return getStaffAccountsRaw() || [];
+  }
+
+  function getAllAccounts() {
+    return getAllAccountsIncludingInactive().filter(a => a.active !== false);
+  }
+
+  function findAccount(user, pass) {
+    const u = (user || '').trim().toLowerCase();
+    return getAllAccounts().find(a => a.user === u && a.pass === pass) || null;
+  }
+
+  function getAccountByUser(user) {
+    const u = (user || '').trim().toLowerCase();
+    return getAllAccountsIncludingInactive().find(a => a.user === u) || null;
+  }
+
+  function getStaffBranchMap() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STAFF_BRANCHES_KEY) || '{}');
+      return saved && typeof saved === 'object' ? saved : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveStaffBranchMap(map) {
+    localStorage.setItem(STAFF_BRANCHES_KEY, JSON.stringify(map));
+  }
+
+  function getSellerAccounts() {
+    return getAllAccounts().filter(a => a.role === 'seller');
+  }
+
+  function getManageableStaff() {
+    return getAllAccounts().filter(a => a.role === 'seller' || a.role === 'manager');
+  }
+
+  function initStaffBranches() {
+    const map = { ...getStaffBranchMap() };
+    const defaultBranch = getBranches()[0]?.id || 'br-main';
+    let changed = false;
+    getSellerAccounts().forEach(a => {
+      if (!map[a.user]) {
+        map[a.user] = a.branchId || defaultBranch;
+        changed = true;
+      }
+    });
+    if (changed) saveStaffBranchMap(map);
+  }
+
+  function getAssignedBranchId(user) {
+    const u = (user || getSession()?.user || '').toLowerCase();
+    if (!u) return '';
+    const map = getStaffBranchMap();
+    if (map[u]) return map[u];
+    const acct = getAccountByUser(u);
+    return acct?.branchId || map[u] || getBranches()[0]?.id || '';
+  }
+
+  function isBranchLocked() {
+    return getSession()?.role === 'seller';
+  }
+
+  function applySessionBranch() {
+    if (!isBranchLocked()) return;
+    const id = getAssignedBranchId();
+    const branch = getBranchById(id);
+    if (branch && branch.active !== false) {
+      setCurrentBranchId(id);
+    }
+  }
+
+  function assignStaffBranch(user, branchId) {
+    if (!hasPerm('branches')) return false;
+    if (!getSellerAccounts().some(a => a.user === user)) return false;
+    if (!getBranches().some(b => b.id === branchId)) return false;
+    const map = getStaffBranchMap();
+    map[user] = branchId;
+    saveStaffBranchMap(map);
+    return true;
+  }
+
+  function reassignStaffFromBranch(branchId) {
+    const map = getStaffBranchMap();
+    const fallback = getBranches().find(b => b.id !== branchId)?.id;
+    if (!fallback) return;
+    let changed = false;
+    Object.keys(map).forEach(user => {
+      if (map[user] === branchId) {
+        map[user] = fallback;
+        changed = true;
+      }
+    });
+    if (changed) saveStaffBranchMap(map);
+  }
+
   function getCurrentBranchId() {
+    if (isBranchLocked()) {
+      const assigned = getAssignedBranchId();
+      if (assigned && getBranches().some(b => b.id === assigned)) return assigned;
+    }
     const id = sessionStorage.getItem(CURRENT_BRANCH_KEY) || localStorage.getItem(CURRENT_BRANCH_KEY);
     if (id && getBranches().some(b => b.id === id)) return id;
     return getBranches()[0]?.id || '';
@@ -137,6 +265,14 @@
   }
 
   function switchBranch(branchId) {
+    if (isBranchLocked()) {
+      const assigned = getAssignedBranchId();
+      if (branchId !== assigned) {
+        showAdminToast('Huwezi kubadili tawi. Umepewa: ' + (getBranchById(assigned)?.name || assigned), 'warn');
+        populateBranchSelect();
+        return;
+      }
+    }
     if (!getBranchById(branchId)) return;
     setCurrentBranchId(branchId);
     populateBranchSelect();
@@ -162,21 +298,33 @@
   function populateBranchSelect() {
     const sel = $('branchSelect');
     if (!sel) return;
-    const branches = getBranches();
+    const locked = isBranchLocked();
+    const branches = locked
+      ? getBranches().filter(b => b.id === getAssignedBranchId())
+      : getBranches();
     const current = getCurrentBranchId();
     sel.innerHTML = branches.map(b =>
       `<option value="${escapeHtml(b.id)}"${b.id === current ? ' selected' : ''}>${escapeHtml(b.name)}</option>`
     ).join('');
+    sel.disabled = locked;
   }
 
   function updateBranchBar() {
     const b = getCurrentBranch();
     const label = $('currentBranchLabel');
     const sub = $('branchBarSub');
+    const barLabel = document.querySelector('.branch-bar-label');
+    if (barLabel) {
+      barLabel.textContent = isBranchLocked() ? 'Tawi lako' : 'Tawi la kazi';
+    }
     if (label) label.textContent = b?.name || '—';
     if (sub && b) {
-      sub.textContent = [b.location, b.phone].filter(Boolean).join(' · ') || 'Chagua tawi la kufanya kazi';
+      sub.textContent = isBranchLocked()
+        ? ([b.location, b.phone].filter(Boolean).join(' · ') || 'Umepewa tawi hili')
+        : ([b.location, b.phone].filter(Boolean).join(' · ') || 'Chagua tawi la kufanya kazi');
     }
+    $('branchBar')?.classList.toggle('branch-bar-locked', isBranchLocked());
+    $('branchBarRight')?.classList.toggle('hidden', isBranchLocked());
   }
 
   function registerBranch() {
@@ -242,6 +390,7 @@
       b.id === id ? { ...b, active: false } : b
     );
     localStorage.setItem(BRANCHES_KEY, JSON.stringify(list));
+    reassignStaffFromBranch(id);
     if (getCurrentBranchId() === id) {
       setCurrentBranchId(getBranches()[0]?.id || '');
     }
@@ -296,6 +445,235 @@
     el.querySelectorAll('[data-delete-branch]').forEach(btn => {
       btn.addEventListener('click', () => deactivateBranch(btn.dataset.deleteBranch));
     });
+    renderStaffAssignments();
+  }
+
+  function toggleStaffAddBranchField() {
+    const role = $('staffAddRole')?.value;
+    const wrap = $('staffAddBranchField');
+    if (wrap) wrap.classList.toggle('hidden', role !== 'seller');
+  }
+
+  function addStaffAccount() {
+    if (!hasPerm('staff_manage')) return;
+    const user = ($('staffAddUser')?.value || '').trim().toLowerCase();
+    const pass = $('staffAddPass')?.value || '';
+    const pass2 = $('staffAddPass2')?.value || '';
+    const role = $('staffAddRole')?.value || 'seller';
+    const branchId = $('staffAddBranch')?.value || getBranches()[0]?.id;
+
+    if (!user || user.length < 2) {
+      showAdminToast('Weka jina la mtumiaji (angalau herufi 2).', 'warn');
+      return;
+    }
+    if (!/^[a-z0-9._-]+$/.test(user)) {
+      showAdminToast('Jina la mtumiaji: herufi ndogo, namba, . _ - tu.', 'warn');
+      return;
+    }
+    if (!pass || pass.length < 6) {
+      showAdminToast('Nenosiri lazima liwe angalau herufi 6.', 'warn');
+      return;
+    }
+    if (pass !== pass2) {
+      showAdminToast('Nenosiri hazifanani.', 'warn');
+      return;
+    }
+    if (role !== 'manager' && role !== 'seller') {
+      showAdminToast('Chagua jukumu: Meneja au Muuzaji.', 'warn');
+      return;
+    }
+
+    const list = getAllAccountsIncludingInactive();
+    if (list.some(a => a.user === user && a.active !== false)) {
+      showAdminToast('Jina la mtumiaji lipo tayari.', 'warn');
+      return;
+    }
+
+    const entry = {
+      user,
+      pass,
+      role,
+      active: true,
+      protected: false,
+      createdAt: new Date().toISOString()
+    };
+    if (role === 'seller') {
+      entry.branchId = branchId;
+      const map = getStaffBranchMap();
+      map[user] = branchId;
+      saveStaffBranchMap(map);
+    }
+
+    const inactiveIdx = list.findIndex(a => a.user === user && a.active === false);
+    if (inactiveIdx >= 0) {
+      list[inactiveIdx] = { ...entry, createdAt: list[inactiveIdx].createdAt || entry.createdAt };
+    } else {
+      list.push(entry);
+    }
+    saveStaffAccountsRaw(list);
+
+    ['staffAddUser', 'staffAddPass', 'staffAddPass2'].forEach(id => { if ($(id)) $(id).value = ''; });
+    renderStaffManagement();
+    renderStaffAssignments();
+    showAdminToast('✓ Akaunti imeongezwa: ' + user + ' (' + (ROLE_LABELS[role] || role) + ')');
+  }
+
+  function changeStaffPassword() {
+    if (!hasPerm('staff_manage')) return;
+    const user = $('staffChangeUser')?.value;
+    const newPass = $('staffNewPass')?.value || '';
+    const newPass2 = $('staffNewPass2')?.value || '';
+    if (!user) {
+      showAdminToast('Chagua mtumiaji.', 'warn');
+      return;
+    }
+    if (!newPass || newPass.length < 6) {
+      showAdminToast('Nenosiri jipya lazima liwe angalau herufi 6.', 'warn');
+      return;
+    }
+    if (newPass !== newPass2) {
+      showAdminToast('Nenosiri jipya hazifanani.', 'warn');
+      return;
+    }
+    const list = getAllAccountsIncludingInactive();
+    const idx = list.findIndex(a => a.user === user && a.active !== false);
+    if (idx < 0) {
+      showAdminToast('Akaunti haijapatikana.', 'warn');
+      return;
+    }
+    list[idx] = { ...list[idx], pass: newPass };
+    saveStaffAccountsRaw(list);
+    ['staffNewPass', 'staffNewPass2'].forEach(id => { if ($(id)) $(id).value = ''; });
+    showAdminToast('✓ Nenosiri limebadilishwa kwa ' + user);
+  }
+
+  function deactivateStaffAccount(user) {
+    if (!hasPerm('staff_manage')) return;
+    const session = getSession();
+    if (session?.user === user) {
+      showAdminToast('Huwezi kufuta akaunti yako mwenyewe.', 'warn');
+      return;
+    }
+    const list = getAllAccountsIncludingInactive();
+    const acct = list.find(a => a.user === user);
+    if (!acct || acct.protected) {
+      showAdminToast('Huwezi kufuta akaunti hii.', 'warn');
+      return;
+    }
+    if (!confirm('Futa akaunti ya ' + user + '?')) return;
+    saveStaffAccountsRaw(list.map(a => a.user === user ? { ...a, active: false } : a));
+    renderStaffManagement();
+    renderStaffAssignments();
+    showAdminToast('✓ Akaunti imefutwa: ' + user);
+  }
+
+  function populateStaffFormSelects() {
+    const changeSel = $('staffChangeUser');
+    const branchSel = $('staffAddBranch');
+    const staff = getAllAccountsIncludingInactive().filter(a => a.active !== false);
+    if (changeSel) {
+      changeSel.innerHTML = staff.map(a =>
+        `<option value="${escapeHtml(a.user)}">${escapeHtml(a.user)} (${escapeHtml(ROLE_LABELS[a.role] || a.role)})</option>`
+      ).join('');
+    }
+    if (branchSel) {
+      branchSel.innerHTML = getBranches().map(b =>
+        `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`
+      ).join('');
+    }
+    toggleStaffAddBranchField();
+  }
+
+  function renderStaffManagement() {
+    const el = $('staffList');
+    if (!el || !hasPerm('staff_manage')) return;
+    populateStaffFormSelects();
+    const staff = getAllAccounts().slice().sort((a, b) => {
+      const order = { admin: 0, manager: 1, seller: 2 };
+      return (order[a.role] ?? 9) - (order[b.role] ?? 9) || a.user.localeCompare(b.user);
+    });
+    if (!staff.length) {
+      el.innerHTML = '<div class="empty">Hakuna wafanyakazi.</div>';
+      return;
+    }
+    el.innerHTML = staff.map(a => {
+      const branch = a.role === 'seller' ? getBranchById(getAssignedBranchId(a.user)) : null;
+      return `
+        <article class="staff-card staff-role-${a.role}${a.protected ? ' staff-protected' : ''}">
+          <div class="staff-card-main">
+            <div class="staff-card-head">
+              <strong>${escapeHtml(a.user)}</strong>
+              <span class="role-badge role-${a.role}">${escapeHtml(ROLE_LABELS[a.role] || a.role)}</span>
+              ${a.protected ? '<span class="staff-tag">Imelindwa</span>' : ''}
+            </div>
+            <div class="staff-card-meta">
+              ${branch ? '🏪 ' + escapeHtml(branch.name) : a.role === 'manager' ? 'Meneja — matawi yote' : 'Admin kamili'}
+            </div>
+          </div>
+          ${!a.protected ? `<button type="button" class="btn btn-delete btn-sm" data-delete-staff="${escapeHtml(a.user)}">Futa</button>` : ''}
+        </article>`;
+    }).join('');
+    el.querySelectorAll('[data-delete-staff]').forEach(btn => {
+      btn.addEventListener('click', () => deactivateStaffAccount(btn.dataset.deleteStaff));
+    });
+  }
+
+  function populateStaffAssignSelects() {
+    const userSel = $('staffAssignUser');
+    const branchSel = $('staffAssignBranch');
+    if (!userSel || !branchSel) return;
+    const sellers = getSellerAccounts();
+    userSel.innerHTML = sellers.map(a =>
+      `<option value="${escapeHtml(a.user)}">${escapeHtml(a.user)} (${escapeHtml(ROLE_LABELS.seller)})</option>`
+    ).join('');
+    branchSel.innerHTML = getBranches().map(b =>
+      `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`
+    ).join('');
+    const map = getStaffBranchMap();
+    const first = sellers[0]?.user;
+    if (first && map[first]) branchSel.value = map[first];
+  }
+
+  function saveStaffBranchAssignment() {
+    if (!hasPerm('branches')) return;
+    const user = $('staffAssignUser')?.value;
+    const branchId = $('staffAssignBranch')?.value;
+    if (!user || !branchId) {
+      showAdminToast('Chagua muuzaji na tawi.', 'warn');
+      return;
+    }
+    if (!assignStaffBranch(user, branchId)) {
+      showAdminToast('Imeshindwa kuhifadhi. Jaribu tena.', 'warn');
+      return;
+    }
+    renderStaffAssignments();
+    showAdminToast('✓ ' + user + ' amepewa tawi: ' + (getBranchById(branchId)?.name || branchId));
+  }
+
+  function renderStaffAssignments() {
+    const el = $('staffBranchList');
+    if (!el || !hasPerm('branches')) return;
+    populateStaffAssignSelects();
+    const map = getStaffBranchMap();
+    const sellers = getSellerAccounts();
+    if (!sellers.length) {
+      el.innerHTML = '<div class="empty">Hakuna akaunti za muuzaji.</div>';
+      return;
+    }
+    el.innerHTML = `
+      <div class="staff-branch-head">Muuzaji waliopewa tawi</div>
+      <ul class="staff-branch-list">
+        ${sellers.map(a => {
+          const bid = map[a.user] || a.branchId || '—';
+          const b = getBranchById(bid);
+          return `
+            <li class="staff-branch-row">
+              <span class="staff-branch-user">👤 ${escapeHtml(a.user)}</span>
+              <span class="staff-branch-arrow">→</span>
+              <span class="staff-branch-name">🏪 ${escapeHtml(b?.name || bid)}</span>
+            </li>`;
+        }).join('')}
+      </ul>`;
   }
 
   function setError(msg) {
@@ -380,6 +758,7 @@
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
       user,
       role,
+      branchId: role === 'seller' ? getAssignedBranchId(user) : null,
       exp: Date.now() + 8 * 60 * 60 * 1000
     }));
   }
@@ -422,6 +801,7 @@
     $('clearOrdersBtn')?.classList.toggle('hidden', !hasPerm('clear'));
     $('clearVisitsBtn')?.classList.toggle('hidden', !hasPerm('clear'));
     $('branchPanel')?.classList.toggle('hidden', !hasPerm('branches'));
+    $('staffPanel')?.classList.toggle('hidden', !hasPerm('staff_manage'));
     $('branchRegisterForm')?.classList.toggle('hidden', !hasPerm('branches'));
     $('registerBranchBtn')?.classList.toggle('hidden', !hasPerm('branches'));
     $('reportsPanel')?.classList.toggle('hidden', !hasPerm('reports'));
@@ -462,9 +842,12 @@
   }
 
   function showApp() {
+    initStaffAccounts();
     initBranches();
     migrateBranchData();
+    initStaffBranches();
     getBranches().forEach(b => initSalesItemsForBranch(b.id));
+    applySessionBranch();
     $('login')?.classList.add('hidden');
     $('app')?.classList.remove('hidden');
     applyRoleUI();
@@ -482,6 +865,7 @@
     renderSalesItems();
     renderStock();
     renderBranches();
+    renderStaffManagement();
   }
 
   function showLogin() {
@@ -505,9 +889,19 @@
       return;
     }
 
-    const account = ACCOUNTS.find(a => a.user === user && a.pass === pass);
+    const account = findAccount(user, pass);
 
     if (account) {
+      if (account.role === 'seller') {
+        initBranches();
+        initStaffBranches();
+        const branchId = getAssignedBranchId(account.user);
+        const branch = getBranchById(branchId);
+        if (!branch || branch.active === false) {
+          setError('Tawi la muuzaji halipatikani. Wasiliana na Admin.');
+          return;
+        }
+      }
       attempts = 0;
       setError('');
       createSession(account.user, account.role);
@@ -1810,6 +2204,7 @@
             ${canStock ? '<button type="button" class="dash-action-btn" data-dash-scroll="stockPanel"><span>📦</span> Angalia Stock</button>' : ''}
             ${hasPerm('reports') ? '<button type="button" class="dash-action-btn" data-dash-scroll="reportsPanel"><span>📋</span> Ripoti Zote</button>' : ''}
             ${hasPerm('branches') ? '<button type="button" class="dash-action-btn" data-dash-scroll="branchPanel"><span>🏪</span> Dhibiti Matawi</button>' : ''}
+            ${hasPerm('staff_manage') ? '<button type="button" class="dash-action-btn" data-dash-scroll="staffPanel"><span>👥</span> Wafanyakazi</button>' : ''}
             <button type="button" class="dash-action-btn" id="dashRefreshBtn"><span>🔄</span> Onyesha Upya</button>
           </div>
           <p class="dash-action-note">Data inasasishwa otomatiki unaporekodi mauzo, stock, au oda.</p>
@@ -2264,6 +2659,10 @@
 
   function bindEvents() {
     $('registerBranchBtn')?.addEventListener('click', registerBranch);
+    $('saveStaffBranchBtn')?.addEventListener('click', saveStaffBranchAssignment);
+    $('addStaffBtn')?.addEventListener('click', addStaffAccount);
+    $('changeStaffPassBtn')?.addEventListener('click', changeStaffPassword);
+    $('staffAddRole')?.addEventListener('change', toggleStaffAddBranchField);
     $('branchSelect')?.addEventListener('change', e => {
       if (e.target.value) switchBranch(e.target.value);
     });

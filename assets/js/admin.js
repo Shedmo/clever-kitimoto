@@ -318,6 +318,60 @@
     return !!(role && (PERMS[role] || []).includes(perm));
   }
 
+  function isSellerQuick() {
+    return hasPerm('sales') && !hasPerm('reports');
+  }
+
+  function setSellerPayment(pay) {
+    if ($('salePayment')) $('salePayment').value = pay;
+    document.querySelectorAll('.seller-pay-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.pay === pay);
+    });
+  }
+
+  function switchSellerTab(tabId) {
+    if (!isSellerQuick()) return;
+    $('salesPanel')?.classList.toggle('hidden', tabId !== 'salesPanel');
+    $('stockPanel')?.classList.toggle('hidden', tabId !== 'stockPanel');
+    document.querySelectorAll('.seller-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.sellerTab === tabId);
+    });
+    if (tabId === 'stockPanel') renderStock();
+    $(tabId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function updateSellerQuickUI() {
+    if (!isSellerQuick()) return;
+    const sales = getSalesLog().filter(x => isToday(x.at));
+    const todayTotal = sales.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    const todayKg = Math.round(sales.reduce((s, x) => {
+      if (x.unit === 'KG') return s + (Number(x.qty) || 0);
+      return s;
+    }, 0) * 10) / 10;
+    const stock = computeStockStats();
+    const stockLabel = stock.out ? stock.out + ' imeisha' : stock.low ? stock.low + ' chini' : 'Salama';
+    const branch = getCurrentBranch();
+
+    const strip = $('sellerTodayStrip');
+    if (strip) {
+      strip.innerHTML = `
+        <div class="seller-strip-inner">
+          <div>
+            <span class="seller-strip-eyebrow">${escapeHtml(branch?.name || 'Mauzo')}</span>
+            <strong class="seller-strip-total">TSH ${formatMoney(todayTotal)}</strong>
+            <span class="seller-strip-meta">${sales.length} mauzo leo · ${todayKg || 0} KG</span>
+          </div>
+          <div class="seller-strip-stock seller-strip-stock-${stock.out ? 'danger' : stock.low ? 'warn' : 'ok'}">
+            <span>Stock</span>
+            <b>${escapeHtml(stockLabel)}</b>
+          </div>
+        </div>`;
+    }
+
+    const quickTotal = $('sellerQuickTotal');
+    if (quickTotal) quickTotal.textContent = 'Leo: TSH ' + formatMoney(todayTotal);
+  }
+
   function isSessionValid() {
     return !!getSession();
   }
@@ -343,7 +397,7 @@
       badge.className = 'role-badge role-' + s.role;
     }
     if (sessionBadge && s) {
-      sessionBadge.textContent = '🔓 ' + (ROLE_LABELS[s.role] || s.role);
+      sessionBadge.textContent = isSellerQuick() ? '⚡ Mauzo Haraka' : '🔓 ' + (ROLE_LABELS[s.role] || s.role);
     }
 
     $('priceSection')?.classList.toggle('hidden', !hasPerm('prices'));
@@ -372,6 +426,35 @@
     $('registerBranchBtn')?.classList.toggle('hidden', !hasPerm('branches'));
     $('reportsPanel')?.classList.toggle('hidden', !hasPerm('reports'));
     document.querySelector('.dash-export-actions')?.classList.toggle('hidden', !hasPerm('export'));
+
+    const sellerQuick = isSellerQuick();
+    $('app')?.classList.toggle('seller-quick-mode', sellerQuick);
+    $('sellerQuickBar')?.classList.toggle('hidden', !sellerQuick);
+    $('sellerTodayStrip')?.classList.toggle('hidden', !sellerQuick);
+    $('sellerPayQuick')?.classList.toggle('hidden', !sellerQuick);
+    $('sellerTotalDisplay')?.classList.toggle('hidden', !sellerQuick);
+    $('sellerMoreToggle')?.classList.toggle('hidden', !sellerQuick);
+    $('dashboardPanel')?.classList.toggle('hidden', sellerQuick || !hasPerm('dashboard'));
+
+    const paySelectField = document.querySelector('.field-pay-select');
+    if (paySelectField) paySelectField.classList.toggle('hidden', sellerQuick);
+
+    const salesTitle = $('salesPanelTitle');
+    const salesNote = $('salesPanelNote');
+    if (sellerQuick) {
+      if (salesTitle) salesTitle.textContent = 'Rekodi Mauzo';
+      if (salesNote) salesNote.textContent = 'Chagua bidhaa → kiasi → malipo → bonyeza rekodi';
+      document.querySelectorAll('.seller-optional').forEach(el => el.classList.add('hidden'));
+      $('recordSaleBtn').textContent = '✓ Rekodi Sasa';
+      switchSellerTab('salesPanel');
+      updateSellerQuickUI();
+      setSellerPayment($('salePayment')?.value || 'cash');
+    } else {
+      if (salesTitle) salesTitle.textContent = '🥩 Mauzo ya Nyama';
+      if (salesNote) salesNote.textContent = 'Rekodi mauzo kwa tawi lililochaguliwa — chagua bidhaa, kiasi, na malipo';
+      document.querySelectorAll('.seller-optional').forEach(el => el.classList.remove('hidden'));
+      $('recordSaleBtn').textContent = '✓ Rekodi Mauzo';
+    }
 
     document.querySelectorAll('#priceForms .panel').forEach(p => {
       p.classList.toggle('hidden', !hasPerm('prices'));
@@ -967,6 +1050,11 @@
     if (totalEl && qty > 0 && !totalEl.dataset.manual) {
       totalEl.value = total;
     }
+    const big = $('sellerTotalBig');
+    if (big) {
+      const shown = totalEl?.value ? Number(totalEl.value) : (qty > 0 && item ? total : 0);
+      big.textContent = shown ? 'TSH ' + formatMoney(shown) : '—';
+    }
   }
 
   function renderSaleQtyPresets() {
@@ -1061,6 +1149,7 @@
     renderDashboard();
     populateSaleItemSelect();
     showSaleSuccessDialog(sale);
+    updateSellerQuickUI();
   }
 
   function computeSalesStats() {
@@ -1477,136 +1566,6 @@
     return { text: 'Tayari kwa siku mpya', cls: 'neutral' };
   }
 
-  function buildSellerDashboard(d, branch, status, dateStr, canSales, canStock) {
-    const top3 = d.topAll.slice(0, 3);
-    return `
-      <section class="dash-hero dash-hero-seller">
-        <div class="dash-hero-main">
-          <span class="dash-hero-greet">${dashGreeting()} 👋</span>
-          <h3 class="dash-hero-title">${escapeHtml(branch?.name || 'Clever Kitimoto')}</h3>
-          <p class="dash-hero-date">${escapeHtml(dateStr)}</p>
-          <div class="dash-hero-tags">
-            <span class="dash-pill dash-pill-${status.cls}">${escapeHtml(status.text)}</span>
-          </div>
-        </div>
-        <div class="dash-hero-kpi">
-          <span class="dash-hero-kpi-label">Mauzo Leo</span>
-          <strong class="dash-hero-kpi-value">TSH ${formatMoney(d.salesToday)}</strong>
-          <span class="dash-hero-kpi-sub">${d.salesTodayCount} mauzo · ${d.todayKg || 0} KG</span>
-        </div>
-      </section>
-
-      <div class="dash-insights" role="list">
-        ${d.insights.map(ins => `
-          <div class="dash-insight dash-insight-${ins.type}" role="listitem">
-            <span class="dash-insight-icon" aria-hidden="true">${ins.icon}</span>
-            <span>${escapeHtml(ins.text)}</span>
-          </div>
-        `).join('')}
-      </div>
-
-      <div class="dash-kpi-grid dash-kpi-grid-seller">
-        <article class="dash-kpi dash-kpi-sales">
-          <div class="dash-kpi-icon" aria-hidden="true">🥩</div>
-          <div class="dash-kpi-body">
-            <span class="dash-kpi-label">Mauzo Yangu Leo</span>
-            <strong class="dash-kpi-value">${d.salesTodayCount}</strong>
-            <span class="dash-kpi-sub">TSH ${formatMoney(d.salesToday)} · ${d.todayKg || 0} KG</span>
-          </div>
-        </article>
-        <article class="dash-kpi dash-kpi-stock${d.stockOut ? ' dash-kpi-danger' : d.stockLow ? ' dash-kpi-warn' : ''}">
-          <div class="dash-kpi-ring" style="--pct:${d.stockPct}" aria-hidden="true">
-            <span>${d.stockPct}%</span>
-          </div>
-          <div class="dash-kpi-body">
-            <span class="dash-kpi-label">Stock / Stoo</span>
-            <strong class="dash-kpi-value">${d.stockOut ? d.stockOut + ' imeisha' : d.stockLow ? d.stockLow + ' chini' : 'Salama'}</strong>
-            <span class="dash-kpi-sub">${d.stockKg || 0} KG kwenye stoo</span>
-          </div>
-        </article>
-      </div>
-
-      <div class="dash-main-grid dash-main-grid-seller">
-        ${top3.length ? `
-        <article class="dash-card">
-          <div class="dash-card-head">
-            <h4>🏆 Bidhaa Leo</h4>
-            <span class="dash-card-meta">Zinazouzwa zaidi</span>
-          </div>
-          <ul class="dash-rank-list">
-            ${top3.map(([name, data], i) => `
-              <li class="dash-rank-item">
-                <span class="dash-rank-num">${i + 1}</span>
-                <div class="dash-rank-body">
-                  <div class="dash-rank-row">
-                    <strong>${escapeHtml(name)}</strong>
-                    <span>TSH ${formatMoney(data.total)}</span>
-                  </div>
-                  <small>${data.qty} ${escapeHtml(data.unit)}</small>
-                </div>
-              </li>`).join('')}
-          </ul>
-        </article>` : ''}
-
-        <article class="dash-card dash-card-stats dash-card-stats-seller">
-          <div class="dash-card-head">
-            <h4>📊 Takwimu za Haraka</h4>
-            <span class="dash-card-meta">Leo tu</span>
-          </div>
-          <div class="dash-seller-stats">
-            <div class="dash-seller-stat">
-              <span>Mauzo Leo</span>
-              <b>TSH ${formatMoney(d.salesToday)}</b>
-            </div>
-            <div class="dash-seller-stat">
-              <span>Idadi</span>
-              <b>${d.salesTodayCount}</b>
-            </div>
-            <div class="dash-seller-stat">
-              <span>KG Leo</span>
-              <b>${d.todayKg || '—'}</b>
-            </div>
-          </div>
-        </article>
-      </div>
-
-      <div class="dash-bottom-grid dash-bottom-grid-seller">
-        <article class="dash-card dash-card-activity">
-          <div class="dash-card-head">
-            <h4>⚡ Mauzo ya Hivi Karibuni</h4>
-            <span class="dash-card-meta">Mauzo 3 ya mwisho</span>
-          </div>
-          ${d.activity.length ? `
-            <ul class="dash-activity-list">
-              ${d.activity.map(a => `
-                <li class="dash-activity-item dash-activity-sale">
-                  <span class="dash-activity-icon">🥩</span>
-                  <div class="dash-activity-body">
-                    <strong>${escapeHtml(a.title)}</strong>
-                    <span>${escapeHtml(a.sub)} · ${escapeHtml(formatOrderDate(a.at))}</span>
-                  </div>
-                  <div class="dash-activity-amt">
-                    <b>TSH ${formatMoney(a.amount)}</b>
-                    <small>${escapeHtml(paymentLabel(a.payment))}</small>
-                  </div>
-                </li>
-              `).join('')}
-            </ul>` : '<p class="dash-empty">Hakuna mauzo bado. Bonyeza Rekodi Mauzo hapo chini.</p>'}
-        </article>
-
-        <article class="dash-card dash-card-actions">
-          <div class="dash-card-head">
-            <h4>🚀 Vitendo vya Haraka</h4>
-          </div>
-          <div class="dash-quick-actions dash-quick-actions-seller">
-            ${canSales ? '<button type="button" class="dash-action-btn" data-dash-scroll="salesPanel"><span>🥩</span> Rekodi Mauzo</button>' : ''}
-            ${canStock ? '<button type="button" class="dash-action-btn" data-dash-scroll="stockPanel"><span>📦</span> Angalia Stock</button>' : ''}
-            <button type="button" class="dash-action-btn" id="dashRefreshBtn"><span>🔄</span> Onyesha Upya</button>
-          </div>
-        </article>
-      </div>`;
-  }
-
   function scrollToPanel(id) {
     const el = $(id);
     if (!el) return;
@@ -1616,12 +1575,15 @@
 
   function renderDashboard() {
     const root = $('dashboardRoot');
+    if (isSellerQuick()) {
+      updateSellerQuickUI();
+      return;
+    }
     if (!root) return;
 
     const d = computeDashboardData();
     const branch = getCurrentBranch();
-    const sellerMode = !d.showReports;
-    const status = dashStatusLabel(d, sellerMode);
+    const status = dashStatusLabel(d, false);
     const now = new Date();
     const dateStr = now.toLocaleDateString('sw-TZ', {
       weekday: 'long',
@@ -1634,17 +1596,10 @@
 
     const dashSubtitle = document.querySelector('#dashboardPanel .panel-note-tight');
     if (dashSubtitle) {
-      dashSubtitle.textContent = sellerMode
-        ? 'Mauzo na stock yako leo — rahisi na wazi'
-        : 'Muhtasari wa biashara — mauzo, stock, na wateja kwa muda halisi';
+      dashSubtitle.textContent = 'Muhtasari wa biashara — mauzo, stock, na wateja kwa muda halisi';
     }
 
-    root.classList.toggle('dashboard-root-seller', sellerMode);
-
-    if (sellerMode) {
-      root.innerHTML = buildSellerDashboard(d, branch, status, dateStr, canSales, canStock);
-      return;
-    }
+    root.classList.remove('dashboard-root-seller');
 
     const combinedTotal = d.totalRevenue + d.salesTotal;
     const avgOrder = d.orderCount ? Math.round(d.totalRevenue / d.orderCount) : 0;
@@ -2323,6 +2278,20 @@
         showAdminToast('✓ Dashboard imesasishwa');
       }
     });
+    document.querySelectorAll('.seller-tab').forEach(btn => {
+      btn.addEventListener('click', () => switchSellerTab(btn.dataset.sellerTab));
+    });
+    document.querySelectorAll('.seller-pay-btn').forEach(btn => {
+      btn.addEventListener('click', () => setSellerPayment(btn.dataset.pay));
+    });
+    $('sellerMoreToggle')?.addEventListener('click', () => {
+      const fields = document.querySelectorAll('.seller-optional');
+      const open = fields[0]?.classList.contains('hidden');
+      fields.forEach(el => el.classList.toggle('hidden', !open));
+      if ($('sellerMoreToggle')) {
+        $('sellerMoreToggle').textContent = open ? '− Ficha simu / maelezo' : '+ Simu / Maelezo (hiari)';
+      }
+    });
     $('loginForm')?.addEventListener('submit', e => { e.preventDefault(); login(); });
     $('togglePass')?.addEventListener('click', togglePassword);
     $('logoutBtn')?.addEventListener('click', logout);
@@ -2350,6 +2319,7 @@
     });
     $('saleTotal')?.addEventListener('input', () => {
       if ($('saleTotal')) $('saleTotal').dataset.manual = '1';
+      updateSaleTotalPreview();
     });
     $('userSearch')?.addEventListener('input', e => {
       userQuery = e.target.value.trim();

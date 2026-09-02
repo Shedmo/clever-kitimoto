@@ -19,7 +19,7 @@
     <div class="brand">Clever <span>Kitimoto</span></div>
     <p class="login-sub">Ingia kwa jukumu lako — Admin, Meneja, au Muuzaji</p>
     <div class="login-roles">
-      <strong>Jukumu:</strong> Admin (kila kitu) · Meneja (bei, menu, mauzo, stock) · Muuzaji (rekodi mauzo & angalia stock tu)
+      <strong>Jukumu:</strong> Admin (kila kitu) · Meneja (bei, menu, mauzo) · Muuzaji (mauzo haraka tu)
     </div>
 
     <form id="loginForm" class="login-form" autocomplete="on">
@@ -116,28 +116,30 @@
     <div id="dashboardRoot" class="dashboard-root"></div>
   </section>
 
+  <div id="sellerTodayStrip" class="seller-today-strip hidden" aria-live="polite"></div>
+
   <section class="panel sales-panel hidden" id="salesPanel">
-    <div class="panel-head-row">
+    <div class="panel-head-row seller-panel-head">
       <div>
-        <h2>🥩 Mauzo ya Nyama</h2>
-        <p class="panel-note panel-note-tight">Rekodi mauzo kwa tawi lililochaguliwa — chagua bidhaa, kiasi, na malipo</p>
+        <h2 id="salesPanelTitle">🥩 Mauzo ya Nyama</h2>
+        <p class="panel-note panel-note-tight" id="salesPanelNote">Rekodi mauzo kwa tawi lililochaguliwa — chagua bidhaa, kiasi, na malipo</p>
       </div>
     </div>
-    <div class="sales-record-grid">
-      <div class="field">
+    <div class="sales-record-grid" id="salesRecordGrid">
+      <div class="field field-product">
         <label>Bidhaa</label>
         <select id="saleItemSelect"><option value="">Chagua bidhaa...</option></select>
       </div>
       <div class="field">
         <label>Kiasi</label>
-        <input id="saleQty" type="number" min="0.01" step="0.01" placeholder="Mfano: 0.5 au 1">
+        <input id="saleQty" type="number" min="0.01" step="0.01" placeholder="0.5 au 1" inputmode="decimal">
       </div>
-      <div class="field">
+      <div class="field field-price">
         <label>Bei (TSH)</label>
         <input id="saleTotal" type="number" min="0" placeholder="Inajazwa otomatiki">
         <small class="field-hint" id="salePriceHint">Chagua bidhaa kwanza</small>
       </div>
-      <div class="field">
+      <div class="field field-pay-select">
         <label>Malipo</label>
         <select id="salePayment">
           <option value="cash">Cash</option>
@@ -145,18 +147,28 @@
           <option value="lipa">Lipa namba</option>
         </select>
       </div>
-      <div class="field">
-        <label>Simu mteja (optional)</label>
-        <input id="salePhone" type="tel" placeholder="07XX XXX XXX">
+      <div class="field seller-optional">
+        <label>Simu (hiari)</label>
+        <input id="salePhone" type="tel" placeholder="07XX XXX XXX" inputmode="tel">
       </div>
-      <div class="field">
-        <label>Maelezo (optional)</label>
-        <input id="saleNotes" type="text" placeholder="Mfano: delivery, jina la mteja...">
+      <div class="field seller-optional">
+        <label>Maelezo (hiari)</label>
+        <input id="saleNotes" type="text" placeholder="Jina, delivery...">
       </div>
     </div>
+    <div class="seller-pay-quick hidden" id="sellerPayQuick" role="group" aria-label="Malipo">
+      <button type="button" class="seller-pay-btn active" data-pay="cash">💵 Cash</button>
+      <button type="button" class="seller-pay-btn" data-pay="mpesa">📱 M-Pesa</button>
+      <button type="button" class="seller-pay-btn" data-pay="lipa">💳 Lipa</button>
+    </div>
+    <div id="sellerTotalDisplay" class="seller-total-display hidden">
+      <span>Jumla ya Mauzo</span>
+      <strong id="sellerTotalBig">TSH 0</strong>
+    </div>
     <div class="sales-qty-presets" id="saleQtyPresets"></div>
-    <div class="actions" style="margin-top:14px">
-      <button class="btn btn-save" type="button" id="recordSaleBtn">✓ Rekodi Mauzo</button>
+    <button type="button" class="seller-more-toggle hidden" id="sellerMoreToggle">+ Simu / Maelezo (hiari)</button>
+    <div class="actions seller-record-actions">
+      <button class="btn btn-save seller-record-btn" type="button" id="recordSaleBtn">✓ Rekodi Mauzo</button>
     </div>
   </section>
 
@@ -313,6 +325,16 @@
       <a class="btn btn-back" href="index.html">👀 Preview Menu</a>
     </div>
   </div>
+
+  <nav class="seller-quick-bar hidden" id="sellerQuickBar" aria-label="Mauzo haraka">
+    <button type="button" class="seller-tab active" data-seller-tab="salesPanel">
+      <span>🥩</span><small>Mauzo</small>
+    </button>
+    <button type="button" class="seller-tab" data-seller-tab="stockPanel">
+      <span>📦</span><small>Stock</small>
+    </button>
+    <div class="seller-tab-total" id="sellerQuickTotal">Leo: TSH 0</div>
+  </nav>
 </div>
 
 <div class="admin-dialog" id="adminDialog" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="adminDialogTitle">

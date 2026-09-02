@@ -7,6 +7,7 @@
   const VISIT_LOG_KEY = 'cleverKitimotoVisitLogV1';
   const SALES_ITEMS_KEY = 'cleverKitimotoSalesItemsV1';
   const SALES_LOG_KEY = 'cleverKitimotoSalesLogV1';
+  const STOCK_LOG_KEY = 'cleverKitimotoStockLogV1';
   const SESSION_KEY = 'cleverKitimotoAdminSession';
   const MAX_ATTEMPTS = 5;
   const LOCK_MS = 60000;
@@ -24,8 +25,8 @@
   ];
 
   const PERMS = {
-    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear'],
-    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'sales', 'sales_items'],
+    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add'],
+    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'sales', 'sales_items', 'stock_add'],
     seller: ['dashboard', 'orders', 'users', 'visits', 'export', 'sales']
   };
 
@@ -104,6 +105,7 @@
     $('saveSection')?.classList.toggle('hidden', !hasPerm('save'));
     $('salesPanel')?.classList.toggle('hidden', !hasPerm('sales'));
     $('salesItemsSection')?.classList.toggle('hidden', !hasPerm('sales_items'));
+    $('stockPanel')?.classList.toggle('hidden', !hasPerm('sales'));
     $('clearSalesBtn')?.classList.toggle('hidden', !hasPerm('sales_clear'));
     $('resetBtn')?.classList.toggle('hidden', !hasPerm('reset'));
     $('clearOrdersBtn')?.classList.toggle('hidden', !hasPerm('clear'));
@@ -125,8 +127,10 @@
     renderVisits();
     renderSales();
     initSalesItems();
+    migrateStockFields();
     populateSaleItemSelect();
     renderSalesItems();
+    renderStock();
   }
 
   function showLogin() {
@@ -267,19 +271,19 @@
   }
 
   const DEFAULT_SALES_ITEMS = [
-    { name: 'Choma', category: 'Choma', unit: 'KG', price: 18000 },
-    { name: 'Choma ya Foil', category: 'Choma ya Foil', unit: 'KG', price: 18000 },
-    { name: 'Rosti', category: 'Rosti', unit: 'KG', price: 17000 },
-    { name: 'Kavu', category: 'Kavu', unit: 'KG', price: 17000 },
-    { name: '½ KG Mix', category: 'Mix', unit: 'Kifurushi', price: 25000 },
-    { name: '1 KG Mix', category: 'Mix', unit: 'Kifurushi', price: 35000 },
-    { name: 'Kisinia Single', category: 'Kisinia', unit: 'Kifurushi', price: 20000 },
-    { name: 'Kisinia Couple', category: 'Kisinia', unit: 'Kifurushi', price: 35000 },
-    { name: 'Kisinia Family', category: 'Kisinia', unit: 'Kifurushi', price: 65000 },
-    { name: 'Chipsi Kavu', category: 'Sides', unit: 'Sahani', price: 2000 },
-    { name: 'Chipsi Yai', category: 'Sides', unit: 'Sahani', price: 3000 },
-    { name: 'Ugali', category: 'Sides', unit: 'Kipande', price: 1000 },
-    { name: 'Ndizi', category: 'Sides', unit: 'Kipande', price: 500 }
+    { name: 'Choma', category: 'Choma', unit: 'KG', price: 18000, stock: 20, lowStock: 3 },
+    { name: 'Choma ya Foil', category: 'Choma ya Foil', unit: 'KG', price: 18000, stock: 20, lowStock: 3 },
+    { name: 'Rosti', category: 'Rosti', unit: 'KG', price: 17000, stock: 20, lowStock: 3 },
+    { name: 'Kavu', category: 'Kavu', unit: 'KG', price: 17000, stock: 20, lowStock: 3 },
+    { name: '½ KG Mix', category: 'Mix', unit: 'Kifurushi', price: 25000, stock: 12, lowStock: 2 },
+    { name: '1 KG Mix', category: 'Mix', unit: 'Kifurushi', price: 35000, stock: 10, lowStock: 2 },
+    { name: 'Kisinia Single', category: 'Kisinia', unit: 'Kifurushi', price: 20000, stock: 15, lowStock: 3 },
+    { name: 'Kisinia Couple', category: 'Kisinia', unit: 'Kifurushi', price: 35000, stock: 10, lowStock: 2 },
+    { name: 'Kisinia Family', category: 'Kisinia', unit: 'Kifurushi', price: 65000, stock: 6, lowStock: 1 },
+    { name: 'Chipsi Kavu', category: 'Sides', unit: 'Sahani', price: 2000, stock: 40, lowStock: 8 },
+    { name: 'Chipsi Yai', category: 'Sides', unit: 'Sahani', price: 3000, stock: 30, lowStock: 6 },
+    { name: 'Ugali', category: 'Sides', unit: 'Kipande', price: 1000, stock: 50, lowStock: 10 },
+    { name: 'Ndizi', category: 'Sides', unit: 'Kipande', price: 500, stock: 60, lowStock: 12 }
   ];
 
   function getSalesItems() {
@@ -305,9 +309,243 @@
     const items = DEFAULT_SALES_ITEMS.map((x, i) => ({
       id: 'si-' + (Date.now() + i),
       ...x,
+      trackStock: true,
       active: true
     }));
     localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(items));
+  }
+
+  function defaultStockForUnit(unit) {
+    if (unit === 'KG') return { stock: 20, lowStock: 3 };
+    if (unit === 'Kifurushi') return { stock: 10, lowStock: 2 };
+    return { stock: 30, lowStock: 5 };
+  }
+
+  function migrateStockFields() {
+    const list = getAllSalesItems();
+    let changed = false;
+    const migrated = list.map(x => {
+      if (x.stock != null && x.lowStock != null && x.trackStock != null) return x;
+      changed = true;
+      const def = defaultStockForUnit(x.unit);
+      return {
+        ...x,
+        stock: x.stock != null ? x.stock : def.stock,
+        lowStock: x.lowStock != null ? x.lowStock : def.lowStock,
+        trackStock: x.trackStock !== false
+      };
+    });
+    if (changed) localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(migrated));
+  }
+
+  function getStockLog() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STOCK_LOG_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function getStockStatus(item) {
+    if (!item || item.trackStock === false) return 'untracked';
+    const stock = Number(item.stock) || 0;
+    const low = Number(item.lowStock) || 0;
+    if (stock <= 0) return 'out';
+    if (stock <= low) return 'low';
+    return 'ok';
+  }
+
+  function stockStatusLabel(status) {
+    return ({ ok: 'Salama', low: 'Chini', out: 'Imeisha', untracked: '—' }[status] || '—');
+  }
+
+  function formatStockQty(n, unit) {
+    const v = Math.round(Number(n) * 100) / 100;
+    return v + ' ' + (unit || '');
+  }
+
+  function saveSalesItemsList(list) {
+    localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(list));
+  }
+
+  function updateItemStock(itemId, delta, type, note, ref) {
+    const list = getAllSalesItems();
+    const idx = list.findIndex(x => x.id === itemId && x.active !== false);
+    if (idx < 0) return null;
+    const item = list[idx];
+    if (item.trackStock === false) return item;
+
+    const before = Number(item.stock) || 0;
+    const after = Math.max(0, Math.round((before + delta) * 100) / 100);
+    list[idx] = { ...item, stock: after };
+    saveSalesItemsList(list);
+
+    const session = getSession();
+    const log = getStockLog();
+    log.unshift({
+      id: 'stk-' + Date.now(),
+      at: new Date().toISOString(),
+      type,
+      itemId,
+      itemName: item.name,
+      unit: item.unit,
+      qty: Math.abs(delta),
+      delta,
+      before,
+      after,
+      note: note || '',
+      ref: ref || '',
+      user: session?.user || 'staff'
+    });
+    if (log.length > 500) log.length = 500;
+    localStorage.setItem(STOCK_LOG_KEY, JSON.stringify(log));
+
+    return list[idx];
+  }
+
+  function addStockToItem(itemId, qty, note) {
+    if (!hasPerm('stock_add')) {
+      showAdminToast('Huna ruhusa ya kuongeza stock.', 'warn');
+      return null;
+    }
+    const amount = parseFloat(qty);
+    if (!amount || amount <= 0) {
+      showAdminToast('Weka kiasi cha stock sahihi.', 'warn');
+      return null;
+    }
+    const updated = updateItemStock(itemId, amount, 'in', note || 'Ongezeko la stock');
+    if (updated) {
+      populateSaleItemSelect();
+      renderSalesItems();
+      renderStock();
+      renderDashboard();
+      showAdminToast('✓ Stock imeongezwa: ' + updated.name + ' → ' + formatStockQty(updated.stock, updated.unit));
+    }
+    return updated;
+  }
+
+  function computeStockStats() {
+    const items = getSalesItems().filter(x => x.trackStock !== false);
+    let low = 0;
+    let out = 0;
+    let totalKg = 0;
+    items.forEach(x => {
+      const status = getStockStatus(x);
+      if (status === 'low') low += 1;
+      if (status === 'out') out += 1;
+      if (x.unit === 'KG') totalKg += Number(x.stock) || 0;
+    });
+    return {
+      tracked: items.length,
+      low,
+      out,
+      ok: items.length - low - out,
+      totalKg: Math.round(totalKg * 10) / 10
+    };
+  }
+
+  function renderStock() {
+    renderStockSummary();
+    renderStockAlerts();
+    renderStockList();
+  }
+
+  function renderStockSummary() {
+    const el = $('stockSummary');
+    if (!el) return;
+    const s = computeStockStats();
+    el.innerHTML = `
+      <div class="summary-chip"><span>Bidhaa zinazofuatiliwa</span><b>${s.tracked}</b></div>
+      <div class="summary-chip"><span>Salama</span><b>${s.ok}</b></div>
+      <div class="summary-chip ${s.low ? 'warn' : ''}"><span>Chini</span><b>${s.low}</b></div>
+      <div class="summary-chip ${s.out ? 'danger' : ''}"><span>Imeisha</span><b>${s.out}</b></div>
+      <div class="summary-chip highlight"><span>KG kwenye stoo</span><b>${s.totalKg || '—'}</b></div>
+    `;
+  }
+
+  function renderStockAlerts() {
+    const el = $('stockAlerts');
+    if (!el) return;
+    const alerts = getSalesItems()
+      .filter(x => x.trackStock !== false)
+      .filter(x => getStockStatus(x) !== 'ok')
+      .sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
+
+    if (!alerts.length) {
+      el.innerHTML = '<div class="stock-alert-ok">✓ Stock zote ziko salama kwa sasa</div>';
+      return;
+    }
+
+    el.innerHTML = alerts.map(x => {
+      const status = getStockStatus(x);
+      return `
+        <div class="stock-alert stock-alert-${status}">
+          <span>${status === 'out' ? '🔴' : '⚠️'} <b>${escapeHtml(x.name)}</b> — ${escapeHtml(formatStockQty(x.stock, x.unit))} (${escapeHtml(stockStatusLabel(status))})</span>
+          ${hasPerm('stock_add') ? `<button type="button" class="btn btn-save btn-sm" data-stock-add="${escapeHtml(x.id)}" data-stock-qty="${x.unit === 'KG' ? '5' : '10'}">+ Ongeza</button>` : ''}
+        </div>`;
+    }).join('');
+
+    el.querySelectorAll('[data-stock-add]').forEach(btn => {
+      btn.addEventListener('click', () => addStockToItem(btn.dataset.stockAdd, btn.dataset.stockQty));
+    });
+  }
+
+  function renderStockList() {
+    const el = $('stockList');
+    if (!el) return;
+    const items = getSalesItems();
+    if (!items.length) {
+      el.innerHTML = '<div class="empty">Hakuna bidhaa za kufuatilia stock.</div>';
+      return;
+    }
+
+    el.innerHTML = items.map(x => {
+      const status = getStockStatus(x);
+      const stock = Number(x.stock) || 0;
+      const low = Number(x.lowStock) || 0;
+      const cap = Math.max(stock, low * 4, 1);
+      const pct = Math.min(100, Math.round((stock / cap) * 100));
+      const canAdd = hasPerm('stock_add');
+      const presets = x.unit === 'KG' ? [1, 5, 10] : [5, 10, 20];
+
+      return `
+        <article class="stock-row stock-${status}">
+          <div class="stock-row-main">
+            <div class="stock-row-head">
+              <div>
+                <strong>${escapeHtml(x.name)}</strong>
+                <span class="stock-meta">${escapeHtml(x.category)} · ${escapeHtml(x.unit)}</span>
+              </div>
+              <span class="stock-badge stock-badge-${status}">${escapeHtml(stockStatusLabel(status))}</span>
+            </div>
+            <div class="stock-bar-wrap">
+              <div class="stock-bar"><div class="stock-bar-fill stock-bar-${status}" style="width:${pct}%"></div></div>
+              <span class="stock-qty-label"><b>${escapeHtml(formatStockQty(stock, x.unit))}</b> · onyo &lt; ${escapeHtml(String(low))}</span>
+            </div>
+          </div>
+          ${canAdd ? `
+          <div class="stock-row-actions">
+            ${presets.map(p => `<button type="button" class="stock-add-btn" data-stock-add="${escapeHtml(x.id)}" data-stock-qty="${p}">+${p}</button>`).join('')}
+            <div class="stock-custom-add">
+              <input type="number" min="0.01" step="0.01" placeholder="+" data-stock-input="${escapeHtml(x.id)}" aria-label="Ongeza stock ${escapeHtml(x.name)}">
+              <button type="button" class="btn btn-back btn-sm" data-stock-custom="${escapeHtml(x.id)}">Ongeza</button>
+            </div>
+          </div>` : `
+          <div class="stock-row-view">${x.trackStock === false ? 'Haifuatiliwi' : 'Angalia tu'}</div>`}
+        </article>`;
+    }).join('');
+
+    el.querySelectorAll('[data-stock-add]').forEach(btn => {
+      btn.addEventListener('click', () => addStockToItem(btn.dataset.stockAdd, btn.dataset.stockQty));
+    });
+    el.querySelectorAll('[data-stock-custom]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = el.querySelector('[data-stock-input="' + btn.dataset.stockCustom + '"]');
+        addStockToItem(btn.dataset.stockCustom, input?.value);
+        if (input) input.value = '';
+      });
+    });
   }
 
   function getSalesLog() {
@@ -325,10 +563,13 @@
     const category = $('salesItemCategory')?.value || 'Nyingine';
     const unit = $('salesItemUnit')?.value || 'KG';
     const price = parseInt($('salesItemPrice')?.value, 10);
+    const stock = parseFloat($('salesItemStock')?.value);
+    const lowStock = parseFloat($('salesItemLowStock')?.value);
     if (!name || !price) {
-      alert('Weka jina la bidhaa na bei.');
+      showAdminToast('Weka jina la bidhaa na bei.', 'warn');
       return;
     }
+    const def = defaultStockForUnit(unit);
     const list = getAllSalesItems();
     list.push({
       id: 'si-' + Date.now(),
@@ -336,13 +577,17 @@
       category,
       unit,
       price,
+      stock: stock > 0 ? stock : def.stock,
+      lowStock: lowStock > 0 ? lowStock : def.lowStock,
+      trackStock: true,
       active: true
     });
     localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(list));
-    ['salesItemName', 'salesItemPrice'].forEach(id => { if ($(id)) $(id).value = ''; });
+    ['salesItemName', 'salesItemPrice', 'salesItemStock', 'salesItemLowStock'].forEach(id => { if ($(id)) $(id).value = ''; });
     renderSalesItems();
     populateSaleItemSelect();
-    alert('Bidhaa imeongezwa.');
+    renderStock();
+    showAdminToast('✓ Bidhaa imeongezwa na stock ya kuanza.');
   }
 
   function deleteSalesItem(id) {
@@ -354,6 +599,7 @@
     localStorage.setItem(SALES_ITEMS_KEY, JSON.stringify(list));
     renderSalesItems();
     populateSaleItemSelect();
+    renderStock();
   }
 
   function renderSalesItems() {
@@ -364,15 +610,18 @@
       el.innerHTML = '<div class="empty">Hakuna bidhaa. Ongeza bidhaa za mauzo hapo juu.</div>';
       return;
     }
-    el.innerHTML = list.map(x => `
+    el.innerHTML = list.map(x => {
+      const status = getStockStatus(x);
+      return `
       <div class="custom-row">
         <div>
           <b>${escapeHtml(x.name)}</b>
           <div class="mini">${escapeHtml(x.category)} · ${escapeHtml(x.unit)} · TSH ${formatMoney(x.price)} / ${escapeHtml(x.unit)}</div>
+          <div class="mini stock-mini stock-mini-${status}">Stock: ${escapeHtml(formatStockQty(x.stock, x.unit))} · ${escapeHtml(stockStatusLabel(status))}</div>
         </div>
         <button class="btn btn-delete" type="button" data-delete-sales="${escapeHtml(x.id)}">🗑 Futa</button>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
     el.querySelectorAll('[data-delete-sales]').forEach(btn => {
       btn.addEventListener('click', () => deleteSalesItem(btn.dataset.deleteSales));
     });
@@ -384,7 +633,13 @@
     const items = getSalesItems();
     const current = sel.value;
     sel.innerHTML = '<option value="">Chagua bidhaa...</option>' +
-      items.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)} — TSH ${formatMoney(x.price)}/${escapeHtml(x.unit)}</option>`).join('');
+      items.map(x => {
+        const status = getStockStatus(x);
+        const stockTxt = x.trackStock === false ? '' : ' · Stoo: ' + formatStockQty(x.stock, x.unit);
+        const warn = status === 'out' ? ' ⛔ IMEISHA' : status === 'low' ? ' ⚠ Chini' : '';
+        const disabled = status === 'out' ? ' disabled' : '';
+        return `<option value="${escapeHtml(x.id)}"${disabled}>${escapeHtml(x.name)} — TSH ${formatMoney(x.price)}/${escapeHtml(x.unit)}${escapeHtml(stockTxt)}${warn}</option>`;
+      }).join('');
     if (current && items.some(x => x.id === current)) sel.value = current;
     updateSaleTotalPreview();
     renderSaleQtyPresets();
@@ -409,8 +664,17 @@
       ? Math.round(unitPrice * qty)
       : Math.round(unitPrice * (qty || 1));
     if (hint) {
-      hint.textContent = 'TSH ' + formatMoney(unitPrice) + ' / ' + item.unit +
-        (qty > 0 ? ' · Jumla: TSH ' + formatMoney(total) : '');
+      let text = 'TSH ' + formatMoney(unitPrice) + ' / ' + item.unit;
+      if (qty > 0) text += ' · Jumla: TSH ' + formatMoney(total);
+      if (item.trackStock !== false) {
+        const status = getStockStatus(item);
+        text += ' · Stoo: ' + formatStockQty(item.stock, item.unit);
+        if (status === 'out') text += ' · IMEISHA';
+        else if (status === 'low') text += ' · Chini';
+        if (qty > 0 && qty > (Number(item.stock) || 0)) text += ' · HAITOSHI!';
+      }
+      hint.textContent = text;
+      hint.classList.toggle('field-hint-warn', item.trackStock !== false && (getStockStatus(item) !== 'ok' || qty > (Number(item.stock) || 0)));
     }
     if (totalEl && qty > 0 && !totalEl.dataset.manual) {
       totalEl.value = total;
@@ -453,6 +717,18 @@
     if (!qty || qty <= 0) { showAdminToast('Weka kiasi sahihi.', 'warn'); return; }
     if (!total || total <= 0) { showAdminToast('Weka bei ya mauzo.', 'warn'); return; }
 
+    if (item.trackStock !== false) {
+      const avail = Number(item.stock) || 0;
+      if (avail <= 0) {
+        showAdminToast('Stock imeisha kwa ' + item.name + '. Ongeza stock kwanza.', 'warn');
+        return;
+      }
+      if (qty > avail) {
+        showAdminToast('Stock haitoshi. Ipo tu: ' + formatStockQty(avail, item.unit), 'warn');
+        return;
+      }
+    }
+
     const sale = {
       id: 'sale-' + Date.now(),
       at: new Date().toISOString(),
@@ -474,6 +750,12 @@
     if (log.length > 500) log.length = 500;
     localStorage.setItem(SALES_LOG_KEY, JSON.stringify(log));
 
+    let stockAfter = null;
+    if (item.trackStock !== false) {
+      stockAfter = updateItemStock(item.id, -qty, 'sale', 'Mauzo', sale.id);
+    }
+    sale.stockAfter = stockAfter ? stockAfter.stock : null;
+
     ['saleQty', 'saleTotal', 'salePhone', 'saleNotes'].forEach(id => {
       if ($(id)) {
         $(id).value = '';
@@ -484,7 +766,9 @@
     updateSaleTotalPreview();
     renderSaleQtyPresets();
     renderSales();
+    renderStock();
     renderDashboard();
+    populateSaleItemSelect();
     showSaleSuccessDialog(sale);
   }
 
@@ -664,6 +948,7 @@
             ${sale.phone ? '<div class="ssd-row"><span>Simu</span><b>' + escapeHtml(sale.phone) + '</b></div>' : ''}
             ${sale.notes ? '<div class="ssd-row"><span>Maelezo</span><b>' + escapeHtml(sale.notes) + '</b></div>' : ''}
             <div class="ssd-row"><span>Muuzaji</span><b>${escapeHtml(sale.seller || 'staff')}</b></div>
+            ${sale.stockAfter != null ? '<div class="ssd-row"><span>Stock baada ya mauzo</span><b>' + escapeHtml(formatStockQty(sale.stockAfter, sale.unit)) + '</b></div>' : ''}
           </div>
           <div class="ssd-total">
             <span>Jumla</span>
@@ -715,6 +1000,7 @@
     const whatsapp = orders.filter(o => o.channel === 'whatsapp').length;
     const sms = orders.filter(o => o.channel === 'sms').length;
     const sales = computeSalesStats();
+    const stock = computeStockStats();
 
     return {
       orderCount: orders.length,
@@ -731,7 +1017,10 @@
       salesTotal: sales.total,
       salesToday: sales.todayTotal,
       salesTodayCount: sales.todayCount,
-      kgSold: sales.kgSold
+      kgSold: sales.kgSold,
+      stockLow: stock.low,
+      stockOut: stock.out,
+      stockKg: stock.totalKg
     };
   }
 
@@ -749,6 +1038,11 @@
         <span class="stat-label">Mauzo ya Nyama</span>
         <strong class="stat-value">TSH ${formatMoney(s.salesTotal)}</strong>
         <span class="stat-sub">Leo: TSH ${formatMoney(s.salesToday)} · ${s.salesCount} mauzo · ${s.kgSold || 0} KG</span>
+      </article>
+      <article class="stat-card stat-stock${s.stockOut ? ' stat-stock-danger' : s.stockLow ? ' stat-stock-warn' : ''}">
+        <span class="stat-label">Stock / Stoo</span>
+        <strong class="stat-value">${s.stockOut ? s.stockOut + ' imeisha' : s.stockLow ? s.stockLow + ' chini' : 'Salama'}</strong>
+        <span class="stat-sub">${s.stockKg ? s.stockKg + ' KG kwenye stoo' : 'Fuatilia bidhaa'} · ${s.stockOut ? 'Ongeza haraka!' : 'Mauzo hupunguza otomatiki'}</span>
       </article>
       <article class="stat-card">
         <span class="stat-label">Oda Zote</span>

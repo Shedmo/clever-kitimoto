@@ -151,11 +151,25 @@
         </select>
       </div>
       <div class="field"><label>Bei kwa kipimo (TSH)</label><input id="salesItemPrice" type="number" min="0" placeholder="18000"></div>
+      <div class="field"><label>Stock ya kuanza</label><input id="salesItemStock" type="number" min="0" step="0.01" placeholder="Mfano: 20"></div>
+      <div class="field"><label>Onyo chini (low stock)</label><input id="salesItemLowStock" type="number" min="0" step="0.01" placeholder="Mfano: 3"></div>
     </div>
     <div class="actions" style="margin-top:14px">
       <button class="btn btn-save" type="button" id="addSalesItemBtn">➕ Ongeza Bidhaa</button>
     </div>
     <div id="salesItemsList" class="sales-items-list"></div>
+  </section>
+
+  <section class="panel hidden" id="stockPanel">
+    <div class="panel-head-row">
+      <div>
+        <h2>📦 Stoo / Stock</h2>
+        <p class="panel-note panel-note-tight">Ongeza stock, fuatilia kilo zilizobaki — mauzo hupunguza otomatiki</p>
+      </div>
+    </div>
+    <div class="report-summary" id="stockSummary"></div>
+    <div id="stockAlerts" class="stock-alerts"></div>
+    <div id="stockList" class="stock-list"></div>
   </section>
 
   <section class="panel reports-panel" id="reportsPanel">

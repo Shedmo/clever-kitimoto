@@ -77,8 +77,8 @@
     </div>
   </div>
 
-  <div class="notice notice-compact">
-    <b>Dashboard:</b> Angalia oda, mapato, na wageni. Mauzo na stock huhifadhiwa kwa <b>kila tawi</b>. Ripoti zinaweza kupakuliwa (CSV).
+  <div class="notice notice-compact hidden" id="dashNotice">
+    <b>Kidokezo:</b> Mauzo na stock huhifadhiwa kwa <b>kila tawi</b>. Chagua tawi juu kisha angalia ripoti.
   </div>
 
   <section class="panel hidden" id="branchPanel">
@@ -100,20 +100,20 @@
   </section>
 
   <section class="panel dashboard-panel" id="dashboardPanel">
-    <div class="panel-head-row">
+    <div class="panel-head-row dash-panel-head">
       <div>
-        <h2>📊 Dashboard</h2>
-        <p class="panel-note panel-note-tight">Muhtasari wa biashara yako</p>
+        <h2>📊 Smart Dashboard</h2>
+        <p class="panel-note panel-note-tight">Muhtasari wa biashara — mauzo, stock, na wateja kwa muda halisi</p>
       </div>
-      <div class="report-actions">
-        <button class="btn btn-back btn-sm" type="button" id="exportOrdersBtn">⬇ Oda CSV</button>
-        <button class="btn btn-back btn-sm" type="button" id="exportUsersBtn">⬇ Wateja CSV</button>
-        <button class="btn btn-back btn-sm" type="button" id="exportVisitsBtn">⬇ Wageni CSV</button>
-        <button class="btn btn-back btn-sm" type="button" id="exportSalesBtn">⬇ Mauzo CSV</button>
+      <div class="report-actions dash-export-actions">
+        <button class="btn btn-back btn-sm" type="button" id="exportOrdersBtn">⬇ Oda</button>
+        <button class="btn btn-back btn-sm" type="button" id="exportUsersBtn">⬇ Wateja</button>
+        <button class="btn btn-back btn-sm" type="button" id="exportVisitsBtn">⬇ Wageni</button>
+        <button class="btn btn-back btn-sm" type="button" id="exportSalesBtn">⬇ Mauzo</button>
         <button class="btn btn-save btn-sm" type="button" id="printReportBtn">🖨 Ripoti</button>
       </div>
     </div>
-    <div class="stats-grid" id="dashboardStats"></div>
+    <div id="dashboardRoot" class="dashboard-root"></div>
   </section>
 
   <section class="panel sales-panel hidden" id="salesPanel">

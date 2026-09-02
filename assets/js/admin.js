@@ -449,9 +449,9 @@
     const notes = $('saleNotes')?.value.trim() || '';
     const session = getSession();
 
-    if (!item) { alert('Chagua bidhaa.'); return; }
-    if (!qty || qty <= 0) { alert('Weka kiasi sahihi.'); return; }
-    if (!total || total <= 0) { alert('Weka bei ya mauzo.'); return; }
+    if (!item) { showAdminToast('Chagua bidhaa kwanza.', 'warn'); return; }
+    if (!qty || qty <= 0) { showAdminToast('Weka kiasi sahihi.', 'warn'); return; }
+    if (!total || total <= 0) { showAdminToast('Weka bei ya mauzo.', 'warn'); return; }
 
     const sale = {
       id: 'sale-' + Date.now(),
@@ -485,7 +485,7 @@
     renderSaleQtyPresets();
     renderSales();
     renderDashboard();
-    alert('Mauzo yamerekodiwa: ' + item.name + ' — TSH ' + formatMoney(total));
+    showSaleSuccessDialog(sale);
   }
 
   function computeSalesStats() {
@@ -610,6 +610,79 @@
 
   function escapeHtml(v) {
     return String(v).replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
+  }
+
+  let adminDialogTimer = null;
+  let adminToastTimer = null;
+
+  function closeAdminDialog() {
+    const el = $('adminDialog');
+    if (!el) return;
+    el.classList.remove('open');
+    el.setAttribute('aria-hidden', 'true');
+    if (adminDialogTimer) {
+      clearTimeout(adminDialogTimer);
+      adminDialogTimer = null;
+    }
+  }
+
+  function showAdminToast(msg, type) {
+    const el = $('adminToast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'admin-toast visible' + (type ? ' admin-toast-' + type : '');
+    if (adminToastTimer) clearTimeout(adminToastTimer);
+    adminToastTimer = setTimeout(() => {
+      el.classList.remove('visible');
+    }, 3200);
+  }
+
+  function showSaleSuccessDialog(sale) {
+    const body = $('adminDialogBody');
+    const dialog = $('adminDialog');
+    if (!body || !dialog) return;
+
+    const stats = computeSalesStats();
+    const payIcon = { cash: '💵', mpesa: '📱', lipa: '💳' }[sale.payment] || '💰';
+
+    body.innerHTML = `
+      <div class="sale-success-dialog">
+        <div class="ssd-icon-wrap" aria-hidden="true">
+          <span class="ssd-ring"></span>
+          <span class="ssd-check">✓</span>
+        </div>
+        <h3 class="ssd-title" id="adminDialogTitle">Mauzo Yamerekodiwa!</h3>
+        <p class="ssd-sub">Imehifadhiwa kwa mafanikio · ${escapeHtml(formatOrderDate(sale.at))}</p>
+        <div class="ssd-card">
+          <div class="ssd-item-head">
+            <span class="ssd-cat">${escapeHtml(sale.category || 'Bidhaa')}</span>
+            <strong>${escapeHtml(sale.itemName)}</strong>
+          </div>
+          <div class="ssd-rows">
+            <div class="ssd-row"><span>Kiasi</span><b>${escapeHtml(String(sale.qty))} ${escapeHtml(sale.unit)}</b></div>
+            <div class="ssd-row"><span>Malipo</span><b>${payIcon} ${escapeHtml(paymentLabel(sale.payment))}</b></div>
+            ${sale.phone ? '<div class="ssd-row"><span>Simu</span><b>' + escapeHtml(sale.phone) + '</b></div>' : ''}
+            ${sale.notes ? '<div class="ssd-row"><span>Maelezo</span><b>' + escapeHtml(sale.notes) + '</b></div>' : ''}
+            <div class="ssd-row"><span>Muuzaji</span><b>${escapeHtml(sale.seller || 'staff')}</b></div>
+          </div>
+          <div class="ssd-total">
+            <span>Jumla</span>
+            <strong>TSH ${formatMoney(sale.total)}</strong>
+          </div>
+        </div>
+        <div class="ssd-smart">
+          <div class="ssd-smart-chip"><span>Leo</span><b>TSH ${formatMoney(stats.todayTotal)}</b></div>
+          <div class="ssd-smart-chip"><span>Mauzo leo</span><b>${stats.todayCount}</b></div>
+          <div class="ssd-smart-chip"><span>KG leo</span><b>${stats.kgSold || '—'}</b></div>
+        </div>
+      </div>`;
+
+    dialog.classList.add('open');
+    dialog.setAttribute('aria-hidden', 'false');
+    $('adminDialogOk')?.focus();
+
+    if (adminDialogTimer) clearTimeout(adminDialogTimer);
+    adminDialogTimer = setTimeout(closeAdminDialog, 7000);
   }
 
   function formatMoney(n) {
@@ -1185,6 +1258,11 @@
     });
     document.querySelectorAll('.report-tab').forEach(btn => {
       btn.addEventListener('click', () => switchReportTab(btn.dataset.tab));
+    });
+    $('adminDialogOk')?.addEventListener('click', closeAdminDialog);
+    $('adminDialogBackdrop')?.addEventListener('click', closeAdminDialog);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && $('adminDialog')?.classList.contains('open')) closeAdminDialog();
     });
   }
 

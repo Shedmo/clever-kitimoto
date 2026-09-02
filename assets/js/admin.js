@@ -29,7 +29,7 @@
   const PERMS = {
     admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add', 'branches'],
     manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'prices', 'menus', 'save', 'sales', 'sales_items', 'stock_add', 'branches'],
-    seller: ['dashboard', 'orders', 'users', 'visits', 'export', 'sales']
+    seller: ['dashboard', 'orders', 'users', 'visits', 'export', 'sales', 'stock_view']
   };
 
   let attempts = 0;
@@ -353,7 +353,16 @@
     $('saveSection')?.classList.toggle('hidden', !hasPerm('save'));
     $('salesPanel')?.classList.toggle('hidden', !hasPerm('sales'));
     $('salesItemsSection')?.classList.toggle('hidden', !hasPerm('sales_items'));
-    $('stockPanel')?.classList.toggle('hidden', !hasPerm('sales'));
+    const canEditStock = hasPerm('stock_add');
+    const canViewStock = hasPerm('stock_view');
+    $('stockPanel')?.classList.toggle('hidden', !canEditStock && !canViewStock);
+    $('stockAlerts')?.classList.toggle('hidden', !canEditStock);
+    const stockNote = $('stockPanelNote');
+    if (stockNote) {
+      stockNote.textContent = canEditStock
+        ? 'Ongeza stock, fuatilia kilo zilizobaki — mauzo hupunguza otomatiki'
+        : 'Muhtasari wa stock tu — huwezi kuhariri au kuongeza';
+    }
     $('clearSalesBtn')?.classList.toggle('hidden', !hasPerm('sales_clear'));
     $('resetBtn')?.classList.toggle('hidden', !hasPerm('reset'));
     $('clearOrdersBtn')?.classList.toggle('hidden', !hasPerm('clear'));
@@ -701,8 +710,28 @@
 
   function renderStock() {
     renderStockSummary();
-    renderStockAlerts();
-    renderStockList();
+    if (hasPerm('stock_add')) {
+      renderStockAlerts();
+      renderStockList();
+    } else if (hasPerm('stock_view')) {
+      const alertsEl = $('stockAlerts');
+      const listEl = $('stockList');
+      if (alertsEl) alertsEl.innerHTML = '';
+      if (listEl) {
+        const s = computeStockStats();
+        listEl.innerHTML = `
+          <div class="stock-view-only">
+            <p class="stock-view-msg">Muuzaji: unaona jumla ya stock tu. Kuhariri au kuongeza, wasiliana na Meneja au Admin.</p>
+            <div class="stock-view-totals">
+              <div class="stock-view-stat"><span>Bidhaa</span><b>${s.tracked}</b></div>
+              <div class="stock-view-stat ok"><span>Salama</span><b>${s.ok}</b></div>
+              <div class="stock-view-stat${s.low ? ' warn' : ''}"><span>Chini</span><b>${s.low}</b></div>
+              <div class="stock-view-stat${s.out ? ' danger' : ''}"><span>Imeisha</span><b>${s.out}</b></div>
+              <div class="stock-view-stat highlight"><span>KG Jumla</span><b>${s.totalKg || '—'}</b></div>
+            </div>
+          </div>`;
+      }
+    }
   }
 
   function renderStockSummary() {
@@ -866,6 +895,9 @@
     }
     el.innerHTML = list.map(x => {
       const status = getStockStatus(x);
+      const deleteBtn = hasPerm('sales_items')
+        ? `<button class="btn btn-delete" type="button" data-delete-sales="${escapeHtml(x.id)}">🗑 Futa</button>`
+        : '';
       return `
       <div class="custom-row">
         <div>
@@ -873,7 +905,7 @@
           <div class="mini">${escapeHtml(x.category)} · ${escapeHtml(x.unit)} · TSH ${formatMoney(x.price)} / ${escapeHtml(x.unit)}</div>
           <div class="mini stock-mini stock-mini-${status}">Stock: ${escapeHtml(formatStockQty(x.stock, x.unit))} · ${escapeHtml(stockStatusLabel(status))}</div>
         </div>
-        <button class="btn btn-delete" type="button" data-delete-sales="${escapeHtml(x.id)}">🗑 Futa</button>
+        ${deleteBtn}
       </div>`;
     }).join('');
     el.querySelectorAll('[data-delete-sales]').forEach(btn => {
@@ -1450,7 +1482,7 @@
     const combinedTotal = d.totalRevenue + d.salesTotal;
     const avgOrder = d.orderCount ? Math.round(d.totalRevenue / d.orderCount) : 0;
     const canSales = hasPerm('sales');
-    const canStock = hasPerm('sales');
+    const canStock = hasPerm('stock_add') || hasPerm('stock_view');
 
     root.innerHTML = `
       <section class="dash-hero">

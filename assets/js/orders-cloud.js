@@ -116,6 +116,7 @@
       .from(TABLE)
       .select('*')
       .neq('status', 'test')
+      .neq('channel', 'pos')
       .order('at', { ascending: false })
       .limit(200);
     if (error) throw error;
@@ -136,6 +137,86 @@
     if (patch.statusBy != null) row.status_by = patch.statusBy;
     const { error } = await client.from(TABLE).update(row).eq('id', orderId);
     if (error) throw error;
+  }
+
+  function isTableMissing(error) {
+    return error?.code === 'PGRST205' || /could not find the table/i.test(error?.message || '');
+  }
+
+  function saleToPosOrder(sale) {
+    const noteParts = [];
+    if (sale.seller) noteParts.push('Muuzaji: ' + sale.seller);
+    if (sale.branchId) noteParts.push('BranchId: ' + sale.branchId);
+    if (sale.notes) noteParts.push(sale.notes);
+    if (sale.receiptId) noteParts.push('Risiti: ' + sale.receiptId);
+    if (sale.stockAfter != null) noteParts.push('Stock: ' + sale.stockAfter);
+    return {
+      id: sale.id,
+      at: sale.at || new Date().toISOString(),
+      channel: 'pos',
+      phone: sale.phone || '',
+      address: sale.branchName || '',
+      notes: noteParts.join(' · '),
+      fulfillment: 'pickup',
+      payment: sale.payment || 'cash',
+      subtotal: Number(sale.total) || 0,
+      items: [{
+        name: sale.itemName || '',
+        qty: sale.qty,
+        unit: sale.unit || '',
+        price: sale.unitPrice,
+        category: sale.category || '',
+        itemId: sale.itemId || ''
+      }],
+      status: 'delivered',
+      statusAt: sale.at || new Date().toISOString(),
+      statusBy: sale.seller || 'pos'
+    };
+  }
+
+  function posOrderToSale(order) {
+    const item = (order.items || [])[0] || {};
+    let branchId = '';
+    const notes = order.notes || '';
+    const branchMatch = notes.match(/BranchId:\s*([^\s·]+)/);
+    if (branchMatch) branchId = branchMatch[1];
+    let receiptId = '';
+    const rcptMatch = notes.match(/Risiti:\s*([^\s·]+)/);
+    if (rcptMatch) receiptId = rcptMatch[1];
+    return {
+      id: order.id,
+      receiptId: receiptId || order.id,
+      at: order.at,
+      itemId: item.itemId || '',
+      itemName: item.name || '—',
+      category: item.category || '',
+      qty: Number(item.qty) || 0,
+      unit: item.unit || '',
+      unitPrice: Number(item.price) || 0,
+      total: Number(order.subtotal) || 0,
+      payment: order.payment,
+      phone: order.phone,
+      notes: notes,
+      seller: order.statusBy || '',
+      branchId,
+      branchName: order.address || ''
+    };
+  }
+
+  async function fetchPosOrdersAsSales(branchId) {
+    const { data, error } = await client
+      .from(TABLE)
+      .select('*')
+      .eq('channel', 'pos')
+      .neq('status', 'test')
+      .order('at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    let sales = (data || []).map(row => posOrderToSale(fromRow(row)));
+    if (branchId) {
+      sales = sales.filter(s => s.branchId === branchId || (!s.branchId && branchId));
+    }
+    return sales;
   }
 
   function toSaleRow(sale) {
@@ -191,26 +272,40 @@
       .limit(500);
     if (branchId) query = query.eq('branch_id', branchId);
     const { data, error } = await query;
+    if (!error) return (data || []).map(fromSaleRow);
+    if (isTableMissing(error)) return fetchPosOrdersAsSales(branchId);
+    throw error;
+  }
+
+  async function saveSaleViaOrders(sale) {
+    const { error } = await client.from(TABLE).upsert(toRow(saleToPosOrder(sale)));
     if (error) throw error;
-    return (data || []).map(fromSaleRow);
+    return 'orders';
   }
 
   async function saveSale(sale) {
     if (!init()) throw new Error('Cloud not configured');
     const { error } = await client.from(SALES_TABLE).upsert(toSaleRow(sale));
-    if (error) throw saleSaveError(error);
+    if (!error) return 'sales';
+    if (isTableMissing(error)) return saveSaleViaOrders(sale);
+    throw saleSaveError(error);
   }
 
   async function saveSales(sales) {
     if (!init()) throw new Error('Cloud not configured');
     const rows = (sales || []).map(toSaleRow);
-    if (!rows.length) return;
+    if (!rows.length) return 'sales';
     const { error } = await client.from(SALES_TABLE).upsert(rows);
-    if (error) throw saleSaveError(error);
+    if (!error) return 'sales';
+    if (isTableMissing(error)) {
+      for (const sale of sales) await saveSaleViaOrders(sale);
+      return 'orders';
+    }
+    throw saleSaveError(error);
   }
 
   function saleSaveError(error) {
-    if (error.code === 'PGRST205' || /could not find the table/i.test(error.message || '')) {
+    if (isTableMissing(error)) {
       return new Error('Jedwali sales halipo — run supabase/sales-migration.sql kwenye Supabase SQL Editor');
     }
     return error;
@@ -228,13 +323,14 @@
       status: 'test'
     });
     if (insErr) {
-      if (insErr.code === 'PGRST205' || /could not find the table/i.test(insErr.message || '')) {
+      if (isTableMissing(insErr)) {
         throw new Error('Jedwali orders halipo — run supabase/schema.sql kwenye Supabase SQL Editor');
       }
       throw insErr;
     }
     await client.from(TABLE).delete().eq('id', testId);
 
+    let salesTableOk = true;
     const saleTestId = 'test-sale-' + Date.now();
     const { error: saleErr } = await client.from(SALES_TABLE).insert({
       id: saleTestId,
@@ -244,15 +340,17 @@
       branch_id: 'test'
     });
     if (saleErr) {
-      if (saleErr.code === 'PGRST205' || /could not find the table/i.test(saleErr.message || '')) {
-        throw new Error('Jedwali sales halipo — run supabase/sales-migration.sql kwenye Supabase SQL Editor');
+      if (isTableMissing(saleErr)) {
+        salesTableOk = false;
+      } else {
+        throw saleErr;
       }
-      throw saleErr;
+    } else {
+      await client.from(SALES_TABLE).delete().eq('id', saleTestId);
     }
-    await client.from(SALES_TABLE).delete().eq('id', saleTestId);
 
     connected = true;
-    return true;
+    return { ok: true, salesTable: salesTableOk };
   }
 
   function subscribeOrders(callback) {
@@ -311,6 +409,11 @@
     const channel = client
       .channel('clever-kitimoto-sales-' + (branchId || 'all'))
       .on('postgres_changes', { event: '*', schema: 'public', table: SALES_TABLE }, () => {
+        fetchSales(branchId)
+          .then(sales => callback(sales))
+          .catch(err => console.error('Sales sync error', err));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, () => {
         fetchSales(branchId)
           .then(sales => callback(sales))
           .catch(err => console.error('Sales sync error', err));

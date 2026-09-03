@@ -1605,23 +1605,31 @@
 
   function syncSaleToCloud(sale) {
     const cloud = window.CleverOrdersCloud;
-    if (!cloud?.isEnabled() || !sale) return;
-    cloud.saveSale(sale)
-      .then(() => updateCloudBadge())
+    if (!cloud?.isEnabled() || !sale) return Promise.resolve(false);
+    return cloud.saveSale(sale)
+      .then(() => {
+        updateCloudBadge();
+        return true;
+      })
       .catch(err => {
         console.warn('POS cloud save failed', err);
-        showAdminToast('Mauzo yamehifadhiwa kwa simu, lakini Supabase imeshindwa. Run sales-migration.sql', 'warn');
+        showAdminToast('Mauzo yamehifadhiwa kwa simu tu: ' + (err.message || 'Supabase imeshindwa'), 'warn');
+        return false;
       });
   }
 
   function syncSalesToCloud(sales) {
     const cloud = window.CleverOrdersCloud;
-    if (!cloud?.isEnabled() || !sales?.length) return;
-    cloud.saveSales(sales)
-      .then(() => updateCloudBadge())
+    if (!cloud?.isEnabled() || !sales?.length) return Promise.resolve(false);
+    return cloud.saveSales(sales)
+      .then(() => {
+        updateCloudBadge();
+        return true;
+      })
       .catch(err => {
         console.warn('POS cloud batch save failed', err);
-        showAdminToast('Risiti imehifadhiwa kwa simu, lakini Supabase imeshindwa. Run sales-migration.sql', 'warn');
+        showAdminToast('Risiti imehifadhiwa kwa simu tu: ' + (err.message || 'Supabase imeshindwa'), 'warn');
+        return false;
       });
   }
 
@@ -2132,11 +2140,12 @@
     }
   }
 
-  function showReceiptSuccessDialog(receiptId, lineCount, grandTotal) {
+  function showReceiptSuccessDialog(receiptId, lineCount, grandTotal, cloudSaved) {
     const body = $('adminDialogBody');
     const dialog = $('adminDialog');
     if (!body || !dialog) return;
     const stats = computeSalesStats();
+    const cloudNote = cloudSaved ? ' · ☁️ Imesave Supabase' : (window.CleverOrdersCloud?.isEnabled() ? ' · ⚠️ Simu tu' : '');
     body.innerHTML = `
       <div class="sale-success-dialog">
         <div class="ssd-icon-wrap" aria-hidden="true">
@@ -2144,7 +2153,7 @@
           <span class="ssd-check">✓</span>
         </div>
         <h3 class="ssd-title" id="adminDialogTitle">Risiti Imerekodiwa!</h3>
-        <p class="ssd-sub">${lineCount} bidhaa · TSH ${formatMoney(grandTotal)}</p>
+        <p class="ssd-sub">${lineCount} bidhaa · TSH ${formatMoney(grandTotal)}${cloudNote}</p>
         <div class="ssd-total ssd-total-inline"><span>Jumla Risiti</span><strong>TSH ${formatMoney(grandTotal)}</strong></div>
         <div class="ssd-smart">
           <div class="ssd-smart-chip"><span>Leo</span><b>TSH ${formatMoney(stats.todayTotal)}</b></div>
@@ -2263,7 +2272,7 @@
     renderSaleCart();
   }
 
-  function recordSaleCart() {
+  async function recordSaleCart() {
     if (!hasPerm('sales') || !saleCart.length) return;
     const payment = $('salePayment')?.value || 'cash';
     const phone = $('salePhone')?.value.trim() || '';
@@ -2316,7 +2325,6 @@
     });
     if (log.length > 500) log.length = 500;
     saveBranchData(SALES_LOG_KEY, log);
-    syncSalesToCloud(newSales);
 
     saleCart = [];
     ['salePhone', 'saleNotes'].forEach(id => { if ($(id)) $(id).value = ''; });
@@ -2329,10 +2337,12 @@
     renderPosUI();
     if ($('posCashPaid')) $('posCashPaid').value = '';
     updatePosCashChange();
-    showReceiptSuccessDialog(receiptId, lineCount, grandTotal);
+
+    const cloudSaved = await syncSalesToCloud(newSales);
+    showReceiptSuccessDialog(receiptId, lineCount, grandTotal, cloudSaved);
   }
 
-  function recordSale() {
+  async function recordSale() {
     if (!hasPerm('sales')) return;
     if (saleCart.length) {
       recordSaleCart();
@@ -2394,8 +2404,6 @@
     }
     sale.stockAfter = stockAfter ? stockAfter.stock : null;
 
-    syncSaleToCloud(sale);
-
     ['saleQty', 'saleTotal', 'salePhone', 'saleNotes'].forEach(id => {
       if ($(id)) {
         $(id).value = '';
@@ -2412,8 +2420,10 @@
     renderPosUI();
     if ($('posCashPaid')) $('posCashPaid').value = '';
     updatePosCashChange();
-    showSaleSuccessDialog(sale);
     updateSellerQuickUI();
+
+    const cloudSaved = await syncSaleToCloud(sale);
+    showSaleSuccessDialog(sale, cloudSaved);
   }
 
   function computeSalesStats() {
@@ -2570,13 +2580,14 @@
     }, 3200);
   }
 
-  function showSaleSuccessDialog(sale) {
+  function showSaleSuccessDialog(sale, cloudSaved) {
     const body = $('adminDialogBody');
     const dialog = $('adminDialog');
     if (!body || !dialog) return;
 
     const stats = computeSalesStats();
     const payIcon = { cash: '💵', mpesa: '📱', lipa: '💳' }[sale.payment] || '💰';
+    const cloudNote = cloudSaved ? ' · ☁️ Imesave Supabase' : (window.CleverOrdersCloud?.isEnabled() ? ' · ⚠️ Simu tu (hakijasave online)' : '');
 
     body.innerHTML = `
       <div class="sale-success-dialog">
@@ -2585,7 +2596,7 @@
           <span class="ssd-check">✓</span>
         </div>
         <h3 class="ssd-title" id="adminDialogTitle">Mauzo Yamerekodiwa!</h3>
-        <p class="ssd-sub">Imehifadhiwa kwa mafanikio · ${escapeHtml(formatOrderDate(sale.at))}${sale.branchName ? ' · ' + escapeHtml(sale.branchName) : ''}${window.CleverOrdersCloud?.isEnabled() ? ' · ☁️ Mtandaoni' : ''}</p>
+        <p class="ssd-sub">Imehifadhiwa kwa mafanikio · ${escapeHtml(formatOrderDate(sale.at))}${sale.branchName ? ' · ' + escapeHtml(sale.branchName) : ''}${cloudNote}</p>
         <div class="ssd-card">
           <div class="ssd-item-head">
             <span class="ssd-cat">${escapeHtml(sale.category || 'Bidhaa')}</span>
@@ -3531,7 +3542,7 @@
       await window.CleverOrdersCloud.testConnection();
       initCloudOrders();
       populateCloudConfigForm();
-      showAdminToast('✓ Muunganisho umefanikiwa — Supabase inafanya kazi');
+      showAdminToast('✓ Muunganisho umefanikiwa — mauzo ya POS yatasave Supabase');
     } catch (e) {
       renderCloudStatus();
       showAdminToast('Imeshindwa: ' + (e.message || 'run supabase/schema.sql kwanza'), 'warn');

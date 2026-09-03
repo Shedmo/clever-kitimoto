@@ -31,7 +31,7 @@ create policy "orders_public_update" on public.orders for update using (true);
 -- Realtime (admin sees new orders instantly)
 alter table public.orders replica identity full;
 
--- POS / in-store sales (Smart POS — mauzo ya muuzaji)
+-- POS / in-store sales (Smart POS — run sales-migration.sql if table missing)
 create table if not exists public.sales (
   id text primary key,
   receipt_id text,

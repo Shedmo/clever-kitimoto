@@ -1433,6 +1433,24 @@
         console.warn('Menu cloud sync failed', err);
       }
     }
+
+    function refreshMenuFromCloud() {
+      applyPrices();
+      renderCustomMenus();
+      renderPopularPicks();
+      renderHalfKgQuickOrder();
+      renderKisiniaQuickOrder();
+      renderKisiniaSmartPicker();
+    }
+
+    document.addEventListener('clever-smart-sync', e => {
+      if (e.detail?.storageChanged) refreshMenuFromCloud();
+    });
+
+    if (window.CleverSmartSync && (window.CleverCloudSync?.isEnabled?.() || window.CleverOrdersCloud?.isEnabled?.())) {
+      window.CleverSmartSync.start();
+    }
+
     trackVisit();
     applyPrices();
     bindCartEvents();

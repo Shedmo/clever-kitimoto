@@ -99,6 +99,27 @@
     return data || [];
   }
 
+  async function pullFromCloud() {
+    if (!initClient()) return { changed: 0 };
+    const rows = await fetchAll();
+    let changed = 0;
+    syncing = true;
+    try {
+      rows.forEach(row => {
+        if (!row?.storage_key || !shouldSyncKey(row.storage_key)) return;
+        const raw = JSON.stringify(row.data);
+        if (localStorage.getItem(row.storage_key) !== raw) {
+          localStorage.setItem(row.storage_key, raw);
+          changed += 1;
+        }
+      });
+    } finally {
+      syncing = false;
+    }
+    if (changed) connected = true;
+    return { changed, total: rows.length };
+  }
+
   async function syncBootstrap() {
     if (!initClient()) return { pulled: 0, uploaded: 0 };
     const rows = await fetchAll();
@@ -197,6 +218,7 @@
     shouldSyncKey,
     pushKey,
     pushAllLocal,
+    pullFromCloud,
     syncBootstrap,
     testConnection,
     onRemoteChange,

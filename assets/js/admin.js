@@ -77,6 +77,9 @@
   let cloudSalesCache = null;
   let cloudSalesUnsub = null;
   let cloudStorageUnsub = null;
+  let smartSyncBadgeTimer = null;
+  let smartSyncListener = null;
+  let profitPeriod = 'today';
 
   const groups = {
     'Choma': [['choma','½ KG','9,000'],['choma1','1 KG','18,000'],['choma15','1½ KG','27,000'],['choma2','2 KG','36,000']],
@@ -845,7 +848,10 @@
 
     if (target === 'stockPanel') renderStock();
     if (target === 'salesPanel') renderPosUI();
-    if (target === 'reportsPanel') renderOrders();
+    if (target === 'reportsPanel') {
+      renderOrders();
+      renderProfitReport();
+    }
     if (target === 'toolsPanel') populateCloudConfigForm();
     if (!opts.silent) {
       $('adminMain')?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -896,6 +902,7 @@
         btn.addEventListener('click', () => switchAdminView(btn.dataset.adminView));
       });
     }
+    updateNavBadges();
   }
 
   function switchSellerTab(tabId, opts = {}) {
@@ -1071,12 +1078,170 @@
     }
   }
 
+  function updateNavBadges() {
+    const pending = getOrders().filter(o => getOrderStatus(o) === 'pending').length;
+    const show = pending > 0 && hasPerm('reports');
+    const label = pending > 99 ? '99+' : String(pending);
+
+    document.querySelectorAll('.admin-nav-item[data-admin-view="reportsPanel"]').forEach(btn => {
+      let badge = btn.querySelector('.admin-nav-badge');
+      if (show) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'admin-nav-badge';
+          btn.appendChild(badge);
+        }
+        badge.textContent = label;
+      } else if (badge) {
+        badge.remove();
+      }
+    });
+
+    document.querySelectorAll('.admin-mobile-item[data-admin-view="reportsPanel"]').forEach(btn => {
+      let badge = btn.querySelector('.admin-mobile-badge');
+      if (show) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'admin-mobile-badge';
+          btn.appendChild(badge);
+        }
+        badge.textContent = label;
+      } else if (badge) {
+        badge.remove();
+      }
+    });
+  }
+
+  function updateSmartSyncBadge(at) {
+    const el = $('smartSyncBadge');
+    const btn = $('smartRefreshBtn');
+    const sync = window.CleverSmartSync;
+    const cloudOn = window.CleverCloudSync?.isEnabled?.() || window.CleverOrdersCloud?.isEnabled?.();
+    if (!el || !cloudOn) {
+      el?.classList.add('hidden');
+      btn?.classList.add('hidden');
+      return;
+    }
+    el.classList.remove('hidden');
+    btn?.classList.remove('hidden');
+    const when = at || sync?.getLastSyncAt?.() || 0;
+    el.textContent = '🔄 ' + (sync?.formatAgo?.(when) || '—');
+    el.title = 'Imesasishwa otomatiki kila sekunde 30 · bonyeza Sasisha kwa haraka';
+  }
+
+  function updateSmartAlertsBar() {
+    const bar = $('smartAlertsBar');
+    if (!bar) return;
+    const alerts = [];
+    const pending = getOrders().filter(o => getOrderStatus(o) === 'pending').length;
+    if (pending && hasPerm('reports')) {
+      alerts.push({
+        type: 'orders',
+        text: '🔔 ' + pending + ' oda zinasubiri',
+        action: () => (isSellerQuick() ? null : switchAdminView('reportsPanel'))
+      });
+    }
+    const stock = computeStockStats();
+    if (stock.out && (hasPerm('stock_view') || hasPerm('stock_add'))) {
+      alerts.push({
+        type: 'stock',
+        text: '📦 ' + stock.out + ' bidhaa zimeisha',
+        action: () => switchAdminView(isSellerQuick() ? 'stockPanel' : 'stockPanel')
+      });
+    } else if (stock.low && (hasPerm('stock_view') || hasPerm('stock_add'))) {
+      alerts.push({
+        type: 'stock-warn',
+        text: '📦 ' + stock.low + ' bidhaa stock chini',
+        action: () => switchAdminView('stockPanel')
+      });
+    }
+    if (!alerts.length) {
+      bar.classList.add('hidden');
+      bar.innerHTML = '';
+      return;
+    }
+    bar.classList.remove('hidden');
+    bar.innerHTML = alerts.map(a =>
+      '<button type="button" class="smart-alert smart-alert-' + a.type + '">' + escapeHtml(a.text) + '</button>'
+    ).join('');
+    bar.querySelectorAll('button').forEach((btn, i) => {
+      btn.addEventListener('click', () => alerts[i].action?.());
+    });
+  }
+
+  function applySmartSyncDetail(d) {
+    if (!d) return;
+    updateSmartSyncBadge(d.at);
+    if (d.orders) {
+      cloudOrdersCache = d.orders;
+      localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(d.orders));
+    }
+    if (d.storageChanged > 0) refreshAllFromCloudStorage();
+    else if (d.orders) {
+      renderOrders();
+      renderDashboard();
+      updateNavBadges();
+      updateSmartAlertsBar();
+    }
+    if (d.newOrders?.length && !d.silent) {
+      showAdminToast('🔔 Oda mpya ' + d.newOrders.length + '! Angalia Ripoti → Oda', 'warn');
+    } else if (d.storageChanged && !d.orders) {
+      updateSmartAlertsBar();
+      updateSellerQuickUI();
+    }
+    updateCloudBadge();
+  }
+
+  function initSmartSync() {
+    const sync = window.CleverSmartSync;
+    if (!sync) return;
+    if (smartSyncListener) {
+      document.removeEventListener('clever-smart-sync', smartSyncListener);
+    }
+    smartSyncListener = e => applySmartSyncDetail(e.detail);
+    document.addEventListener('clever-smart-sync', smartSyncListener);
+    if (!sync.isRunning()) sync.start();
+    if (smartSyncBadgeTimer) clearInterval(smartSyncBadgeTimer);
+    smartSyncBadgeTimer = setInterval(() => updateSmartSyncBadge(), 8000);
+    updateSmartSyncBadge();
+    $('smartRefreshBtn')?.classList.toggle('hidden', !(window.CleverCloudSync?.isEnabled?.() || window.CleverOrdersCloud?.isEnabled?.()));
+  }
+
+  function stopSmartSync() {
+    window.CleverSmartSync?.stop();
+    if (smartSyncBadgeTimer) {
+      clearInterval(smartSyncBadgeTimer);
+      smartSyncBadgeTimer = null;
+    }
+    if (smartSyncListener) {
+      document.removeEventListener('clever-smart-sync', smartSyncListener);
+      smartSyncListener = null;
+    }
+  }
+
+  async function manualSmartRefresh() {
+    const btn = $('smartRefreshBtn');
+    const badge = $('smartSyncBadge');
+    btn?.classList.add('syncing');
+    badge?.classList.add('syncing');
+    try {
+      const detail = await window.CleverSmartSync?.tick({ silent: false });
+      if (detail) applySmartSyncDetail(detail);
+      else refreshAllFromCloudStorage();
+      showAdminToast('✓ Data imesasishwa');
+    } catch (err) {
+      showAdminToast('Imeshindwa kusasisha: ' + (err.message || 'jaribu tena'), 'warn');
+    } finally {
+      btn?.classList.remove('syncing');
+      badge?.classList.remove('syncing');
+    }
+  }
+
   function refreshAllFromCloudStorage() {
     render();
     renderDashboard();
     renderUsers();
     renderOrders();
-    initCloudOrders();
     renderVisits();
     renderSales();
     initSalesItems();
@@ -1089,6 +1254,9 @@
     renderStaffManagement();
     renderSaleCart();
     updateSellerQuickUI();
+    updateNavBadges();
+    updateSmartAlertsBar();
+    renderProfitReport();
   }
 
   async function initCloudStorage() {
@@ -1120,6 +1288,8 @@
     $('app')?.classList.remove('hidden');
 
     await initCloudStorage();
+    initCloudOrders();
+    initSmartSync();
 
     applyRoleUI();
     populateBranchSelect();
@@ -1186,6 +1356,7 @@
     window.CleverOrdersCloud?.stopSync();
     window.CleverOrdersCloud?.stopSalesSync();
     window.CleverCloudSync?.stopSync();
+    stopSmartSync();
     cloudOrdersCache = null;
     cloudOrdersUnsub = null;
     cloudSalesCache = null;
@@ -1283,19 +1454,19 @@
   }
 
   const DEFAULT_SALES_ITEMS = [
-    { name: 'Choma', category: 'Choma', unit: 'KG', price: 18000, stock: 20, lowStock: 3 },
-    { name: 'Choma ya Foil', category: 'Choma ya Foil', unit: 'KG', price: 18000, stock: 20, lowStock: 3 },
-    { name: 'Rosti', category: 'Rosti', unit: 'KG', price: 17000, stock: 20, lowStock: 3 },
-    { name: 'Kavu', category: 'Kavu', unit: 'KG', price: 17000, stock: 20, lowStock: 3 },
-    { name: '½ KG Mix', category: 'Mix', unit: 'Kifurushi', price: 25000, stock: 12, lowStock: 2 },
-    { name: '1 KG Mix', category: 'Mix', unit: 'Kifurushi', price: 35000, stock: 10, lowStock: 2 },
-    { name: 'Kisinia Single', category: 'Kisinia', unit: 'Kifurushi', price: 20000, stock: 15, lowStock: 3 },
-    { name: 'Kisinia Couple', category: 'Kisinia', unit: 'Kifurushi', price: 35000, stock: 10, lowStock: 2 },
-    { name: 'Kisinia Family', category: 'Kisinia', unit: 'Kifurushi', price: 65000, stock: 6, lowStock: 1 },
-    { name: 'Chipsi Kavu', category: 'Sides', unit: 'Sahani', price: 2000, stock: 40, lowStock: 8 },
-    { name: 'Chipsi Yai', category: 'Sides', unit: 'Sahani', price: 3000, stock: 30, lowStock: 6 },
-    { name: 'Ugali', category: 'Sides', unit: 'Kipande', price: 1000, stock: 50, lowStock: 10 },
-    { name: 'Ndizi', category: 'Sides', unit: 'Kipande', price: 500, stock: 60, lowStock: 12 }
+    { name: 'Choma', category: 'Choma', unit: 'KG', price: 18000, costPrice: 12000, stock: 20, lowStock: 3 },
+    { name: 'Choma ya Foil', category: 'Choma ya Foil', unit: 'KG', price: 18000, costPrice: 12000, stock: 20, lowStock: 3 },
+    { name: 'Rosti', category: 'Rosti', unit: 'KG', price: 17000, costPrice: 11000, stock: 20, lowStock: 3 },
+    { name: 'Kavu', category: 'Kavu', unit: 'KG', price: 17000, costPrice: 11000, stock: 20, lowStock: 3 },
+    { name: '½ KG Mix', category: 'Mix', unit: 'Kifurushi', price: 25000, costPrice: 16000, stock: 12, lowStock: 2 },
+    { name: '1 KG Mix', category: 'Mix', unit: 'Kifurushi', price: 35000, costPrice: 22000, stock: 10, lowStock: 2 },
+    { name: 'Kisinia Single', category: 'Kisinia', unit: 'Kifurushi', price: 20000, costPrice: 13000, stock: 15, lowStock: 3 },
+    { name: 'Kisinia Couple', category: 'Kisinia', unit: 'Kifurushi', price: 35000, costPrice: 22000, stock: 10, lowStock: 2 },
+    { name: 'Kisinia Family', category: 'Kisinia', unit: 'Kifurushi', price: 65000, costPrice: 42000, stock: 6, lowStock: 1 },
+    { name: 'Chipsi Kavu', category: 'Sides', unit: 'Sahani', price: 2000, costPrice: 800, stock: 40, lowStock: 8 },
+    { name: 'Chipsi Yai', category: 'Sides', unit: 'Sahani', price: 3000, costPrice: 1200, stock: 30, lowStock: 6 },
+    { name: 'Ugali', category: 'Sides', unit: 'Kipande', price: 1000, costPrice: 400, stock: 50, lowStock: 10 },
+    { name: 'Ndizi', category: 'Sides', unit: 'Kipande', price: 500, costPrice: 200, stock: 60, lowStock: 12 }
   ];
 
   function getSalesItems() {
@@ -1631,6 +1802,268 @@
     }
   }
 
+  function getSalesLog() {
+    try {
+      const saved = loadBranchData(SALES_LOG_KEY, '[]');
+      const local = Array.isArray(saved) ? saved : [];
+      if (cloudSalesCache && window.CleverOrdersCloud?.isEnabled()) {
+        return mergeSalesLogs(local, cloudSalesCache);
+      }
+      return local;
+    } catch {
+      return [];
+    }
+  }
+
+  function getItemCostPrice(itemOrId) {
+    const item = typeof itemOrId === 'string'
+      ? getAllSalesItems().find(x => x.id === itemOrId)
+      : itemOrId;
+    return Number(item?.costPrice) || 0;
+  }
+
+  function buildSaleEconomicsFields(item, qty, total) {
+    const costPrice = getItemCostPrice(item);
+    const q = Number(qty) || 0;
+    const costTotal = Math.round(costPrice * q);
+    const revenue = Number(total) || 0;
+    const profit = revenue - costTotal;
+    const marginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
+    return { costPrice, costTotal, profit, marginPct };
+  }
+
+  function resolveSaleEconomics(sale) {
+    if (sale?.costTotal != null && sale?.profit != null) {
+      return {
+        costPrice: Number(sale.costPrice) || 0,
+        costTotal: Number(sale.costTotal) || 0,
+        profit: Number(sale.profit) || 0,
+        marginPct: Number(sale.marginPct) || 0
+      };
+    }
+    const item = getAllSalesItems().find(x => x.id === sale?.itemId);
+    const costPrice = Number(sale?.costPrice) || getItemCostPrice(item);
+    const qty = Number(sale?.qty) || 0;
+    const costTotal = Math.round(costPrice * qty);
+    const revenue = Number(sale?.total) || 0;
+    const profit = revenue - costTotal;
+    const marginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
+    return { costPrice, costTotal, profit, marginPct };
+  }
+
+  function filterByPeriod(items, dateField, period) {
+    const now = new Date();
+    return items.filter(x => {
+      const iso = x[dateField];
+      if (!iso) return false;
+      if (period === 'all') return true;
+      if (period === 'today') return isToday(iso);
+      const d = new Date(iso);
+      if (period === 'week') {
+        const start = new Date(now);
+        start.setHours(0, 0, 0, 0);
+        start.setDate(start.getDate() - 6);
+        return d >= start;
+      }
+      if (period === 'month') {
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+      return true;
+    });
+  }
+
+  function profitPeriodLabel(period) {
+    return ({ today: 'Leo', week: 'Wiki 7', month: 'Mwezi huu', all: 'Muda wote' }[period] || period);
+  }
+
+  function computeProfitStats(period = profitPeriod) {
+    const sales = filterByPeriod(getSalesLog(), 'at', period);
+    let revenue = 0;
+    let cost = 0;
+    let profit = 0;
+    const byItem = {};
+
+    sales.forEach(sale => {
+      const econ = resolveSaleEconomics(sale);
+      const rev = Number(sale.total) || 0;
+      revenue += rev;
+      cost += econ.costTotal;
+      profit += econ.profit;
+      const key = sale.itemName || 'Nyingine';
+      if (!byItem[key]) {
+        byItem[key] = { qty: 0, revenue: 0, cost: 0, profit: 0, unit: sale.unit, count: 0 };
+      }
+      byItem[key].qty += Number(sale.qty) || 0;
+      byItem[key].revenue += rev;
+      byItem[key].cost += econ.costTotal;
+      byItem[key].profit += econ.profit;
+      byItem[key].count += 1;
+    });
+
+    const wastage = filterByPeriod(getStockLog().filter(x => x.type === 'wastage'), 'at', period);
+    let wastageLoss = 0;
+    wastage.forEach(w => {
+      const item = getAllSalesItems().find(x => x.id === w.itemId)
+        || getAllSalesItems().find(x => x.name === w.itemName);
+      wastageLoss += Math.round(getItemCostPrice(item) * (Number(w.qty) || 0));
+    });
+
+    const netProfit = profit - wastageLoss;
+    const marginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
+    const netMarginPct = revenue > 0 ? Math.round((netProfit / revenue) * 100) : 0;
+    const hasCostData = cost > 0 || getSalesItems().some(x => Number(x.costPrice) > 0);
+
+    return {
+      period,
+      revenue,
+      cost,
+      profit,
+      netProfit,
+      wastageLoss,
+      wastageCount: wastage.length,
+      marginPct,
+      netMarginPct,
+      count: sales.length,
+      byItem,
+      topByRevenue: Object.entries(byItem).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 10),
+      topByQty: Object.entries(byItem).sort((a, b) => b[1].qty - a[1].qty).slice(0, 10),
+      topByProfit: Object.entries(byItem).sort((a, b) => b[1].profit - a[1].profit).slice(0, 10),
+      hasCostData
+    };
+  }
+
+  function updateSalesItemCost(id, costPrice) {
+    if (!hasPerm('sales_items')) return;
+    const cost = Math.max(0, parseInt(String(costPrice), 10) || 0);
+    const list = getAllSalesItems().map(x =>
+      x.id === id ? { ...x, costPrice: cost } : x
+    );
+    saveSalesItemsList(list);
+    renderSalesItems();
+    renderProfitReport();
+    renderDashboard();
+  }
+
+  function renderProfitReport() {
+    const root = $('profitReportRoot');
+    if (!root || !hasPerm('reports')) return;
+    const p = computeProfitStats(profitPeriod);
+    const branch = getCurrentBranch();
+
+    root.innerHTML = `
+      <p class="panel-note panel-note-tight profit-report-note">
+        ${escapeHtml(profitPeriodLabel(p.period))}${branch ? ' · ' + escapeHtml(branch.name) : ''} · ${p.count} mauzo
+        ${!p.hasCostData ? ' · <b>Weka bei ya kununua kwenye Bidhaa ili kuona faida sahihi</b>' : ''}
+      </p>
+      <div class="profit-kpi-grid">
+        <article class="profit-kpi profit-kpi-revenue">
+          <span>Mapato (Mauzo)</span>
+          <strong>TSH ${formatMoney(p.revenue)}</strong>
+        </article>
+        <article class="profit-kpi profit-kpi-cost">
+          <span>Gharama ya Bidhaa</span>
+          <strong>TSH ${formatMoney(p.cost)}</strong>
+        </article>
+        <article class="profit-kpi profit-kpi-profit${p.profit >= 0 ? '' : ' profit-kpi-loss'}">
+          <span>Faida Jumla</span>
+          <strong>TSH ${formatMoney(p.profit)}</strong>
+          <small>${p.marginPct}% margin</small>
+        </article>
+        <article class="profit-kpi profit-kpi-wastage">
+          <span>Hasara — Uharibifu</span>
+          <strong>TSH ${formatMoney(p.wastageLoss)}</strong>
+          <small>${p.wastageCount} rekodi</small>
+        </article>
+        <article class="profit-kpi profit-kpi-net${p.netProfit >= 0 ? ' profit-kpi-net-ok' : ' profit-kpi-loss'}">
+          <span>Faida Halisi (Net)</span>
+          <strong>TSH ${formatMoney(p.netProfit)}</strong>
+          <small>${p.netMarginPct}% net margin</small>
+        </article>
+      </div>
+      <div class="profit-grid-2">
+        <article class="profit-card">
+          <h3>🏆 Zinazouzwa Zaidi — Mapato</h3>
+          ${p.topByRevenue.length ? `
+            <table class="profit-table">
+              <thead><tr><th>#</th><th>Bidhaa</th><th>Kiasi</th><th>Mapato</th><th>Faida</th></tr></thead>
+              <tbody>${p.topByRevenue.map(([name, d], i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td><b>${escapeHtml(name)}</b></td>
+                  <td>${d.qty} ${escapeHtml(d.unit)}</td>
+                  <td>TSH ${formatMoney(d.revenue)}</td>
+                  <td class="${d.profit >= 0 ? 'profit-pos' : 'profit-neg'}">TSH ${formatMoney(d.profit)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>` : '<p class="dash-empty">Hakuna mauzo kwa kipindi hiki.</p>'}
+        </article>
+        <article class="profit-card">
+          <h3>📦 Zinazouzwa Zaidi — Kiasi</h3>
+          ${p.topByQty.length ? `
+            <table class="profit-table">
+              <thead><tr><th>#</th><th>Bidhaa</th><th>Kiasi</th><th>Mauzo</th><th>Mapato</th></tr></thead>
+              <tbody>${p.topByQty.map(([name, d], i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td><b>${escapeHtml(name)}</b></td>
+                  <td>${d.qty} ${escapeHtml(d.unit)}</td>
+                  <td>${d.count}×</td>
+                  <td>TSH ${formatMoney(d.revenue)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>` : '<p class="dash-empty">Hakuna mauzo kwa kipindi hiki.</p>'}
+        </article>
+        <article class="profit-card profit-card-wide">
+          <h3>💎 Faida kwa Bidhaa</h3>
+          ${p.topByProfit.length ? `
+            <table class="profit-table">
+              <thead><tr><th>#</th><th>Bidhaa</th><th>Mapato</th><th>Gharama</th><th>Faida</th><th>Margin</th></tr></thead>
+              <tbody>${p.topByProfit.map(([name, d], i) => {
+                const m = d.revenue > 0 ? Math.round((d.profit / d.revenue) * 100) : 0;
+                return `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td><b>${escapeHtml(name)}</b></td>
+                  <td>TSH ${formatMoney(d.revenue)}</td>
+                  <td>TSH ${formatMoney(d.cost)}</td>
+                  <td class="${d.profit >= 0 ? 'profit-pos' : 'profit-neg'}">TSH ${formatMoney(d.profit)}</td>
+                  <td>${m}%</td>
+                </tr>`;
+              }).join('')}
+              </tbody>
+            </table>` : '<p class="dash-empty">Weka gharama za bidhaa kisha rekodi mauzo.</p>'}
+        </article>
+      </div>`;
+  }
+
+  function exportProfitCsv() {
+    if (!hasPerm('reports')) return;
+    const p = computeProfitStats(profitPeriod);
+    const branch = getCurrentBranch();
+    const header = ['Bidhaa', 'Kiasi', 'Kipimo', 'Mauzo', 'Mapato TSH', 'Gharama TSH', 'Faida TSH', 'Margin %'];
+    const rows = [header.join(',')];
+    Object.entries(p.byItem).sort((a, b) => b[1].revenue - a[1].revenue).forEach(([name, d]) => {
+      const m = d.revenue > 0 ? Math.round((d.profit / d.revenue) * 100) : 0;
+      rows.push([
+        csvEscape(name),
+        csvEscape(d.qty),
+        csvEscape(d.unit),
+        csvEscape(d.count),
+        csvEscape(d.revenue),
+        csvEscape(d.cost),
+        csvEscape(d.profit),
+        csvEscape(m)
+      ].join(','));
+    });
+    rows.push('');
+    rows.push(['JUMLA', '', '', csvEscape(p.count), csvEscape(p.revenue), csvEscape(p.cost), csvEscape(p.profit), csvEscape(p.marginPct)].join(','));
+    rows.push(['Uharibifu', '', '', csvEscape(p.wastageCount), '', csvEscape(p.wastageLoss), '', ''].join(','));
+    rows.push(['FAIDA HALISI', '', '', '', csvEscape(p.revenue), '', csvEscape(p.netProfit), csvEscape(p.netMarginPct)].join(','));
+    const slug = (branch?.name || 'faida').replace(/[^\w\-]+/g, '-').slice(0, 24);
+    downloadCsv('clever-kitimoto-faida-' + slug + '-' + profitPeriod + '-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
+    showAdminToast('✓ Ripoti ya faida imepakuliwa');
+  }
+
   function syncSaleToCloud(sale) {
     const cloud = window.CleverOrdersCloud;
     if (!cloud?.isEnabled() || !sale) return Promise.resolve(false);
@@ -1667,6 +2100,7 @@
     const category = $('salesItemCategory')?.value || 'Nyingine';
     const unit = $('salesItemUnit')?.value || 'KG';
     const price = parseInt($('salesItemPrice')?.value, 10);
+    const costPrice = parseInt($('salesItemCost')?.value, 10) || 0;
     const stock = parseFloat($('salesItemStock')?.value);
     const lowStock = parseFloat($('salesItemLowStock')?.value);
     if (!name || !price) {
@@ -1681,13 +2115,14 @@
       category,
       unit,
       price,
+      costPrice,
       stock: stock > 0 ? stock : def.stock,
       lowStock: lowStock > 0 ? lowStock : def.lowStock,
       trackStock: true,
       active: true
     });
     saveSalesItemsList(list);
-    ['salesItemName', 'salesItemPrice', 'salesItemStock', 'salesItemLowStock'].forEach(id => { if ($(id)) $(id).value = ''; });
+    ['salesItemName', 'salesItemPrice', 'salesItemCost', 'salesItemStock', 'salesItemLowStock'].forEach(id => { if ($(id)) $(id).value = ''; });
     renderSalesItems();
     populateSaleItemSelect();
     renderStock();
@@ -1716,14 +2151,22 @@
     }
     el.innerHTML = list.map(x => {
       const status = getStockStatus(x);
+      const cost = Number(x.costPrice) || 0;
+      const margin = x.price > 0 && cost > 0 ? Math.round(((x.price - cost) / x.price) * 100) : null;
       const deleteBtn = hasPerm('sales_items')
         ? `<button class="btn btn-delete" type="button" data-delete-sales="${escapeHtml(x.id)}">🗑 Futa</button>`
         : '';
+      const costField = hasPerm('sales_items')
+        ? `<label class="sales-item-cost-edit">Gharama/kipimo
+            <input type="number" min="0" class="sales-cost-input" data-cost-item="${escapeHtml(x.id)}" value="${cost || ''}" placeholder="0">
+          </label>`
+        : (cost ? `<div class="mini">Gharama: TSH ${formatMoney(cost)}${margin != null ? ' · Margin ' + margin + '%' : ''}</div>` : '');
       return `
-      <div class="custom-row">
+      <div class="custom-row sales-item-row">
         <div>
           <b>${escapeHtml(x.name)}</b>
-          <div class="mini">${escapeHtml(x.category)} · ${escapeHtml(x.unit)} · TSH ${formatMoney(x.price)} / ${escapeHtml(x.unit)}</div>
+          <div class="mini">${escapeHtml(x.category)} · ${escapeHtml(x.unit)} · Uza: TSH ${formatMoney(x.price)} / ${escapeHtml(x.unit)}</div>
+          ${costField}
           <div class="mini stock-mini stock-mini-${status}">Stock: ${escapeHtml(formatStockQty(x.stock, x.unit))} · ${escapeHtml(stockStatusLabel(status))}</div>
         </div>
         ${deleteBtn}
@@ -1731,6 +2174,9 @@
     }).join('');
     el.querySelectorAll('[data-delete-sales]').forEach(btn => {
       btn.addEventListener('click', () => deleteSalesItem(btn.dataset.deleteSales));
+    });
+    el.querySelectorAll('.sales-cost-input').forEach(input => {
+      input.addEventListener('change', () => updateSalesItemCost(input.dataset.costItem, input.value));
     });
   }
 
@@ -2278,6 +2724,7 @@
       qty,
       unit: item.unit,
       unitPrice: item.price,
+      costPrice: getItemCostPrice(item),
       total,
       trackStock: item.trackStock !== false
     });
@@ -2326,6 +2773,11 @@
     const lineCount = saleCart.length;
     const newSales = [];
     saleCart.forEach(line => {
+      const econ = buildSaleEconomicsFields(
+        getAllSalesItems().find(x => x.id === line.itemId),
+        line.qty,
+        line.total
+      );
       const sale = {
         id: 'sale-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         receiptId,
@@ -2336,6 +2788,10 @@
         qty: line.qty,
         unit: line.unit,
         unitPrice: line.unitPrice,
+        costPrice: line.costPrice ?? econ.costPrice,
+        costTotal: econ.costTotal,
+        profit: econ.profit,
+        marginPct: econ.marginPct,
         total: line.total,
         payment,
         phone,
@@ -2402,6 +2858,7 @@
 
     const branch = getCurrentBranch();
     const receiptId = 'rcpt-' + Date.now();
+    const econ = buildSaleEconomicsFields(item, qty, total);
     const sale = {
       id: 'sale-' + Date.now(),
       receiptId,
@@ -2412,6 +2869,10 @@
       qty,
       unit: item.unit,
       unitPrice: item.price,
+      costPrice: econ.costPrice,
+      costTotal: econ.costTotal,
+      profit: econ.profit,
+      marginPct: econ.marginPct,
       total,
       payment,
       phone,
@@ -2459,22 +2920,31 @@
     const total = sales.reduce((s, x) => s + (Number(x.total) || 0), 0);
     const today = sales.filter(x => isToday(x.at));
     const todayTotal = today.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    let totalProfit = 0;
+    let todayProfit = 0;
     const kgSold = sales.reduce((s, x) => {
       if (x.unit === 'KG') return s + (Number(x.qty) || 0);
       return s;
     }, 0);
     const byItem = {};
     sales.forEach(x => {
+      const econ = resolveSaleEconomics(x);
+      totalProfit += econ.profit;
+      if (isToday(x.at)) todayProfit += econ.profit;
       const key = x.itemName || 'Nyingine';
-      if (!byItem[key]) byItem[key] = { qty: 0, total: 0, unit: x.unit };
+      if (!byItem[key]) byItem[key] = { qty: 0, total: 0, profit: 0, unit: x.unit, count: 0 };
       byItem[key].qty += Number(x.qty) || 0;
       byItem[key].total += Number(x.total) || 0;
+      byItem[key].profit += econ.profit;
+      byItem[key].count += 1;
     });
     return {
       count: sales.length,
       total,
       todayCount: today.length,
       todayTotal,
+      totalProfit,
+      todayProfit,
       kgSold: Math.round(kgSold * 10) / 10,
       byItem
     };
@@ -2484,9 +2954,11 @@
     const el = $('salesSummary');
     if (!el) return;
     const s = computeSalesStats();
+    const pToday = computeProfitStats('today');
     el.innerHTML = `
       <div class="summary-chip highlight"><span>Jumla Mauzo</span><b>TSH ${formatMoney(s.total)}</b></div>
       <div class="summary-chip"><span>Leo</span><b>TSH ${formatMoney(s.todayTotal)}</b></div>
+      <div class="summary-chip profit-chip"><span>Faida Leo</span><b>TSH ${formatMoney(pToday.netProfit)}</b></div>
       <div class="summary-chip"><span>Mauzo</span><b>${s.count}</b></div>
       <div class="summary-chip"><span>Leo</span><b>${s.todayCount}</b></div>
       <div class="summary-chip"><span>KG iliyouzwa</span><b>${s.kgSold || '—'}</b></div>
@@ -2503,12 +2975,14 @@
       return;
     }
     el.innerHTML = `
-      <div class="sales-breakdown-head">Mauzo kwa bidhaa</div>
+      <div class="sales-breakdown-head">🏆 Bidhaa zinazouzwa zaidi</div>
       <div class="sales-breakdown-grid">
-        ${entries.slice(0, 8).map(([name, data]) => `
+        ${entries.slice(0, 8).map(([name, data], i) => `
           <div class="sales-breakdown-chip">
+            <span class="sales-rank-num">${i + 1}</span>
             <b>${escapeHtml(name)}</b>
-            <span>${data.qty} ${escapeHtml(data.unit)} · TSH ${formatMoney(data.total)}</span>
+            <span>${data.qty} ${escapeHtml(data.unit)} · ${data.count || 0}× · TSH ${formatMoney(data.total)}</span>
+            ${data.profit != null ? '<small>Faida: TSH ' + formatMoney(data.profit) + '</small>' : ''}
           </div>
         `).join('')}
       </div>`;
@@ -2548,9 +3022,10 @@
     const sales = getSalesLog();
     const branch = getCurrentBranch();
     if (!sales.length) { alert('Hakuna mauzo ya kupakua.'); return; }
-    const header = ['Tarehe', 'Tawi', 'Bidhaa', 'Aina', 'Kiasi', 'Kipimo', 'Bei/TSH', 'Jumla TSH', 'Malipo', 'Simu', 'Maelezo', 'Muuzaji'];
+    const header = ['Tarehe', 'Tawi', 'Bidhaa', 'Aina', 'Kiasi', 'Kipimo', 'Bei/TSH', 'Gharama', 'Faida', 'Jumla TSH', 'Malipo', 'Simu', 'Maelezo', 'Muuzaji'];
     const rows = [header.join(',')];
     sales.forEach(x => {
+      const econ = resolveSaleEconomics(x);
       rows.push([
         csvEscape(formatOrderDate(x.at)),
         csvEscape(x.branchName || branch?.name || ''),
@@ -2559,6 +3034,8 @@
         csvEscape(x.qty),
         csvEscape(x.unit),
         csvEscape(x.unitPrice),
+        csvEscape(econ.costTotal),
+        csvEscape(econ.profit),
         csvEscape(x.total),
         csvEscape(paymentLabel(x.payment)),
         csvEscape(x.phone),
@@ -2829,6 +3306,24 @@
 
     const { byItem } = computeSalesStats();
     const topAll = Object.entries(byItem).sort((a, b) => b[1].total - a[1].total).slice(0, 5);
+    const topByQty = Object.entries(byItem).sort((a, b) => b[1].qty - a[1].qty).slice(0, 3);
+    const profitToday = computeProfitStats('today');
+
+    if (profitToday.hasCostData && (profitToday.profit !== 0 || profitToday.revenue > 0)) {
+      insights.push({
+        type: profitToday.netProfit >= 0 ? 'money' : 'danger',
+        icon: profitToday.netProfit >= 0 ? '📈' : '📉',
+        text: 'Faida halisi leo: TSH ' + formatMoney(profitToday.netProfit) + ' (' + profitToday.netMarginPct + '% net)'
+      });
+    }
+    if (topByQty[0]) {
+      insights.push({
+        type: 'hot',
+        icon: '🏆',
+        text: 'Inayouzwa zaidi (kiasi): ' + topByQty[0][0] + ' — ' + topByQty[0][1].qty + ' ' + (topByQty[0][1].unit || '')
+      });
+    }
+
     const stock = computeStockStats();
     const stockPct = stock.tracked ? Math.round((stock.ok / stock.tracked) * 100) : 100;
 
@@ -2846,6 +3341,8 @@
       activity,
       insights,
       topAll,
+      topByQty,
+      profitToday,
       stockPct,
       todayCombined,
       stock,
@@ -2929,7 +3426,7 @@
         <div class="dash-hero-kpi">
           <span class="dash-hero-kpi-label">Mapato Leo</span>
           <strong class="dash-hero-kpi-value">TSH ${formatMoney(d.todayCombined)}</strong>
-          <span class="dash-hero-kpi-sub">${d.todayOrderCount + d.salesTodayCount} shughuli leo</span>
+          <span class="dash-hero-kpi-sub">${d.todayOrderCount + d.salesTodayCount} shughuli leo${d.profitToday?.hasCostData ? ' · Faida TSH ' + formatMoney(d.profitToday.netProfit) : ''}</span>
         </div>
       </section>
 
@@ -2967,6 +3464,14 @@
             <span class="dash-kpi-label">Stock / Stoo</span>
             <strong class="dash-kpi-value">${d.stockOut ? d.stockOut + ' imeisha' : d.stockLow ? d.stockLow + ' chini' : 'Salama'}</strong>
             <span class="dash-kpi-sub">${d.stockKg || 0} KG kwenye stoo · ${d.stock.ok}/${d.stock.tracked} bidhaa</span>
+          </div>
+        </article>
+        <article class="dash-kpi dash-kpi-profit${d.profitToday?.netProfit >= 0 ? '' : ' dash-kpi-danger'}">
+          <div class="dash-kpi-icon" aria-hidden="true">📈</div>
+          <div class="dash-kpi-body">
+            <span class="dash-kpi-label">Faida Halisi Leo</span>
+            <strong class="dash-kpi-value">TSH ${formatMoney(d.profitToday?.netProfit || 0)}</strong>
+            <span class="dash-kpi-sub">Faida ${formatMoney(d.profitToday?.profit || 0)} · Uharibifu ${formatMoney(d.profitToday?.wastageLoss || 0)} · ${d.profitToday?.netMarginPct || 0}% net</span>
           </div>
         </article>
         <article class="dash-kpi">
@@ -3007,7 +3512,7 @@
         <article class="dash-card">
           <div class="dash-card-head">
             <h4>🏆 Bidhaa Zinazouzwa</h4>
-            <span class="dash-card-meta">Kwa tawi hili</span>
+            <span class="dash-card-meta">Mapato & faida · bonyeza Ripoti → Faida</span>
           </div>
           ${d.topAll.length ? `
             <ul class="dash-rank-list">
@@ -3022,11 +3527,32 @@
                         <span>TSH ${formatMoney(data.total)}</span>
                       </div>
                       <div class="dash-rank-bar"><span style="width:${pct}%"></span></div>
-                      <small>${data.qty} ${escapeHtml(data.unit)} · ${pct}% ya mauzo</small>
+                      <small>${data.qty} ${escapeHtml(data.unit)} · ${data.count || 0}× · ${pct}% ya mauzo${data.profit != null ? ' · Faida TSH ' + formatMoney(data.profit) : ''}</small>
                     </div>
                   </li>`;
               }).join('')}
             </ul>` : '<p class="dash-empty">Hakuna mauzo bado. Rekodi mauzo ya kwanza.</p>'}
+        </article>
+
+        <article class="dash-card">
+          <div class="dash-card-head">
+            <h4>📦 Zinazouzwa Zaidi — Kiasi</h4>
+            <span class="dash-card-meta">Kwa idadi / kilo</span>
+          </div>
+          ${d.topByQty?.length ? `
+            <ul class="dash-rank-list">
+              ${d.topByQty.map(([name, data], i) => `
+                <li class="dash-rank-item">
+                  <span class="dash-rank-num">${i + 1}</span>
+                  <div class="dash-rank-body">
+                    <div class="dash-rank-row">
+                      <strong>${escapeHtml(name)}</strong>
+                      <span>${data.qty} ${escapeHtml(data.unit)}</span>
+                    </div>
+                    <small>${data.count || 0} mauzo · TSH ${formatMoney(data.total)}</small>
+                  </div>
+                </li>`).join('')}
+            </ul>` : '<p class="dash-empty">Hakuna data bado.</p>'}
         </article>
 
         <article class="dash-card">
@@ -3119,6 +3645,7 @@
           <div class="dash-quick-actions">
             ${canSales ? '<button type="button" class="dash-action-btn" data-dash-scroll="salesPanel"><span>⚡</span> Smart POS</button>' : ''}
             ${canStock ? '<button type="button" class="dash-action-btn" data-dash-scroll="stockPanel"><span>📦</span> Angalia Stock</button>' : ''}
+            ${hasPerm('reports') ? '<button type="button" class="dash-action-btn" data-dash-scroll="reportsPanel" data-profit-tab="1"><span>📈</span> Faida & Hasara</button>' : ''}
             ${hasPerm('reports') ? '<button type="button" class="dash-action-btn" data-dash-scroll="reportsPanel"><span>📋</span> Ripoti Zote</button>' : ''}
             ${hasPerm('branches') ? '<button type="button" class="dash-action-btn" data-dash-scroll="branchPanel"><span>🏪</span> Dhibiti Matawi</button>' : ''}
             ${hasPerm('staff_manage') ? '<button type="button" class="dash-action-btn" data-dash-scroll="staffPanel"><span>👥</span> Wafanyakazi</button>' : ''}
@@ -3501,8 +4028,11 @@
     });
     $('usersPane')?.classList.toggle('active', tab === 'users');
     $('ordersPane')?.classList.toggle('active', tab === 'orders');
+    $('profitPane')?.classList.toggle('active', tab === 'profit');
     $('salesPane')?.classList.toggle('active', tab === 'sales');
     $('visitsPane')?.classList.toggle('active', tab === 'visits');
+    if (tab === 'profit') renderProfitReport();
+    if (tab === 'sales') renderSales();
   }
 
   const CLOUD_MIGRATION_SQL = `-- Clever Kitimoto — run ONCE in Supabase SQL Editor
@@ -3686,7 +4216,14 @@ alter table public.app_storage replica identity full;`;
       }
     }
     window.CleverOrdersCloud.saveConfig(cfg);
-    initCloudOrders();
+    if (cfg.enabled) {
+      initCloudOrders();
+      initCloudStorage().then(() => refreshAllFromCloudStorage());
+      initSmartSync();
+    } else {
+      stopSmartSync();
+      cloudOrdersCache = null;
+    }
     populateCloudConfigForm();
     showAdminToast(cfg.enabled ? '✓ Supabase imeunganishwa' : '✓ Cloud imezimwa');
   }
@@ -3710,6 +4247,7 @@ alter table public.app_storage replica identity full;`;
         await window.CleverCloudSync.pushAllLocal();
       }
       populateCloudConfigForm();
+      initSmartSync();
       const tables = await checkCloudTables();
       if (!tables.appStorage) {
         showAdminToast('Oda & mauzo OK — run SQL ya app_storage (Zana) ili menu/stock zisave online', 'warn');
@@ -3884,7 +4422,9 @@ alter table public.app_storage replica identity full;`;
       byItem[key].total += Number(x.total) || 0;
     });
     const topItems = Object.entries(byItem).sort((a, b) => b[1].total - a[1].total).slice(0, 8);
+    const topByQty = Object.entries(byItem).sort((a, b) => b[1].qty - a[1].qty).slice(0, 5);
     const totalSales = sales.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    const profitStats = computeProfitStats('today');
     const wastage = getStockLog().filter(x => isToday(x.at) && x.type === 'wastage');
     const wastageKg = wastage.reduce((s, x) => x.unit === 'KG' ? s + (Number(x.qty) || 0) : s, 0);
     return {
@@ -3895,6 +4435,8 @@ alter table public.app_storage replica identity full;`;
       kgSold: Math.round(kgSold * 10) / 10,
       pendingOrders,
       topItems,
+      topByQty,
+      profitStats,
       totalSales,
       salesCount: sales.length,
       ordersCount: orders.length,
@@ -3912,6 +4454,9 @@ alter table public.app_storage replica identity full;`;
     if (!w) { alert('Ruhusu pop-ups kuchapisha ripoti.'); return; }
     const itemRows = d.topItems.map(([name, data]) =>
       `<tr><td>${escapeHtml(name)}</td><td>${data.qty} ${escapeHtml(data.unit)}</td><td>TSH ${formatMoney(data.total)}</td></tr>`
+    ).join('');
+    const qtyRows = (d.topByQty || []).map(([name, data]) =>
+      `<tr><td>${escapeHtml(name)}</td><td>${data.qty} ${escapeHtml(data.unit)}</td><td>${data.qty}</td></tr>`
     ).join('');
     w.document.write(`<!DOCTYPE html><html><head><title>Funga Siku — Clever Kitimoto</title>
       <style>
@@ -3931,6 +4476,8 @@ alter table public.app_storage replica identity full;`;
       <p class="meta">${escapeHtml(new Date().toLocaleDateString('sw-TZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}${branch ? ' · ' + escapeHtml(branch.name) : ''} · ${escapeHtml(session?.user || 'staff')}</p>
       <div class="stats">
         <div class="stat"><span>Mapato ya Mauzo</span><b>TSH ${formatMoney(d.totalSales)}</b></div>
+        <div class="stat"><span>Faida Jumla</span><b>TSH ${formatMoney(d.profitStats?.profit || 0)}</b></div>
+        <div class="stat"><span>Faida Halisi</span><b>TSH ${formatMoney(d.profitStats?.netProfit || 0)}</b></div>
         <div class="stat"><span>Rekodi za Mauzo</span><b>${d.salesCount}</b></div>
         <div class="stat"><span>KG Iliyouzwa</span><b>${d.kgSold || '—'}</b></div>
         <div class="stat"><span>Cash</span><b>TSH ${formatMoney(d.payMix.cash)}</b></div>
@@ -3939,6 +4486,7 @@ alter table public.app_storage replica identity full;`;
         <div class="stat"><span>Oda za Leo</span><b>${d.ordersCount}</b></div>
         <div class="stat"><span>Oda Mpya</span><b>${d.pendingOrders}</b></div>
         <div class="stat"><span>Uharibifu (KG)</span><b>${d.wastageKg || '—'}</b></div>
+        <div class="stat"><span>Hasara Uharibifu</span><b>TSH ${formatMoney(d.profitStats?.wastageLoss || 0)}</b></div>
       </div>
       <h2>Stock — Muhtasari</h2>
       <div class="stats">
@@ -3946,9 +4494,12 @@ alter table public.app_storage replica identity full;`;
         <div class="stat"><span>Chini</span><b>${d.stock.low}</b></div>
         <div class="stat"><span>Imeisha</span><b>${d.stock.out}</b></div>
       </div>
-      <h2>Bidhaa Zilizouzwa Zaidi Leo</h2>
+      <h2>Bidhaa Zilizouzwa Zaidi Leo — Mapato</h2>
       <table><thead><tr><th>Bidhaa</th><th>Kiasi</th><th>Mapato</th></tr></thead>
       <tbody>${itemRows || '<tr><td colspan="3">Hakuna mauzo leo</td></tr>'}</tbody></table>
+      <h2>Bidhaa Zilizouzwa Zaidi Leo — Kiasi</h2>
+      <table><thead><tr><th>Bidhaa</th><th>Kipimo</th><th>Kiasi</th></tr></thead>
+      <tbody>${qtyRows || '<tr><td colspan="3">Hakuna mauzo leo</td></tr>'}</tbody></table>
       <p class="foot">Clever Kitimoto · Ripoti ya kufunga siku · ${escapeHtml(new Date().toLocaleString('sw-TZ'))}</p>
       </body></html>`);
     w.document.close();
@@ -4011,6 +4562,7 @@ alter table public.app_storage replica identity full;`;
     applySessionBranch();
     initCloudOrders();
     await initCloudStorage();
+    initSmartSync();
     refreshAllFromCloudStorage();
     populateCloudConfigForm();
   }
@@ -4144,6 +4696,7 @@ alter table public.app_storage replica identity full;`;
   }
 
   function bindEvents() {
+    $('smartRefreshBtn')?.addEventListener('click', manualSmartRefresh);
     $('adminMenuToggle')?.addEventListener('click', () => {
       $('adminSidebar')?.classList.toggle('open');
       $('adminLayout')?.classList.toggle('sidebar-open');
@@ -4159,12 +4712,17 @@ alter table public.app_storage replica identity full;`;
     $('dashboardRoot')?.addEventListener('click', e => {
       const scrollBtn = e.target.closest('[data-dash-scroll]');
       if (scrollBtn) {
+        if (scrollBtn.dataset.profitTab) {
+          switchAdminView('reportsPanel');
+          switchReportTab('profit');
+          return;
+        }
         scrollToPanel(scrollBtn.dataset.dashScroll);
         return;
       }
       if (e.target.closest('#dashRefreshBtn')) {
-        renderDashboard();
-        showAdminToast('✓ Dashboard imesasishwa');
+        manualSmartRefresh();
+        return;
       }
       if (e.target.closest('#dashEodBtn')) printEodReport();
     });
@@ -4256,6 +4814,16 @@ alter table public.app_storage replica identity full;`;
     document.querySelectorAll('.report-tab').forEach(btn => {
       btn.addEventListener('click', () => switchReportTab(btn.dataset.tab));
     });
+    document.querySelectorAll('.profit-period-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        profitPeriod = btn.dataset.profitPeriod || 'today';
+        document.querySelectorAll('.profit-period-tab').forEach(b => {
+          b.classList.toggle('active', b.dataset.profitPeriod === profitPeriod);
+        });
+        renderProfitReport();
+      });
+    });
+    $('exportProfitBtn')?.addEventListener('click', exportProfitCsv);
     $('adminDialogOk')?.addEventListener('click', closeAdminDialog);
     $('adminDialogBackdrop')?.addEventListener('click', closeAdminDialog);
     document.addEventListener('keydown', e => {

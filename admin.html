@@ -54,10 +54,11 @@
         <img class="brand-logo" src="assets/logo.png" alt="Clever Kitimoto">
         <div>
           <div class="brand">Clever <span>Kitimoto</span></div>
-          <div class="brand-sub">Admin Panel · <span class="session-badge" id="sessionBadge">🔓 Imefunguliwa</span> <span id="cloudBadge" class="cloud-badge hidden" title="Oda zinahifadhiwa mtandaoni">☁️ Live</span> <span id="roleBadge" class="role-badge"></span></div>
+          <div class="brand-sub">Admin Panel · <span class="session-badge" id="sessionBadge">🔓 Imefunguliwa</span> <span id="cloudBadge" class="cloud-badge hidden" title="Oda zinahifadhiwa mtandaoni">☁️ Live</span> <span id="smartSyncBadge" class="smart-sync-badge hidden" title="Imesasishwa otomatiki">🔄 —</span> <span id="roleBadge" class="role-badge"></span></div>
         </div>
       </div>
       <div class="actions">
+        <button type="button" class="btn btn-smart-sync hidden" id="smartRefreshBtn" title="Sasisha data sasa">🔄 Sasisha</button>
         <a class="btn btn-back" href="index.html">← View Menu</a>
         <button class="btn btn-reset hidden" type="button" id="resetBtn">Reset Prices</button>
         <button class="btn btn-logout" type="button" id="logoutBtn">🚪 Toka</button>
@@ -78,6 +79,8 @@
         <select id="branchSelect" class="branch-select"></select>
       </div>
     </div>
+
+    <div id="smartAlertsBar" class="smart-alerts-bar hidden" aria-live="polite"></div>
 
     <div class="notice notice-compact hidden" id="dashNotice">
       <b>Kidokezo:</b> Mauzo na stock huhifadhiwa kwa <b>kila tawi</b>. Chagua tawi juu kisha angalia ripoti.
@@ -313,7 +316,8 @@
           <option value="Kifurushi">Kifurushi</option>
         </select>
       </div>
-      <div class="field"><label>Bei kwa kipimo (TSH)</label><input id="salesItemPrice" type="number" min="0" placeholder="18000"></div>
+      <div class="field"><label>Bei ya kuuza (TSH)</label><input id="salesItemPrice" type="number" min="0" placeholder="18000"></div>
+      <div class="field"><label>Bei ya kununua / gharama (TSH)</label><input id="salesItemCost" type="number" min="0" placeholder="12000" title="Gharama kwa kipimo — inatumika kuhesabu faida"></div>
       <div class="field"><label>Stock ya kuanza</label><input id="salesItemStock" type="number" min="0" step="0.01" placeholder="Mfano: 20"></div>
       <div class="field"><label>Onyo chini (low stock)</label><input id="salesItemLowStock" type="number" min="0" step="0.01" placeholder="Mfano: 3"></div>
     </div>
@@ -349,6 +353,7 @@
       <div class="report-tabs" id="reportTabs">
         <button type="button" class="report-tab active" data-tab="users">Wateja</button>
         <button type="button" class="report-tab" data-tab="orders">Oda Zote</button>
+        <button type="button" class="report-tab" data-tab="profit">Faida & Hasara</button>
         <button type="button" class="report-tab" data-tab="sales">Mauzo</button>
         <button type="button" class="report-tab" data-tab="visits">Wageni</button>
       </div>
@@ -377,6 +382,19 @@
         <button class="btn btn-reset btn-sm" type="button" id="clearOrdersBtn">Futa oda</button>
       </div>
       <div id="ordersList" class="orders-list"></div>
+    </div>
+
+    <div class="report-pane" id="profitPane">
+      <div class="profit-toolbar">
+        <div class="profit-period-tabs" id="profitPeriodTabs" role="tablist">
+          <button type="button" class="profit-period-tab active" data-profit-period="today">Leo</button>
+          <button type="button" class="profit-period-tab" data-profit-period="week">Wiki 7</button>
+          <button type="button" class="profit-period-tab" data-profit-period="month">Mwezi</button>
+          <button type="button" class="profit-period-tab" data-profit-period="all">Zote</button>
+        </div>
+        <button class="btn btn-back btn-sm" type="button" id="exportProfitBtn">⬇ Pakua CSV</button>
+      </div>
+      <div id="profitReportRoot" class="profit-report-root"></div>
     </div>
 
     <div class="report-pane" id="salesPane">
@@ -551,6 +569,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="assets/js/orders-cloud.js"></script>
 <script src="assets/js/cloud-sync.js"></script>
+<script src="assets/js/smart-sync.js"></script>
 <script src="assets/js/admin.js"></script>
 </body>
 </html>

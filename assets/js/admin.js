@@ -76,6 +76,7 @@
   let cloudOrdersUnsub = null;
   let cloudSalesCache = null;
   let cloudSalesUnsub = null;
+  let cloudStorageUnsub = null;
 
   const groups = {
     'Choma': [['choma','½ KG','9,000'],['choma1','1 KG','18,000'],['choma15','1½ KG','27,000'],['choma2','2 KG','36,000']],
@@ -1070,18 +1071,7 @@
     }
   }
 
-  function showApp() {
-    initStaffAccounts();
-    initBranches();
-    migrateBranchData();
-    initStaffBranches();
-    getBranches().forEach(b => initSalesItemsForBranch(b.id));
-    applySessionBranch();
-    $('login')?.classList.add('hidden');
-    $('app')?.classList.remove('hidden');
-    applyRoleUI();
-    populateBranchSelect();
-    updateBranchBar();
+  function refreshAllFromCloudStorage() {
     render();
     renderDashboard();
     renderUsers();
@@ -1098,6 +1088,43 @@
     renderBranches();
     renderStaffManagement();
     renderSaleCart();
+    updateSellerQuickUI();
+  }
+
+  async function initCloudStorage() {
+    const sync = window.CleverCloudSync;
+    if (cloudStorageUnsub) {
+      cloudStorageUnsub();
+      cloudStorageUnsub = null;
+    }
+    if (!sync?.isEnabled()) return;
+    try {
+      await sync.syncBootstrap();
+      cloudStorageUnsub = sync.onRemoteChange(() => refreshAllFromCloudStorage());
+      updateCloudBadge();
+      return true;
+    } catch (err) {
+      console.warn('Cloud storage bootstrap failed', err);
+      return false;
+    }
+  }
+
+  async function showApp() {
+    initStaffAccounts();
+    initBranches();
+    migrateBranchData();
+    initStaffBranches();
+    getBranches().forEach(b => initSalesItemsForBranch(b.id));
+    applySessionBranch();
+    $('login')?.classList.add('hidden');
+    $('app')?.classList.remove('hidden');
+
+    await initCloudStorage();
+
+    applyRoleUI();
+    populateBranchSelect();
+    updateBranchBar();
+    refreshAllFromCloudStorage();
     populateCloudConfigForm();
   }
 
@@ -1158,6 +1185,7 @@
     if (!confirm('Toka kwenye Admin?')) return;
     window.CleverOrdersCloud?.stopSync();
     window.CleverOrdersCloud?.stopSalesSync();
+    window.CleverCloudSync?.stopSync();
     cloudOrdersCache = null;
     cloudOrdersUnsub = null;
     cloudSalesCache = null;
@@ -3477,6 +3505,136 @@
     $('visitsPane')?.classList.toggle('active', tab === 'visits');
   }
 
+  const CLOUD_MIGRATION_SQL = `-- Clever Kitimoto — run ONCE in Supabase SQL Editor
+-- Adds app_storage (menu, stock, branches, staff, visits)
+
+create table if not exists public.app_storage (
+  storage_key text primary key,
+  data jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_storage enable row level security;
+drop policy if exists "app_storage_public_read" on public.app_storage;
+drop policy if exists "app_storage_public_insert" on public.app_storage;
+drop policy if exists "app_storage_public_update" on public.app_storage;
+create policy "app_storage_public_read" on public.app_storage for select using (true);
+create policy "app_storage_public_insert" on public.app_storage for insert with check (true);
+create policy "app_storage_public_update" on public.app_storage for update using (true);
+alter table public.app_storage replica identity full;`;
+
+  function getSupabaseSqlEditorUrl() {
+    const url = window.CleverOrdersCloud?.config()?.supabaseUrl || '';
+    const m = url.match(/https:\/\/([^.]+)\.supabase\.co/);
+    if (m) return 'https://supabase.com/dashboard/project/' + m[1] + '/sql/new';
+    return 'https://supabase.com/dashboard';
+  }
+
+  async function probeCloudTable(table, testRow, idField) {
+    const c = window.CleverOrdersCloud?.config();
+    if (!c?.supabaseUrl || !c?.supabaseAnonKey) return false;
+    const base = c.supabaseUrl.replace(/\/$/, '') + '/rest/v1/' + table;
+    const headers = {
+      apikey: c.supabaseAnonKey,
+      Authorization: 'Bearer ' + c.supabaseAnonKey,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal'
+    };
+    const testId = testRow[idField];
+    try {
+      const ins = await fetch(base, { method: 'POST', headers, body: JSON.stringify(testRow) });
+      if (ins.status === 201) {
+        await fetch(base + '?' + idField + '=eq.' + encodeURIComponent(testId), {
+          method: 'DELETE', headers: { apikey: c.supabaseAnonKey, Authorization: 'Bearer ' + c.supabaseAnonKey }
+        });
+        return true;
+      }
+      if (ins.status === 404) return false;
+      return ins.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function checkCloudTables() {
+    const ts = Date.now();
+    const orders = await probeCloudTable('orders', {
+      id: 'probe-order-' + ts, channel: 'test', subtotal: 0, items: [], status: 'test'
+    }, 'id');
+    const sales = await probeCloudTable('sales', {
+      id: 'probe-sale-' + ts, item_name: 'test', total: 0, branch_id: 'test'
+    }, 'id');
+    const appStorage = await probeCloudTable('app_storage', {
+      storage_key: 'probe-storage-' + ts,
+      data: { ok: true },
+      updated_at: new Date().toISOString()
+    }, 'storage_key');
+    return { orders, sales, appStorage };
+  }
+
+  function renderCloudTableStatus(tables) {
+    const wrap = $('cloudTableStatus');
+    const chips = $('cloudTableChips');
+    const migBox = $('cloudMigrationBox');
+    const sqlTa = $('cloudMigrationSql');
+    const sqlLink = $('cloudSqlEditorLink');
+    if (!wrap || !chips) return;
+
+    if (!tables) {
+      wrap.classList.add('hidden');
+      migBox?.classList.add('hidden');
+      return;
+    }
+
+    wrap.classList.remove('hidden');
+    const rows = [
+      { key: 'orders', label: 'Oda (orders)', ok: tables.orders },
+      { key: 'sales', label: 'Mauzo POS (sales)', ok: tables.sales },
+      { key: 'app_storage', label: 'Menu/Stock/Matawi (app_storage)', ok: tables.appStorage }
+    ];
+    chips.innerHTML = rows.map(r => `
+      <span class="cloud-table-chip${r.ok ? ' ok' : ' missing'}">${r.ok ? '✓' : '✗'} ${escapeHtml(r.label)}</span>
+    `).join('');
+
+    if (sqlTa && !sqlTa.value) sqlTa.value = CLOUD_MIGRATION_SQL;
+    if (sqlLink) sqlLink.href = getSupabaseSqlEditorUrl();
+
+    if (!tables.appStorage) {
+      migBox?.classList.remove('hidden');
+    } else {
+      migBox?.classList.add('hidden');
+    }
+  }
+
+  async function refreshCloudTableStatus() {
+    const cloud = window.CleverOrdersCloud;
+    if (!cloud?.isEnabled()) {
+      renderCloudTableStatus(null);
+      return;
+    }
+    try {
+      const tables = await checkCloudTables();
+      renderCloudTableStatus(tables);
+      if (!tables.appStorage) {
+        const text = $('cloudStatusText');
+        if (text && cloud.isConnected()) {
+          text.textContent = 'Imeunganishwa kwa oda/mauzo — lakini app_storage haipo. Run SQL hapa chini ili menu & stock zisave online.';
+        }
+      }
+    } catch (err) {
+      console.warn('Cloud table check failed', err);
+    }
+  }
+
+  function copyCloudMigrationSql() {
+    const sql = $('cloudMigrationSql')?.value || CLOUD_MIGRATION_SQL;
+    navigator.clipboard?.writeText(sql).then(() => {
+      showAdminToast('✓ SQL imenakiliwa — bandika kwenye Supabase SQL Editor → Run');
+    }).catch(() => {
+      $('cloudMigrationSql')?.select();
+      showAdminToast('Nakili manually kutoka kisanduku cha SQL.', 'warn');
+    });
+  }
+
   function renderCloudStatus() {
     const text = $('cloudStatusText');
     const pill = $('cloudStatusPill');
@@ -3489,8 +3647,8 @@
       return;
     }
     if (cloud.isConnected()) {
-      text.textContent = 'Imeunganishwa! Oda na mauzo ya POS (Smart POS) zinaingia Supabase mtandaoni.';
-      pill.textContent = '☁️ Live — Imefunguka';
+      text.textContent = 'Imeunganishwa! Data yote (menu, stock, mauzo, oda, wafanyakazi) inahifadhiwa Supabase mtandaoni.';
+      pill.textContent = '☁️ Live — Data Online';
       pill.className = 'cloud-status-pill cloud-status-live';
     } else {
       text.textContent = 'Config ipo lakini muunganisho umeshindwa — angalia URL, anon key, na schema.sql.';
@@ -3504,7 +3662,10 @@
     if ($('cloudEnabled')) $('cloudEnabled').checked = !!c.enabled;
     if ($('cloudSupabaseUrl')) $('cloudSupabaseUrl').value = c.supabaseUrl || '';
     if ($('cloudSupabaseKey')) $('cloudSupabaseKey').value = c.supabaseAnonKey || '';
+    if ($('cloudMigrationSql')) $('cloudMigrationSql').value = CLOUD_MIGRATION_SQL;
+    if ($('cloudSqlEditorLink')) $('cloudSqlEditorLink').href = getSupabaseSqlEditorUrl();
     renderCloudStatus();
+    refreshCloudTableStatus();
   }
 
   function readCloudConfigForm() {
@@ -3540,11 +3701,24 @@
     window.CleverOrdersCloud.saveConfig(cfg);
     try {
       await window.CleverOrdersCloud.testConnection();
+      if (window.CleverCloudSync?.isEnabled()) {
+        await window.CleverCloudSync.testConnection();
+      }
       initCloudOrders();
+      await initCloudStorage();
+      if (window.CleverCloudSync?.isEnabled()) {
+        await window.CleverCloudSync.pushAllLocal();
+      }
       populateCloudConfigForm();
-      showAdminToast('✓ Muunganisho umefanikiwa — mauzo ya POS yatasave Supabase');
+      const tables = await checkCloudTables();
+      if (!tables.appStorage) {
+        showAdminToast('Oda & mauzo OK — run SQL ya app_storage (Zana) ili menu/stock zisave online', 'warn');
+      } else {
+        showAdminToast('✓ Muunganisho kamili — data YOTE itahifadhiwa online');
+      }
     } catch (e) {
       renderCloudStatus();
+      await refreshCloudTableStatus();
       showAdminToast('Imeshindwa: ' + (e.message || 'run supabase/schema.sql kwanza'), 'warn');
     }
   }
@@ -3568,7 +3742,7 @@
     const on = cloud?.isEnabled() && cloud?.isConnected();
     badge.classList.toggle('hidden', !on);
     badge.classList.toggle('cloud-badge-live', on);
-    badge.title = on ? 'Oda na mauzo ya POS zinahifadhiwa mtandaoni' : '';
+    badge.title = on ? 'Data yote inahifadhiwa mtandaoni (oda, mauzo, stock, menu)' : '';
     renderCloudStatus();
   }
 
@@ -3786,6 +3960,61 @@
     return Object.keys(localStorage).filter(k => k.startsWith(BACKUP_PREFIX));
   }
 
+  const LOCAL_KEEP_KEYS = new Set([
+    'cleverKitimotoCloudConfigV1'
+  ]);
+
+  async function clearLocalAppData() {
+    if (!hasPerm('backup')) return;
+    if (!confirm('Futa data yote ya simu (localStorage)?\n\nHii haifuti Supabase — data mtandaoni inabaki.\nEndelea?')) return;
+    if (!confirm('Uhakika? Backup ipo? Hatua hii haiwezi rudishwa kwa urahisi.')) return;
+
+    const kept = {};
+    LOCAL_KEEP_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v != null) kept[k] = v;
+    });
+
+    getAllBackupKeys().forEach(k => {
+      if (!LOCAL_KEEP_KEYS.has(k)) localStorage.removeItem(k);
+    });
+
+    Object.entries(kept).forEach(([k, v]) => localStorage.setItem(k, v));
+
+    saleCart = [];
+    cloudOrdersCache = null;
+    cloudSalesCache = null;
+    userFilter = 'all';
+    userQuery = '';
+
+    if (window.CleverCloudSync?.isEnabled()) {
+      try {
+        await window.CleverCloudSync.syncBootstrap();
+        showAdminToast('✓ Local imefutwa — data imerudishwa kutoka Supabase');
+      } catch (err) {
+        showAdminToast('Local imefutwa lakini cloud pull imeshindwa: ' + (err.message || ''), 'warn');
+        initStaffAccounts();
+        initBranches();
+        migrateBranchData();
+        initStaffBranches();
+        getBranches().forEach(b => initSalesItemsForBranch(b.id));
+      }
+    } else {
+      initStaffAccounts();
+      initBranches();
+      migrateBranchData();
+      initStaffBranches();
+      getBranches().forEach(b => initSalesItemsForBranch(b.id));
+      showAdminToast('✓ Data ya simu imefutwa — defaults zimerudishwa');
+    }
+
+    applySessionBranch();
+    initCloudOrders();
+    await initCloudStorage();
+    refreshAllFromCloudStorage();
+    populateCloudConfigForm();
+  }
+
   function exportBackup() {
     if (!hasPerm('backup')) return;
     const data = {
@@ -3984,6 +4213,7 @@
     $('printReportBtn')?.addEventListener('click', printReport);
     $('printEodBtn')?.addEventListener('click', printEodReport);
     $('exportBackupBtn')?.addEventListener('click', exportBackup);
+    $('clearLocalDataBtn')?.addEventListener('click', clearLocalAppData);
     $('importBackupInput')?.addEventListener('change', e => {
       const file = e.target.files?.[0];
       if (file) importBackupFile(file);
@@ -3992,6 +4222,7 @@
     $('saveCloudConfigBtn')?.addEventListener('click', saveCloudConfigFromAdmin);
     $('testCloudConfigBtn')?.addEventListener('click', testCloudConfigFromAdmin);
     $('downloadCloudConfigBtn')?.addEventListener('click', downloadCloudConfigFile);
+    $('copyCloudMigrationBtn')?.addEventListener('click', copyCloudMigrationSql);
     $('addToSaleCartBtn')?.addEventListener('click', addToSaleCart);
     $('recordSaleCartBtn')?.addEventListener('click', recordSaleCart);
     $('clearSaleCartBtn')?.addEventListener('click', clearSaleCart);

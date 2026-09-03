@@ -1,37 +1,8 @@
--- Clever Kitimoto — run once in Supabase → SQL Editor → Run
--- https://supabase.com/dashboard → your project → SQL Editor
+-- Clever Kitimoto — run ONCE in Supabase SQL Editor (safe to re-run)
+-- Adds: sales + app_storage (menu, stock, branches, staff, visits...)
+-- https://supabase.com/dashboard → SQL Editor → New query → Run
 
-create table if not exists public.orders (
-  id text primary key,
-  at timestamptz not null default now(),
-  channel text,
-  phone text,
-  address text,
-  notes text,
-  fulfillment text,
-  payment text,
-  subtotal numeric default 0,
-  items jsonb default '[]'::jsonb,
-  status text default 'pending',
-  status_at timestamptz,
-  status_by text,
-  created_at timestamptz default now()
-);
-
-alter table public.orders enable row level security;
-
-drop policy if exists "orders_public_read" on public.orders;
-drop policy if exists "orders_public_insert" on public.orders;
-drop policy if exists "orders_public_update" on public.orders;
-
-create policy "orders_public_read" on public.orders for select using (true);
-create policy "orders_public_insert" on public.orders for insert with check (true);
-create policy "orders_public_update" on public.orders for update using (true);
-
--- Realtime (admin sees new orders instantly)
-alter table public.orders replica identity full;
-
--- POS / in-store sales (Smart POS — run sales-migration.sql if table missing)
+-- ── POS sales ──────────────────────────────────────────────
 create table if not exists public.sales (
   id text primary key,
   receipt_id text,
@@ -52,34 +23,26 @@ create table if not exists public.sales (
   stock_after numeric,
   created_at timestamptz default now()
 );
-
 alter table public.sales enable row level security;
-
 drop policy if exists "sales_public_read" on public.sales;
 drop policy if exists "sales_public_insert" on public.sales;
 drop policy if exists "sales_public_update" on public.sales;
-
 create policy "sales_public_read" on public.sales for select using (true);
 create policy "sales_public_insert" on public.sales for insert with check (true);
 create policy "sales_public_update" on public.sales for update using (true);
-
 alter table public.sales replica identity full;
 
--- All app data (menu, stock, branches, staff, visits, sales items...) — key/value sync
+-- ── App storage (menu, stock, branches, staff, visits) ─────
 create table if not exists public.app_storage (
   storage_key text primary key,
   data jsonb,
   updated_at timestamptz not null default now()
 );
-
 alter table public.app_storage enable row level security;
-
 drop policy if exists "app_storage_public_read" on public.app_storage;
 drop policy if exists "app_storage_public_insert" on public.app_storage;
 drop policy if exists "app_storage_public_update" on public.app_storage;
-
 create policy "app_storage_public_read" on public.app_storage for select using (true);
 create policy "app_storage_public_insert" on public.app_storage for insert with check (true);
 create policy "app_storage_public_update" on public.app_storage for update using (true);
-
 alter table public.app_storage replica identity full;

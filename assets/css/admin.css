@@ -2604,6 +2604,70 @@ body {
 .cloud-status-off { background: #f8f9fa; color: #6c757d; }
 .cloud-status-warn { background: #fff3cd; color: #856404; }
 
+.cloud-table-status {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-strong);
+}
+.cloud-table-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.cloud-table-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cloud-table-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+}
+.cloud-table-chip.ok {
+  border-color: #28a745;
+  background: #d4edda;
+  color: #155724;
+}
+.cloud-table-chip.missing {
+  border-color: #dc3545;
+  background: #f8d7da;
+  color: #721c24;
+}
+.cloud-migration-box {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff8e7;
+  border: 2px solid rgba(122, 21, 21, 0.25);
+}
+.cloud-migration-title {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--maroon);
+}
+.cloud-migration-sql {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  font-family: ui-monospace, monospace;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 160px;
+  background: #fff;
+  color: var(--ink);
+}
+
 @media (max-width: 960px) {
   .dash-kpi-grid { grid-template-columns: 1fr 1fr; }
   .dash-main-grid,

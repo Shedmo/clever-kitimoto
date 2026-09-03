@@ -1417,7 +1417,22 @@
 
   window.CK = { getPrices, formatPrice, applyPrices, waLink, smsLink, openSms, openWhatsApp, getOrderMessage, openOrderPanel };
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (window.CleverCloudSync?.isEnabled()) {
+      try {
+        await window.CleverCloudSync.syncBootstrap();
+        window.CleverCloudSync.onRemoteChange(() => {
+          applyPrices();
+          renderCustomMenus();
+          renderPopularPicks();
+          renderHalfKgQuickOrder();
+          renderKisiniaQuickOrder();
+          renderKisiniaSmartPicker();
+        });
+      } catch (err) {
+        console.warn('Menu cloud sync failed', err);
+      }
+    }
     trackVisit();
     applyPrices();
     bindCartEvents();

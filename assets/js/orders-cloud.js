@@ -3,8 +3,10 @@
 
   const CONFIG_KEY = 'cleverKitimotoCloudConfigV1';
   const TABLE = 'orders';
+  const SALES_TABLE = 'sales';
   let client = null;
   let unsubscribe = null;
+  let salesUnsubscribe = null;
   let connected = false;
 
   function fileConfig() {
@@ -45,6 +47,7 @@
 
   function resetCloud() {
     stopSync();
+    stopSalesSync();
     client = null;
     connected = false;
   }
@@ -135,6 +138,84 @@
     if (error) throw error;
   }
 
+  function toSaleRow(sale) {
+    return {
+      id: sale.id,
+      receipt_id: sale.receiptId || null,
+      at: sale.at || new Date().toISOString(),
+      item_id: sale.itemId || '',
+      item_name: sale.itemName || '',
+      category: sale.category || '',
+      qty: Number(sale.qty) || 0,
+      unit: sale.unit || '',
+      unit_price: Number(sale.unitPrice) || 0,
+      total: Number(sale.total) || 0,
+      payment: sale.payment || '',
+      phone: sale.phone || '',
+      notes: sale.notes || '',
+      seller: sale.seller || '',
+      branch_id: sale.branchId || '',
+      branch_name: sale.branchName || '',
+      stock_after: sale.stockAfter != null ? Number(sale.stockAfter) : null
+    };
+  }
+
+  function fromSaleRow(row) {
+    return {
+      id: row.id,
+      receiptId: row.receipt_id,
+      at: row.at,
+      itemId: row.item_id,
+      itemName: row.item_name,
+      category: row.category,
+      qty: Number(row.qty) || 0,
+      unit: row.unit,
+      unitPrice: Number(row.unit_price) || 0,
+      total: Number(row.total) || 0,
+      payment: row.payment,
+      phone: row.phone,
+      notes: row.notes,
+      seller: row.seller,
+      branchId: row.branch_id,
+      branchName: row.branch_name,
+      stockAfter: row.stock_after
+    };
+  }
+
+  async function fetchSales(branchId) {
+    if (!init()) throw new Error('Cloud not ready');
+    let query = client
+      .from(SALES_TABLE)
+      .select('*')
+      .order('at', { ascending: false })
+      .limit(500);
+    if (branchId) query = query.eq('branch_id', branchId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map(fromSaleRow);
+  }
+
+  async function saveSale(sale) {
+    if (!init()) throw new Error('Cloud not configured');
+    const { error } = await client.from(SALES_TABLE).upsert(toSaleRow(sale));
+    if (error) throw saleSaveError(error);
+  }
+
+  async function saveSales(sales) {
+    if (!init()) throw new Error('Cloud not configured');
+    const rows = (sales || []).map(toSaleRow);
+    if (!rows.length) return;
+    const { error } = await client.from(SALES_TABLE).upsert(rows);
+    if (error) throw saleSaveError(error);
+  }
+
+  function saleSaveError(error) {
+    if (error.code === 'PGRST205' || /could not find the table/i.test(error.message || '')) {
+      return new Error('Jedwali sales halipo — run supabase/sales-migration.sql kwenye Supabase SQL Editor');
+    }
+    return error;
+  }
+
   async function testConnection() {
     if (!init()) throw new Error('Supabase haijasanidi vizuri');
     const testId = 'test-' + Date.now();
@@ -153,6 +234,23 @@
       throw insErr;
     }
     await client.from(TABLE).delete().eq('id', testId);
+
+    const saleTestId = 'test-sale-' + Date.now();
+    const { error: saleErr } = await client.from(SALES_TABLE).insert({
+      id: saleTestId,
+      at: new Date().toISOString(),
+      item_name: 'test',
+      total: 0,
+      branch_id: 'test'
+    });
+    if (saleErr) {
+      if (saleErr.code === 'PGRST205' || /could not find the table/i.test(saleErr.message || '')) {
+        throw new Error('Jedwali sales halipo — run supabase/sales-migration.sql kwenye Supabase SQL Editor');
+      }
+      throw saleErr;
+    }
+    await client.from(SALES_TABLE).delete().eq('id', saleTestId);
+
     connected = true;
     return true;
   }
@@ -196,6 +294,45 @@
     }
   }
 
+  function subscribeSales(branchId, callback) {
+    if (!init()) return () => {};
+    if (salesUnsubscribe) salesUnsubscribe();
+
+    fetchSales(branchId)
+      .then(sales => {
+        connected = true;
+        callback(sales);
+      })
+      .catch(err => {
+        console.error('Sales fetch error', err);
+        connected = false;
+      });
+
+    const channel = client
+      .channel('clever-kitimoto-sales-' + (branchId || 'all'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: SALES_TABLE }, () => {
+        fetchSales(branchId)
+          .then(sales => callback(sales))
+          .catch(err => console.error('Sales sync error', err));
+      })
+      .subscribe(status => {
+        connected = status === 'SUBSCRIBED';
+      });
+
+    salesUnsubscribe = () => {
+      client.removeChannel(channel);
+      salesUnsubscribe = null;
+    };
+    return salesUnsubscribe;
+  }
+
+  function stopSalesSync() {
+    if (salesUnsubscribe) {
+      salesUnsubscribe();
+      salesUnsubscribe = null;
+    }
+  }
+
   window.CleverOrdersCloud = {
     CONFIG_KEY,
     config,
@@ -206,9 +343,14 @@
     init,
     saveOrder,
     updateOrder,
+    saveSale,
+    saveSales,
+    fetchSales,
     testConnection,
     subscribeOrders,
+    subscribeSales,
     stopSync,
+    stopSalesSync,
     resetCloud
   };
 })();

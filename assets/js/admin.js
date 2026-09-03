@@ -74,6 +74,8 @@
   let currentAdminView = 'dashboardPanel';
   let cloudOrdersCache = null;
   let cloudOrdersUnsub = null;
+  let cloudSalesCache = null;
+  let cloudSalesUnsub = null;
 
   const groups = {
     'Choma': [['choma','½ KG','9,000'],['choma1','1 KG','18,000'],['choma15','1½ KG','27,000'],['choma2','2 KG','36,000']],
@@ -336,6 +338,7 @@
     renderStock();
     renderPosUI();
     renderBranches();
+    initCloudSales();
   }
 
   function populateBranchSelect() {
@@ -1154,8 +1157,11 @@
   function logout() {
     if (!confirm('Toka kwenye Admin?')) return;
     window.CleverOrdersCloud?.stopSync();
+    window.CleverOrdersCloud?.stopSalesSync();
     cloudOrdersCache = null;
     cloudOrdersUnsub = null;
+    cloudSalesCache = null;
+    cloudSalesUnsub = null;
     clearSession();
     showLogin();
     $('password').value = '';
@@ -1577,13 +1583,46 @@
     });
   }
 
+  function mergeSalesLogs(local, cloud) {
+    const byId = {};
+    (local || []).forEach(s => { if (s?.id) byId[s.id] = s; });
+    (cloud || []).forEach(s => { if (s?.id) byId[s.id] = s; });
+    return Object.values(byId).sort((a, b) => new Date(b.at) - new Date(a.at));
+  }
+
   function getSalesLog() {
     try {
       const saved = loadBranchData(SALES_LOG_KEY, '[]');
-      return Array.isArray(saved) ? saved : [];
+      const local = Array.isArray(saved) ? saved : [];
+      if (cloudSalesCache && window.CleverOrdersCloud?.isEnabled()) {
+        return mergeSalesLogs(local, cloudSalesCache);
+      }
+      return local;
     } catch {
       return [];
     }
+  }
+
+  function syncSaleToCloud(sale) {
+    const cloud = window.CleverOrdersCloud;
+    if (!cloud?.isEnabled() || !sale) return;
+    cloud.saveSale(sale)
+      .then(() => updateCloudBadge())
+      .catch(err => {
+        console.warn('POS cloud save failed', err);
+        showAdminToast('Mauzo yamehifadhiwa kwa simu, lakini Supabase imeshindwa. Run sales-migration.sql', 'warn');
+      });
+  }
+
+  function syncSalesToCloud(sales) {
+    const cloud = window.CleverOrdersCloud;
+    if (!cloud?.isEnabled() || !sales?.length) return;
+    cloud.saveSales(sales)
+      .then(() => updateCloudBadge())
+      .catch(err => {
+        console.warn('POS cloud batch save failed', err);
+        showAdminToast('Risiti imehifadhiwa kwa simu, lakini Supabase imeshindwa. Run sales-migration.sql', 'warn');
+      });
   }
 
   function addSalesItem() {
@@ -2248,6 +2287,7 @@
     }
 
     const lineCount = saleCart.length;
+    const newSales = [];
     saleCart.forEach(line => {
       const sale = {
         id: 'sale-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
@@ -2268,6 +2308,7 @@
         branchName: branch?.name || ''
       };
       log.unshift(sale);
+      newSales.push(sale);
       grandTotal += line.total;
       if (line.trackStock !== false) {
         updateItemStock(line.itemId, -line.qty, 'sale', 'Mauzo (risiti)', sale.id);
@@ -2275,6 +2316,7 @@
     });
     if (log.length > 500) log.length = 500;
     saveBranchData(SALES_LOG_KEY, log);
+    syncSalesToCloud(newSales);
 
     saleCart = [];
     ['salePhone', 'saleNotes'].forEach(id => { if ($(id)) $(id).value = ''; });
@@ -2351,6 +2393,8 @@
       stockAfter = updateItemStock(item.id, -qty, 'sale', 'Mauzo', sale.id);
     }
     sale.stockAfter = stockAfter ? stockAfter.stock : null;
+
+    syncSaleToCloud(sale);
 
     ['saleQty', 'saleTotal', 'salePhone', 'saleNotes'].forEach(id => {
       if ($(id)) {
@@ -2541,7 +2585,7 @@
           <span class="ssd-check">✓</span>
         </div>
         <h3 class="ssd-title" id="adminDialogTitle">Mauzo Yamerekodiwa!</h3>
-        <p class="ssd-sub">Imehifadhiwa kwa mafanikio · ${escapeHtml(formatOrderDate(sale.at))}${sale.branchName ? ' · ' + escapeHtml(sale.branchName) : ''}</p>
+        <p class="ssd-sub">Imehifadhiwa kwa mafanikio · ${escapeHtml(formatOrderDate(sale.at))}${sale.branchName ? ' · ' + escapeHtml(sale.branchName) : ''}${window.CleverOrdersCloud?.isEnabled() ? ' · ☁️ Mtandaoni' : ''}</p>
         <div class="ssd-card">
           <div class="ssd-item-head">
             <span class="ssd-cat">${escapeHtml(sale.category || 'Bidhaa')}</span>
@@ -3434,7 +3478,7 @@
       return;
     }
     if (cloud.isConnected()) {
-      text.textContent = 'Imeunganishwa! Oda zinaingia Supabase mtandaoni. Pakia cloud-config.js kwenye GitHub ili wateja wahifadhi online pia.';
+      text.textContent = 'Imeunganishwa! Oda na mauzo ya POS (Smart POS) zinaingia Supabase mtandaoni.';
       pill.textContent = '☁️ Live — Imefunguka';
       pill.className = 'cloud-status-pill cloud-status-live';
     } else {
@@ -3513,8 +3557,29 @@
     const on = cloud?.isEnabled() && cloud?.isConnected();
     badge.classList.toggle('hidden', !on);
     badge.classList.toggle('cloud-badge-live', on);
-    badge.title = on ? 'Oda zinapokelewa mtandaoni kwa muda halisi' : '';
+    badge.title = on ? 'Oda na mauzo ya POS zinahifadhiwa mtandaoni' : '';
     renderCloudStatus();
+  }
+
+  function initCloudSales() {
+    const cloud = window.CleverOrdersCloud;
+    if (cloudSalesUnsub) {
+      cloudSalesUnsub();
+      cloudSalesUnsub = null;
+    }
+    if (!cloud?.isEnabled()) {
+      cloudSalesCache = null;
+      return;
+    }
+    const branchId = getCurrentBranchId();
+    cloudSalesUnsub = cloud.subscribeSales(branchId, sales => {
+      cloudSalesCache = sales;
+      updateCloudBadge();
+      renderSales();
+      renderDashboard();
+      updateSellerQuickUI();
+      renderPosUI();
+    });
   }
 
   function initCloudOrders() {
@@ -3525,6 +3590,7 @@
     }
     if (!cloud?.isEnabled()) {
       cloudOrdersCache = null;
+      cloudSalesCache = null;
       updateCloudBadge();
       renderCloudStatus();
       return;
@@ -3537,6 +3603,7 @@
       renderDashboard();
       renderUsers();
     });
+    initCloudSales();
     updateCloudBadge();
   }
 

@@ -54,7 +54,7 @@
         <img class="brand-logo" src="assets/logo.png" alt="Clever Kitimoto">
         <div>
           <div class="brand">Clever <span>Kitimoto</span></div>
-          <div class="brand-sub">Admin Panel · <span class="session-badge" id="sessionBadge">🔓 Imefunguliwa</span> <span id="roleBadge" class="role-badge"></span></div>
+          <div class="brand-sub">Admin Panel · <span class="session-badge" id="sessionBadge">🔓 Imefunguliwa</span> <span id="cloudBadge" class="cloud-badge hidden" title="Oda zinahifadhiwa mtandaoni">☁️ Live</span> <span id="roleBadge" class="role-badge"></span></div>
         </div>
       </div>
       <div class="actions">
@@ -195,13 +195,24 @@
     <div id="dashboardRoot" class="dashboard-root"></div>
   </section>
 
-  <section class="panel sales-panel admin-view hidden" id="salesPanel" data-view-title="Mauzo" data-view-sub="Rekodi mauzo ya nyama kwa tawi">
+  <section class="panel sales-panel admin-view hidden" id="salesPanel" data-view-title="Smart POS" data-view-sub="Mauzo, risiti, na stock — mfumo mmoja wa haraka">
     <div class="panel-head-row seller-panel-head">
       <div>
-        <h2 id="salesPanelTitle">🥩 Mauzo ya Nyama</h2>
-        <p class="panel-note panel-note-tight" id="salesPanelNote">Rekodi mauzo kwa tawi lililochaguliwa — chagua bidhaa, kiasi, na malipo</p>
+        <h2 id="salesPanelTitle">⚡ Smart POS</h2>
+        <p class="panel-note panel-note-tight" id="salesPanelNote">Chagua bidhaa, ongeza kwenye risiti, rekodi malipo — stock hupungua otomatiki</p>
       </div>
     </div>
+    <div class="pos-smart-tabs" id="posSmartTabs" role="tablist">
+      <button type="button" class="pos-tab active" data-pos-tab="sell" role="tab" aria-selected="true">🛒 Uza</button>
+      <button type="button" class="pos-tab" data-pos-tab="receipts" role="tab" aria-selected="false">🧾 Risiti Leo</button>
+    </div>
+    <div class="pos-pane pos-pane-sell" id="posPaneSell">
+    <div class="pos-smart-toolbar">
+      <input type="search" id="posSearch" class="pos-search" placeholder="🔍 Tafuta bidhaa..." autocomplete="off" enterkeyhint="search">
+      <div class="pos-cat-chips" id="posCatChips"></div>
+    </div>
+    <div class="pos-smart-suggestions hidden" id="posSmartSuggestions"></div>
+    <div class="pos-product-grid" id="posProductGrid"></div>
     <div class="sales-record-grid" id="salesRecordGrid">
       <div class="field field-product">
         <label>Bidhaa</label>
@@ -255,9 +266,27 @@
         <button class="btn btn-save" type="button" id="recordSaleCartBtn">✓ Rekodi Risiti</button>
       </div>
     </div>
+    <div class="pos-cash-change hidden" id="posCashChange">
+      <div class="field">
+        <label>Mteja analipa (TSH)</label>
+        <input id="posCashPaid" type="number" min="0" step="100" placeholder="Weka kiasi alichotoa" inputmode="numeric">
+      </div>
+      <div class="pos-change-due">
+        <span>Rudisha mteja</span>
+        <strong id="posChangeDue">—</strong>
+      </div>
+    </div>
     <div class="actions seller-record-actions">
-      <button class="btn btn-back seller-add-cart-btn hidden" type="button" id="addToSaleCartBtn">+ Ongeza kwenye Risiti</button>
+      <button class="btn btn-back seller-add-cart-btn" type="button" id="addToSaleCartBtn">+ Ongeza kwenye Risiti</button>
       <button class="btn btn-save seller-record-btn" type="button" id="recordSaleBtn">✓ Rekodi Mauzo</button>
+    </div>
+    </div><!-- /.pos-pane-sell -->
+    <div class="pos-pane pos-pane-receipts hidden" id="posPaneReceipts">
+      <div class="pos-receipts-head">
+        <p class="panel-note panel-note-tight">Risiti zote za leo — bonyeza kuchapisha tena</p>
+        <button type="button" class="btn btn-back btn-sm" id="posRefreshReceiptsBtn">↻ Sasisha</button>
+      </div>
+      <div id="posReceiptsList" class="pos-receipts-list"></div>
     </div>
   </section>
 
@@ -290,6 +319,7 @@
     </div>
     <div class="actions" style="margin-top:14px">
       <button class="btn btn-save" type="button" id="addSalesItemBtn">➕ Ongeza Bidhaa</button>
+      <button class="btn btn-back" type="button" id="syncMenuToPosBtn">🔄 Linganisha bei kutoka Menu</button>
     </div>
     <div id="salesItemsList" class="sales-items-list"></div>
   </section>
@@ -432,6 +462,25 @@
       </div>
     </div>
     <div class="tools-grid">
+      <article class="tools-card tools-card-wide" id="cloudSetupCard">
+        <h3>☁️ Unganisha Supabase — Oda za Mtandaoni</h3>
+        <p class="panel-note panel-note-tight">Database rahisi — URL + Anon Key tu. <a href="https://supabase.com/dashboard" target="_blank" rel="noopener">supabase.com</a> → project → SQL Editor → run <code>supabase/schema.sql</code></p>
+        <div class="cloud-setup-grid">
+          <label class="field cloud-enable-field">
+            <input type="checkbox" id="cloudEnabled"> Wezesha oda za mtandaoni
+          </label>
+          <div class="field full"><label>Supabase Project URL</label><input id="cloudSupabaseUrl" autocomplete="off" placeholder="https://xxxxx.supabase.co"></div>
+          <div class="field full"><label>Supabase Anon Key (public)</label><input id="cloudSupabaseKey" autocomplete="off" placeholder="eyJhbGciOiJIUzI1NiIs..."></div>
+        </div>
+        <div class="actions cloud-setup-actions">
+          <button class="btn btn-save btn-sm" type="button" id="saveCloudConfigBtn">💾 Hifadhi & Unganisha</button>
+          <button class="btn btn-back btn-sm" type="button" id="testCloudConfigBtn">🔌 Jaribu Muunganisho</button>
+          <button class="btn btn-back btn-sm" type="button" id="downloadCloudConfigBtn">⬇ Pakua cloud-config.js</button>
+          <a class="btn btn-back btn-sm" href="https://supabase.com/dashboard" target="_blank" rel="noopener">Supabase Dashboard ↗</a>
+        </div>
+        <p id="cloudStatusText" class="cloud-setup-status">Haijaunganishwa bado.</p>
+        <div class="cloud-status-pill cloud-status-off" id="cloudStatusPill">Offline</div>
+      </article>
       <article class="tools-card">
         <h3>💾 Chelezo Data (Backup)</h3>
         <p>Pakua nakala kamili ya mauzo, stock, oda, matawi, na wafanyakazi.</p>
@@ -455,8 +504,11 @@
   <nav class="admin-mobile-nav hidden" id="adminMobileNav" aria-label="Menyu ya simu"></nav>
 
   <nav class="seller-quick-bar hidden" id="sellerQuickBar" aria-label="Mauzo haraka">
-    <button type="button" class="seller-tab active" data-seller-tab="salesPanel">
-      <span>🥩</span><small>Mauzo</small>
+    <button type="button" class="seller-tab active" data-seller-tab="salesPanel" data-pos-tab="sell">
+      <span>🛒</span><small>Uza</small>
+    </button>
+    <button type="button" class="seller-tab" data-seller-tab="salesPanel" data-pos-tab="receipts">
+      <span>🧾</span><small>Risiti</small>
     </button>
     <button type="button" class="seller-tab" data-seller-tab="stockPanel">
       <span>📦</span><small>Stock</small>
@@ -476,6 +528,9 @@
 </div>
 <div class="admin-toast" id="adminToast" aria-live="polite"></div>
 
+<script src="assets/js/cloud-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/orders-cloud.js"></script>
 <script src="assets/js/admin.js"></script>
 </body>
 </html>

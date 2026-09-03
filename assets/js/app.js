@@ -377,6 +377,13 @@
     if (history.length > 200) history.length = 200;
     localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history));
     renderMyHistory();
+
+    if (window.CleverOrdersCloud?.isEnabled()) {
+      window.CleverOrdersCloud.saveOrder(record).catch(err => {
+        console.warn('Online order save failed', err);
+      });
+    }
+
     return record;
   }
 
@@ -1032,7 +1039,11 @@
     const msg = buildCartMessage();
     if (channel === 'sms') openSms(msg);
     else openWhatsApp(msg);
-    showToast('Oda imetumwa — asante!');
+    if (window.CleverOrdersCloud?.isEnabled()) {
+      showToast('Oda imetumwa na imehifadhiwa mtandaoni ✓');
+    } else {
+      showToast('Oda imetumwa — asante!');
+    }
   }
 
   function renderPopularPicks() {

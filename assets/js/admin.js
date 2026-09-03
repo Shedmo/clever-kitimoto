@@ -39,6 +39,9 @@
   let userFilter = 'all';
   let userQuery = '';
   let saleCart = [];
+  let posActiveTab = 'sell';
+  let posCatFilter = 'all';
+  let posSearchQuery = '';
 
   const ORDER_STATUSES = ['pending', 'preparing', 'ready', 'delivered', 'cancelled'];
   const ORDER_STATUS_LABELS = {
@@ -58,7 +61,7 @@
 
   const ADMIN_VIEWS = [
     { id: 'dashboardPanel', label: 'Dashboard', icon: '📊', perm: 'dashboard' },
-    { id: 'salesPanel', label: 'Mauzo', icon: '🥩', perm: 'sales' },
+    { id: 'salesPanel', label: 'Smart POS', icon: '⚡', perm: 'sales' },
     { id: 'stockPanel', label: 'Stock', icon: '📦', permAny: ['stock_add', 'stock_view'] },
     { id: 'reportsPanel', label: 'Ripoti', icon: '📋', perm: 'reports' },
     { id: 'salesItemsSection', label: 'Bidhaa', icon: '🏷️', perm: 'sales_items' },
@@ -69,6 +72,8 @@
   ];
 
   let currentAdminView = 'dashboardPanel';
+  let cloudOrdersCache = null;
+  let cloudOrdersUnsub = null;
 
   const groups = {
     'Choma': [['choma','½ KG','9,000'],['choma1','1 KG','18,000'],['choma15','1½ KG','27,000'],['choma2','2 KG','36,000']],
@@ -329,6 +334,7 @@
     populateSaleItemSelect();
     renderSalesItems();
     renderStock();
+    renderPosUI();
     renderBranches();
   }
 
@@ -763,6 +769,7 @@
     document.querySelectorAll('.seller-pay-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.pay === pay);
     });
+    updatePosCashChange();
   }
 
   function canAccessView(view) {
@@ -833,7 +840,9 @@
     });
 
     if (target === 'stockPanel') renderStock();
+    if (target === 'salesPanel') renderPosUI();
     if (target === 'reportsPanel') renderOrders();
+    if (target === 'toolsPanel') populateCloudConfigForm();
     if (!opts.silent) {
       $('adminMain')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -885,7 +894,7 @@
     }
   }
 
-  function switchSellerTab(tabId) {
+  function switchSellerTab(tabId, opts = {}) {
     if (!isSellerQuick()) {
       switchAdminView(tabId);
       return;
@@ -893,10 +902,25 @@
     hideAllAdminViews();
     setViewElementsVisible(tabId, true);
     $(tabId)?.classList.add('active');
-    document.querySelectorAll('.seller-tab').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.sellerTab === tabId);
-    });
-    if (tabId === 'stockPanel') renderStock();
+    if (tabId === 'stockPanel') {
+      document.querySelectorAll('.seller-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.sellerTab === 'stockPanel');
+      });
+      renderStock();
+    } else if (tabId === 'salesPanel') {
+      const posTab = opts.posTab || posActiveTab || 'sell';
+      switchPosTab(posTab, { silent: true });
+      document.querySelectorAll('.seller-tab').forEach(btn => {
+        if (btn.dataset.sellerTab === 'stockPanel') {
+          btn.classList.toggle('active', false);
+        } else if (btn.dataset.posTab) {
+          btn.classList.toggle('active', btn.dataset.posTab === posTab);
+        } else {
+          btn.classList.toggle('active', btn.dataset.sellerTab === 'salesPanel' && posTab === 'sell');
+        }
+      });
+      renderPosUI();
+    }
     $('adminMain')?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1009,20 +1033,22 @@
     const salesTitle = $('salesPanelTitle');
     const salesNote = $('salesPanelNote');
     if (sellerQuick) {
-      if (salesTitle) salesTitle.textContent = 'Rekodi Mauzo';
-      if (salesNote) salesNote.textContent = 'Chagua bidhaa → kiasi → malipo → bonyeza rekodi';
+      if (salesTitle) salesTitle.textContent = '⚡ Smart POS';
+      if (salesNote) salesNote.textContent = 'Gusa bidhaa → kiasi → malipo → rekodi au ongeza kwenye risiti';
       document.querySelectorAll('.seller-optional').forEach(el => el.classList.add('hidden'));
-      $('recordSaleBtn').textContent = '✓ Rekodi Sasa';
-      switchSellerTab('salesPanel');
+      $('recordSaleBtn').textContent = saleCart.length ? '✓ Rekodi Risiti' : '✓ Rekodi Sasa';
+      switchSellerTab('salesPanel', { posTab: 'sell' });
       updateSellerQuickUI();
       setSellerPayment($('salePayment')?.value || 'cash');
       renderSaleCart();
+      renderPosUI();
     } else {
-      if (salesTitle) salesTitle.textContent = '🥩 Mauzo ya Nyama';
-      if (salesNote) salesNote.textContent = 'Rekodi mauzo kwa tawi lililochaguliwa — chagua bidhaa, kiasi, na malipo';
+      if (salesTitle) salesTitle.textContent = '⚡ Smart POS';
+      if (salesNote) salesNote.textContent = 'Mauzo, risiti, na stock — chagua bidhaa, ongeza kwenye risiti, rekodi malipo';
       document.querySelectorAll('.seller-optional').forEach(el => el.classList.remove('hidden'));
       $('recordSaleBtn').textContent = '✓ Rekodi Mauzo';
       renderSaleCart();
+      renderPosUI();
     }
 
     document.querySelectorAll('#priceForms .panel').forEach(p => {
@@ -1057,6 +1083,7 @@
     renderDashboard();
     renderUsers();
     renderOrders();
+    initCloudOrders();
     renderVisits();
     renderSales();
     initSalesItems();
@@ -1064,9 +1091,11 @@
     populateSaleItemSelect();
     renderSalesItems();
     renderStock();
+    renderPosUI();
     renderBranches();
     renderStaffManagement();
     renderSaleCart();
+    populateCloudConfigForm();
   }
 
   function showLogin() {
@@ -1124,6 +1153,9 @@
 
   function logout() {
     if (!confirm('Toka kwenye Admin?')) return;
+    window.CleverOrdersCloud?.stopSync();
+    cloudOrdersCache = null;
+    cloudOrdersUnsub = null;
     clearSession();
     showLogin();
     $('password').value = '';
@@ -1369,30 +1401,7 @@
   }
 
   function recordWastage(itemId) {
-    if (!hasPerm('stock_add')) return;
-    const item = getAllSalesItems().find(x => x.id === itemId && x.active !== false);
-    if (!item) return;
-    const qtyStr = prompt('Kiasi cha uharibifu kwa ' + item.name + ' (' + item.unit + '):', item.unit === 'KG' ? '0.5' : '1');
-    if (qtyStr == null) return;
-    const qty = parseFloat(qtyStr);
-    if (!qty || qty <= 0) {
-      showAdminToast('Weka kiasi sahihi.', 'warn');
-      return;
-    }
-    const avail = Number(item.stock) || 0;
-    if (qty > avail) {
-      showAdminToast('Stock haitoshi. Ipo tu: ' + formatStockQty(avail, item.unit), 'warn');
-      return;
-    }
-    const reason = prompt('Sababu ya uharibifu (mfano: imeharibika, muda umeisha):', 'Uharibifu wa nyama') || 'Uharibifu';
-    const updated = updateItemStock(itemId, -qty, 'wastage', reason);
-    if (updated) {
-      populateSaleItemSelect();
-      renderSalesItems();
-      renderStock();
-      renderDashboard();
-      showAdminToast('✓ Uharibifu umerekodiwa: -' + formatStockQty(qty, item.unit) + ' ' + item.name);
-    }
+    showWastageDialog(itemId);
   }
 
   function renderStockLog() {
@@ -1666,6 +1675,7 @@
     if (current && items.some(x => x.id === current)) sel.value = current;
     updateSaleTotalPreview();
     renderSaleQtyPresets();
+    renderPosProductGrid();
   }
 
   function getSelectedSaleItem() {
@@ -1707,6 +1717,407 @@
       const shown = totalEl?.value ? Number(totalEl.value) : (qty > 0 && item ? total : 0);
       big.textContent = shown ? 'TSH ' + formatMoney(shown) : '—';
     }
+    updatePosCashChange();
+  }
+
+  function switchPosTab(tab, opts = {}) {
+    posActiveTab = tab === 'receipts' ? 'receipts' : 'sell';
+    document.querySelectorAll('.pos-tab').forEach(btn => {
+      const active = btn.dataset.posTab === posActiveTab;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    $('posPaneSell')?.classList.toggle('hidden', posActiveTab !== 'sell');
+    $('posPaneReceipts')?.classList.toggle('hidden', posActiveTab !== 'receipts');
+    if (posActiveTab === 'receipts') renderPosReceipts();
+    if (!opts.silent && isSellerQuick()) {
+      document.querySelectorAll('.seller-tab[data-pos-tab]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.posTab === posActiveTab && btn.dataset.sellerTab === 'salesPanel');
+      });
+      document.querySelectorAll('.seller-tab[data-seller-tab="stockPanel"]').forEach(btn => {
+        btn.classList.toggle('active', false);
+      });
+    }
+  }
+
+  function getPosCategories() {
+    const cats = new Set();
+    getSalesItems().forEach(x => { if (x.category) cats.add(x.category); });
+    return ['all', ...Array.from(cats).sort()];
+  }
+
+  function getPosFilteredItems() {
+    const q = posSearchQuery.trim().toLowerCase();
+    return getSalesItems().filter(x => {
+      if (posCatFilter !== 'all' && x.category !== posCatFilter) return false;
+      if (!q) return true;
+      return (x.name || '').toLowerCase().includes(q) ||
+        (x.category || '').toLowerCase().includes(q);
+    });
+  }
+
+  function getSmartPosSuggestions() {
+    const sales = getSalesLog().filter(x => isToday(x.at));
+    const counts = {};
+    sales.forEach(x => {
+      const k = x.itemId || x.itemName;
+      if (!k) return;
+      counts[k] = (counts[k] || 0) + (Number(x.qty) || 1);
+    });
+    const items = getSalesItems();
+    const byId = Object.fromEntries(items.map(x => [x.id, x]));
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([id, qty]) => {
+        const item = byId[id] || items.find(x => x.name === id);
+        return item ? { item, soldToday: qty } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function selectPosProduct(itemId) {
+    const sel = $('saleItemSelect');
+    if (!sel || !itemId) return;
+    sel.value = itemId;
+    if ($('saleTotal')) delete $('saleTotal').dataset.manual;
+    const item = getSelectedSaleItem();
+    if (item && $('saleQty') && !$('saleQty').value) {
+      $('saleQty').value = item.unit === 'KG' ? '1' : '1';
+    }
+    updateSaleTotalPreview();
+    renderSaleQtyPresets();
+    document.querySelectorAll('.pos-product-tile').forEach(el => {
+      el.classList.toggle('selected', el.dataset.posItem === itemId);
+    });
+    $('saleQty')?.focus();
+  }
+
+  function renderPosCatChips() {
+    const el = $('posCatChips');
+    if (!el) return;
+    const cats = getPosCategories();
+    el.innerHTML = cats.map(cat => `
+      <button type="button" class="pos-cat-chip${posCatFilter === cat ? ' active' : ''}" data-pos-cat="${escapeHtml(cat)}">
+        ${cat === 'all' ? 'Zote' : escapeHtml(cat)}
+      </button>
+    `).join('');
+    el.querySelectorAll('[data-pos-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        posCatFilter = btn.dataset.posCat || 'all';
+        renderPosProductGrid();
+      });
+    });
+  }
+
+  function renderPosSmartSuggestions() {
+    const wrap = $('posSmartSuggestions');
+    if (!wrap) return;
+    const suggestions = getSmartPosSuggestions();
+    if (!suggestions.length) {
+      wrap.classList.add('hidden');
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.classList.remove('hidden');
+    wrap.innerHTML = `
+      <span class="pos-suggest-label">⚡ Mauzo ya leo</span>
+      <div class="pos-suggest-row">
+        ${suggestions.map(({ item, soldToday }) => {
+          const status = getStockStatus(item);
+          const disabled = status === 'out';
+          return `<button type="button" class="pos-suggest-btn${disabled ? ' disabled' : ''}" data-pos-item="${escapeHtml(item.id)}"${disabled ? ' disabled' : ''}>
+            ${escapeHtml(item.name)} <small>${soldToday}×</small>
+          </button>`;
+        }).join('')}
+      </div>`;
+    wrap.querySelectorAll('[data-pos-item]').forEach(btn => {
+      btn.addEventListener('click', () => selectPosProduct(btn.dataset.posItem));
+    });
+  }
+
+  function renderPosProductGrid() {
+    renderPosCatChips();
+    renderPosSmartSuggestions();
+    const el = $('posProductGrid');
+    if (!el) return;
+    const items = getPosFilteredItems();
+    if (!items.length) {
+      el.innerHTML = '<div class="pos-grid-empty">Hakuna bidhaa. Ongeza kwenye Bidhaa za Mauzo.</div>';
+      return;
+    }
+    const selected = $('saleItemSelect')?.value || '';
+    el.innerHTML = items.map(x => {
+      const status = getStockStatus(x);
+      const stockTxt = x.trackStock === false ? '' : formatStockQty(x.stock, x.unit);
+      return `
+        <button type="button" class="pos-product-tile pos-tile-${status}${selected === x.id ? ' selected' : ''}${status === 'out' ? ' out' : ''}"
+          data-pos-item="${escapeHtml(x.id)}"${status === 'out' ? ' disabled' : ''}>
+          <span class="pos-tile-cat">${escapeHtml(x.category || '')}</span>
+          <strong class="pos-tile-name">${escapeHtml(x.name)}</strong>
+          <span class="pos-tile-price">TSH ${formatMoney(x.price)}<small>/${escapeHtml(x.unit)}</small></span>
+          ${stockTxt ? '<span class="pos-tile-stock">' + escapeHtml(stockTxt) + '</span>' : ''}
+          ${status === 'low' ? '<span class="pos-tile-badge warn">Chini</span>' : ''}
+          ${status === 'out' ? '<span class="pos-tile-badge out">Imeisha</span>' : ''}
+        </button>`;
+    }).join('');
+    el.querySelectorAll('[data-pos-item]').forEach(btn => {
+      btn.addEventListener('click', () => selectPosProduct(btn.dataset.posItem));
+    });
+  }
+
+  function getReceiptsGrouped(todayOnly = true) {
+    const sales = getSalesLog().filter(x => !todayOnly || isToday(x.at));
+    const map = {};
+    sales.forEach(sale => {
+      const rid = sale.receiptId || sale.id;
+      if (!map[rid]) {
+        map[rid] = {
+          receiptId: rid,
+          at: sale.at,
+          payment: sale.payment,
+          phone: sale.phone,
+          notes: sale.notes,
+          seller: sale.seller,
+          branchName: sale.branchName,
+          lines: [],
+          total: 0
+        };
+      }
+      map[rid].lines.push(sale);
+      map[rid].total += Number(sale.total) || 0;
+      if (sale.at < map[rid].at) map[rid].at = sale.at;
+    });
+    return Object.values(map).sort((a, b) => new Date(b.at) - new Date(a.at));
+  }
+
+  function renderPosReceipts() {
+    const el = $('posReceiptsList');
+    if (!el) return;
+    const receipts = getReceiptsGrouped(true);
+    if (!receipts.length) {
+      el.innerHTML = '<div class="empty">Hakuna risiti leo bado. Rekodi mauzo kwenye tab ya Uza.</div>';
+      return;
+    }
+    el.innerHTML = receipts.map(r => `
+      <article class="pos-receipt-card">
+        <div class="pos-receipt-head">
+          <div>
+            <strong>${escapeHtml(formatOrderDate(r.at))}</strong>
+            <span class="order-meta">${escapeHtml(paymentLabel(r.payment))} · ${escapeHtml(r.seller || 'staff')}${r.lines.length > 1 ? ' · ' + r.lines.length + ' bidhaa' : ''}</span>
+          </div>
+          <strong class="order-total">TSH ${formatMoney(r.total)}</strong>
+        </div>
+        <ul class="pos-receipt-lines">
+          ${r.lines.map(l => `<li>${escapeHtml(String(l.qty))} ${escapeHtml(l.unit)} ${escapeHtml(l.itemName)} · TSH ${formatMoney(l.total)}</li>`).join('')}
+        </ul>
+        <button type="button" class="btn btn-back btn-sm" data-print-receipt="${escapeHtml(r.receiptId)}">🖨 Chapisha Risiti</button>
+      </article>
+    `).join('');
+    el.querySelectorAll('[data-print-receipt]').forEach(btn => {
+      btn.addEventListener('click', () => printReceipt(btn.dataset.printReceipt));
+    });
+  }
+
+  function buildReceiptHtml(receiptId) {
+    const receipts = getReceiptsGrouped(false);
+    const r = receipts.find(x => x.receiptId === receiptId);
+    if (!r) return null;
+    const branch = getCurrentBranch();
+    const payIcon = { cash: '💵', mpesa: '📱', lipa: '💳' }[r.payment] || '💰';
+    const linesHtml = r.lines.map(l =>
+      `<tr><td>${escapeHtml(l.itemName)}</td><td>${escapeHtml(String(l.qty))} ${escapeHtml(l.unit)}</td><td>TSH ${formatMoney(l.total)}</td></tr>`
+    ).join('');
+    return `<!DOCTYPE html><html><head><title>Risiti ${escapeHtml(receiptId)}</title>
+      <style>
+        body{font-family:system-ui,sans-serif;max-width:320px;margin:24px auto;color:#2d1a12}
+        h1{font-size:1.1rem;margin:0 0 4px;color:#7a1515}
+        .meta{font-size:0.75rem;color:#666;margin-bottom:12px}
+        table{width:100%;border-collapse:collapse;font-size:0.85rem}
+        td{padding:4px 0;border-bottom:1px dashed #ddd}
+        td:last-child{text-align:right;font-weight:700}
+        .total{margin-top:12px;padding-top:8px;border-top:2px solid #7a1515;font-size:1.1rem;font-weight:800;text-align:right}
+        .foot{margin-top:16px;font-size:0.7rem;color:#888;text-align:center}
+      </style></head><body>
+      <h1>Clever Kitimoto</h1>
+      <div class="meta">${escapeHtml(branch?.name || r.branchName || '')}<br>${escapeHtml(formatOrderDate(r.at))}<br>${payIcon} ${escapeHtml(paymentLabel(r.payment))} · ${escapeHtml(r.seller || '')}</div>
+      ${r.phone ? '<div class="meta">Simu: ' + escapeHtml(r.phone) + '</div>' : ''}
+      <table>${linesHtml}</table>
+      <div class="total">JUMLA: TSH ${formatMoney(r.total)}</div>
+      ${r.notes ? '<div class="meta">Maelezo: ' + escapeHtml(r.notes) + '</div>' : ''}
+      <div class="foot">Asante kwa kununua! · ${escapeHtml(receiptId)}</div>
+    </body></html>`;
+  }
+
+  function printReceipt(receiptId) {
+    const html = buildReceiptHtml(receiptId);
+    if (!html) {
+      showAdminToast('Risiti haijapatikana.', 'warn');
+      return;
+    }
+    const w = window.open('', '_blank', 'width=400,height=640');
+    if (!w) { showAdminToast('Ruhusu pop-ups kuchapisha risiti.', 'warn'); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  }
+
+  function updatePosCashChange() {
+    const wrap = $('posCashChange');
+    const payment = $('salePayment')?.value || 'cash';
+    if (!wrap) return;
+    const show = payment === 'cash' && (hasPerm('sales'));
+    wrap.classList.toggle('hidden', !show);
+    if (!show) return;
+    const paid = parseInt($('posCashPaid')?.value, 10) || 0;
+    const cartTotal = saleCart.length ? getSaleCartTotal() : 0;
+    const lineTotal = parseInt($('saleTotal')?.value, 10) || 0;
+    const due = cartTotal || lineTotal;
+    const changeEl = $('posChangeDue');
+    if (!changeEl) return;
+    if (!due || !paid) {
+      changeEl.textContent = '—';
+      changeEl.classList.remove('pos-change-ok', 'pos-change-warn');
+      return;
+    }
+    const change = paid - due;
+    changeEl.textContent = change >= 0 ? 'TSH ' + formatMoney(change) : 'Punguza TSH ' + formatMoney(Math.abs(change));
+    changeEl.classList.toggle('pos-change-ok', change >= 0);
+    changeEl.classList.toggle('pos-change-warn', change < 0);
+  }
+
+  function renderPosUI() {
+    if (!hasPerm('sales')) return;
+    renderPosProductGrid();
+    updatePosCashChange();
+    if (posActiveTab === 'receipts') renderPosReceipts();
+  }
+
+  function getSavedMenuPrices() {
+    try {
+      return { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
+    } catch {
+      return { ...defaults };
+    }
+  }
+
+  function syncMenuPricesToPos() {
+    if (!hasPerm('sales_items')) return;
+    const saved = getSavedMenuPrices();
+    const list = getAllSalesItems();
+    let updated = 0;
+    list.forEach((item, idx) => {
+      if (item.active === false) return;
+      let newPrice = null;
+      Object.values(groups).flat().forEach(([id, label, defPrice]) => {
+        const labelNorm = label.toLowerCase();
+        const nameNorm = item.name.toLowerCase();
+        if (!labelNorm.includes(nameNorm.split(' ')[0].toLowerCase())) return;
+        const priceStr = saved[id] || defPrice;
+        const pkgPrice = parseInt(String(priceStr).replace(/,/g, ''), 10);
+        if (!pkgPrice) return;
+        if (item.unit === 'KG') {
+          const kgMatch = label.match(/([\d½]+)\s*KG/i);
+          if (kgMatch) {
+            const kg = parseFloat(String(kgMatch[1]).replace('½', '0.5')) || 1;
+            const perKg = Math.round(pkgPrice / kg);
+            if (label.includes('1 KG') || kg === 1) newPrice = perKg;
+          }
+        } else if (labelNorm.includes(item.name.toLowerCase()) || nameNorm.includes(label.split('—')[0].trim().toLowerCase())) {
+          newPrice = pkgPrice;
+        }
+      });
+      if (newPrice && newPrice !== item.price) {
+        list[idx] = { ...item, price: newPrice };
+        updated += 1;
+      }
+    });
+    if (updated) {
+      saveSalesItemsList(list);
+      populateSaleItemSelect();
+      renderSalesItems();
+      renderPosUI();
+      showAdminToast('✓ Bei ' + updated + ' zimesasishwa kutoka Menu');
+    } else {
+      showAdminToast('Bei ziko sawa na Menu tayari.', 'warn');
+    }
+  }
+
+  function showWastageDialog(itemId) {
+    if (!hasPerm('stock_add')) return;
+    const item = getAllSalesItems().find(x => x.id === itemId && x.active !== false);
+    if (!item) return;
+    const body = $('adminDialogBody');
+    const dialog = $('adminDialog');
+    if (!body || !dialog) return;
+    body.innerHTML = `
+      <div class="wastage-dialog">
+        <h3 class="ssd-title" id="adminDialogTitle">− Rekodi Uharibifu</h3>
+        <p class="ssd-sub">${escapeHtml(item.name)} · Stoo: ${escapeHtml(formatStockQty(item.stock, item.unit))}</p>
+        <div class="field"><label>Kiasi (${escapeHtml(item.unit)})</label>
+          <input id="wastageQty" type="number" min="0.01" step="0.01" value="${item.unit === 'KG' ? '0.5' : '1'}"></div>
+        <div class="field"><label>Sababu</label>
+          <input id="wastageReason" type="text" value="Uharibifu wa nyama" placeholder="Sababu ya uharibifu"></div>
+      </div>`;
+    dialog.classList.add('open');
+    dialog.setAttribute('aria-hidden', 'false');
+    const okBtn = $('adminDialogOk');
+    if (okBtn) {
+      okBtn.textContent = 'Rekodi Uharibifu';
+      okBtn.onclick = () => {
+        const qty = parseFloat($('wastageQty')?.value);
+        const reason = $('wastageReason')?.value.trim() || 'Uharibifu';
+        if (!qty || qty <= 0) {
+          showAdminToast('Weka kiasi sahihi.', 'warn');
+          return;
+        }
+        const avail = Number(item.stock) || 0;
+        if (qty > avail) {
+          showAdminToast('Stock haitoshi. Ipo tu: ' + formatStockQty(avail, item.unit), 'warn');
+          return;
+        }
+        const updated = updateItemStock(itemId, -qty, 'wastage', reason);
+        if (updated) {
+          populateSaleItemSelect();
+          renderSalesItems();
+          renderStock();
+          renderDashboard();
+          renderPosUI();
+          showAdminToast('✓ Uharibifu umerekodiwa: -' + formatStockQty(qty, item.unit));
+        }
+        closeAdminDialog();
+        if (okBtn) okBtn.onclick = closeAdminDialog;
+        if (okBtn) okBtn.textContent = 'Sawa ✓';
+      };
+    }
+  }
+
+  function showReceiptSuccessDialog(receiptId, lineCount, grandTotal) {
+    const body = $('adminDialogBody');
+    const dialog = $('adminDialog');
+    if (!body || !dialog) return;
+    const stats = computeSalesStats();
+    body.innerHTML = `
+      <div class="sale-success-dialog">
+        <div class="ssd-icon-wrap" aria-hidden="true">
+          <span class="ssd-ring"></span>
+          <span class="ssd-check">✓</span>
+        </div>
+        <h3 class="ssd-title" id="adminDialogTitle">Risiti Imerekodiwa!</h3>
+        <p class="ssd-sub">${lineCount} bidhaa · TSH ${formatMoney(grandTotal)}</p>
+        <div class="ssd-total ssd-total-inline"><span>Jumla Risiti</span><strong>TSH ${formatMoney(grandTotal)}</strong></div>
+        <div class="ssd-smart">
+          <div class="ssd-smart-chip"><span>Leo</span><b>TSH ${formatMoney(stats.todayTotal)}</b></div>
+          <div class="ssd-smart-chip"><span>Mauzo leo</span><b>${stats.todayCount}</b></div>
+        </div>
+        <button type="button" class="btn btn-save ssd-print-btn" id="ssdPrintReceiptBtn">🖨 Chapisha Risiti</button>
+      </div>`;
+    dialog.classList.add('open');
+    dialog.setAttribute('aria-hidden', 'false');
+    $('ssdPrintReceiptBtn')?.addEventListener('click', () => printReceipt(receiptId));
+    if (adminDialogTimer) clearTimeout(adminDialogTimer);
+    adminDialogTimer = setTimeout(closeAdminDialog, 12000);
   }
 
   function renderSaleQtyPresets() {
@@ -1741,9 +2152,13 @@
     const totalEl = $('saleCartTotal');
     const addBtn = $('addToSaleCartBtn');
     if (!wrap || !list) return;
-    const showCart = hasPerm('sales') && !isSellerQuick();
+    const showCart = hasPerm('sales');
     wrap.classList.toggle('hidden', !showCart || !saleCart.length);
     if (addBtn) addBtn.classList.toggle('hidden', !showCart);
+    const recordBtn = $('recordSaleBtn');
+    if (recordBtn && isSellerQuick()) {
+      recordBtn.textContent = saleCart.length ? '✓ Rekodi Risiti (' + saleCart.length + ')' : '✓ Rekodi Sasa';
+    }
     if (!saleCart.length) return;
     list.innerHTML = saleCart.map((line, idx) => `
       <div class="sale-cart-line">
@@ -1761,6 +2176,7 @@
         renderSaleCart();
       });
     });
+    updatePosCashChange();
   }
 
   function addToSaleCart() {
@@ -1800,6 +2216,7 @@
     renderSaleQtyPresets();
     renderSaleCart();
     showAdminToast('✓ Imeongezwa kwenye risiti');
+    updatePosCashChange();
   }
 
   function clearSaleCart() {
@@ -1867,11 +2284,18 @@
     renderDashboard();
     populateSaleItemSelect();
     updateSellerQuickUI();
-    showAdminToast('✓ Risiti imerekodiwa — ' + lineCount + ' bidhaa · TSH ' + formatMoney(grandTotal));
+    renderPosUI();
+    if ($('posCashPaid')) $('posCashPaid').value = '';
+    updatePosCashChange();
+    showReceiptSuccessDialog(receiptId, lineCount, grandTotal);
   }
 
   function recordSale() {
     if (!hasPerm('sales')) return;
+    if (saleCart.length) {
+      recordSaleCart();
+      return;
+    }
     const item = getSelectedSaleItem();
     const qty = parseFloat($('saleQty')?.value);
     const total = parseInt($('saleTotal')?.value, 10);
@@ -1897,8 +2321,10 @@
     }
 
     const branch = getCurrentBranch();
+    const receiptId = 'rcpt-' + Date.now();
     const sale = {
       id: 'sale-' + Date.now(),
+      receiptId,
       at: new Date().toISOString(),
       itemId: item.id,
       itemName: item.name,
@@ -1939,6 +2365,9 @@
     renderStock();
     renderDashboard();
     populateSaleItemSelect();
+    renderPosUI();
+    if ($('posCashPaid')) $('posCashPaid').value = '';
+    updatePosCashChange();
     showSaleSuccessDialog(sale);
     updateSellerQuickUI();
   }
@@ -2136,11 +2565,13 @@
           <div class="ssd-smart-chip"><span>Mauzo leo</span><b>${stats.todayCount}</b></div>
           <div class="ssd-smart-chip"><span>KG leo</span><b>${stats.kgSold || '—'}</b></div>
         </div>
+        <button type="button" class="btn btn-save ssd-print-btn" id="ssdPrintReceiptBtn">🖨 Chapisha Risiti</button>
       </div>`;
 
     dialog.classList.add('open');
     dialog.setAttribute('aria-hidden', 'false');
     $('adminDialogOk')?.focus();
+    $('ssdPrintReceiptBtn')?.addEventListener('click', () => printReceipt(sale.receiptId || sale.id));
 
     if (adminDialogTimer) clearTimeout(adminDialogTimer);
     adminDialogTimer = setTimeout(closeAdminDialog, 7000);
@@ -2603,7 +3034,7 @@
             <h4>🚀 Vitendo vya Haraka</h4>
           </div>
           <div class="dash-quick-actions">
-            ${canSales ? '<button type="button" class="dash-action-btn" data-dash-scroll="salesPanel"><span>🥩</span> Rekodi Mauzo</button>' : ''}
+            ${canSales ? '<button type="button" class="dash-action-btn" data-dash-scroll="salesPanel"><span>⚡</span> Smart POS</button>' : ''}
             ${canStock ? '<button type="button" class="dash-action-btn" data-dash-scroll="stockPanel"><span>📦</span> Angalia Stock</button>' : ''}
             ${hasPerm('reports') ? '<button type="button" class="dash-action-btn" data-dash-scroll="reportsPanel"><span>📋</span> Ripoti Zote</button>' : ''}
             ${hasPerm('branches') ? '<button type="button" class="dash-action-btn" data-dash-scroll="branchPanel"><span>🏪</span> Dhibiti Matawi</button>' : ''}
@@ -2991,7 +3422,126 @@
     $('visitsPane')?.classList.toggle('active', tab === 'visits');
   }
 
+  function renderCloudStatus() {
+    const text = $('cloudStatusText');
+    const pill = $('cloudStatusPill');
+    const cloud = window.CleverOrdersCloud;
+    if (!text || !pill) return;
+    if (!cloud?.isEnabled()) {
+      text.textContent = 'Haijaunganishwa. Jaza Supabase URL + Anon Key hapo juu, kisha Hifadhi & Unganisha.';
+      pill.textContent = 'Offline';
+      pill.className = 'cloud-status-pill cloud-status-off';
+      return;
+    }
+    if (cloud.isConnected()) {
+      text.textContent = 'Imeunganishwa! Oda zinaingia Supabase mtandaoni. Pakia cloud-config.js kwenye GitHub ili wateja wahifadhi online pia.';
+      pill.textContent = '☁️ Live — Imefunguka';
+      pill.className = 'cloud-status-pill cloud-status-live';
+    } else {
+      text.textContent = 'Config ipo lakini muunganisho umeshindwa — angalia URL, anon key, na schema.sql.';
+      pill.textContent = 'Hitilafu';
+      pill.className = 'cloud-status-pill cloud-status-warn';
+    }
+  }
+
+  function populateCloudConfigForm() {
+    const c = window.CleverOrdersCloud?.config() || {};
+    if ($('cloudEnabled')) $('cloudEnabled').checked = !!c.enabled;
+    if ($('cloudSupabaseUrl')) $('cloudSupabaseUrl').value = c.supabaseUrl || '';
+    if ($('cloudSupabaseKey')) $('cloudSupabaseKey').value = c.supabaseAnonKey || '';
+    renderCloudStatus();
+  }
+
+  function readCloudConfigForm() {
+    return {
+      enabled: !!$('cloudEnabled')?.checked,
+      supabaseUrl: ($('cloudSupabaseUrl')?.value || '').trim(),
+      supabaseAnonKey: ($('cloudSupabaseKey')?.value || '').trim()
+    };
+  }
+
+  function saveCloudConfigFromAdmin() {
+    if (!hasPerm('backup')) return;
+    const cfg = readCloudConfigForm();
+    if (cfg.enabled) {
+      if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+        showAdminToast('Weka Supabase URL na Anon Key.', 'warn');
+        return;
+      }
+    }
+    window.CleverOrdersCloud.saveConfig(cfg);
+    initCloudOrders();
+    populateCloudConfigForm();
+    showAdminToast(cfg.enabled ? '✓ Supabase imeunganishwa' : '✓ Cloud imezimwa');
+  }
+
+  async function testCloudConfigFromAdmin() {
+    if (!hasPerm('backup')) return;
+    const cfg = readCloudConfigForm();
+    if (!cfg.enabled || !cfg.supabaseUrl) {
+      showAdminToast('Weka config na uwezeshe kwanza.', 'warn');
+      return;
+    }
+    window.CleverOrdersCloud.saveConfig(cfg);
+    try {
+      await window.CleverOrdersCloud.testConnection();
+      initCloudOrders();
+      populateCloudConfigForm();
+      showAdminToast('✓ Muunganisho umefanikiwa — Supabase inafanya kazi');
+    } catch (e) {
+      renderCloudStatus();
+      showAdminToast('Imeshindwa: ' + (e.message || 'run supabase/schema.sql kwanza'), 'warn');
+    }
+  }
+
+  function downloadCloudConfigFile() {
+    const cfg = readCloudConfigForm();
+    const body = `/**\n * Clever Kitimoto — online orders config\n * Generated from Admin → Zana\n */\nwindow.CLEVER_KITIMOTO_CLOUD = ${JSON.stringify(cfg, null, 2)};\n`;
+    const blob = new Blob([body], { type: 'application/javascript' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cloud-config.js';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showAdminToast('✓ Pakua cloud-config.js — weka kwenye assets/js/ na push GitHub');
+  }
+
+  function updateCloudBadge() {
+    const badge = $('cloudBadge');
+    if (!badge) return;
+    const cloud = window.CleverOrdersCloud;
+    const on = cloud?.isEnabled() && cloud?.isConnected();
+    badge.classList.toggle('hidden', !on);
+    badge.classList.toggle('cloud-badge-live', on);
+    badge.title = on ? 'Oda zinapokelewa mtandaoni kwa muda halisi' : '';
+    renderCloudStatus();
+  }
+
+  function initCloudOrders() {
+    const cloud = window.CleverOrdersCloud;
+    if (cloudOrdersUnsub) {
+      cloudOrdersUnsub();
+      cloudOrdersUnsub = null;
+    }
+    if (!cloud?.isEnabled()) {
+      cloudOrdersCache = null;
+      updateCloudBadge();
+      renderCloudStatus();
+      return;
+    }
+    cloudOrdersUnsub = cloud.subscribeOrders(orders => {
+      cloudOrdersCache = orders;
+      localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(orders));
+      updateCloudBadge();
+      renderOrders();
+      renderDashboard();
+      renderUsers();
+    });
+    updateCloudBadge();
+  }
+
   function getOrders() {
+    if (cloudOrdersCache) return cloudOrdersCache;
     try {
       const saved = JSON.parse(localStorage.getItem(ORDER_HISTORY_KEY) || '[]');
       return Array.isArray(saved) ? saved : [];
@@ -3001,6 +3551,9 @@
   }
 
   function saveOrders(list) {
+    if (window.CleverOrdersCloud?.isEnabled()) {
+      cloudOrdersCache = list;
+    }
     localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(list));
   }
 
@@ -3019,13 +3572,19 @@
     const orders = getOrders();
     const idx = orders.findIndex(o => o.id === orderId);
     if (idx < 0) return;
-    orders[idx] = {
-      ...orders[idx],
+    const patch = {
       status,
       statusAt: new Date().toISOString(),
       statusBy: getSession()?.user || 'staff'
     };
+    orders[idx] = { ...orders[idx], ...patch };
     saveOrders(orders);
+    if (window.CleverOrdersCloud?.isEnabled()) {
+      window.CleverOrdersCloud.updateOrder(orderId, patch).catch(err => {
+        console.warn('Cloud status update failed', err);
+        showAdminToast('Imeshindwa kusasisha mtandaoni.', 'warn');
+      });
+    }
     renderOrders();
     renderDashboard();
     showAdminToast('✓ Oda: ' + orderStatusLabel(status));
@@ -3258,6 +3817,10 @@
 
   function clearOrders() {
     if (!hasPerm('clear')) return;
+    if (window.CleverOrdersCloud?.isEnabled()) {
+      showAdminToast('Oda za mtandaoni hazifutwi hapa — futa kwenye Supabase Dashboard.', 'warn');
+      return;
+    }
     if (!confirm('Futa historia yote ya oda?')) return;
     localStorage.removeItem(ORDER_HISTORY_KEY);
     renderOrders();
@@ -3299,8 +3862,24 @@
       if (e.target.closest('#dashEodBtn')) printEodReport();
     });
     document.querySelectorAll('.seller-tab').forEach(btn => {
-      btn.addEventListener('click', () => switchSellerTab(btn.dataset.sellerTab));
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.sellerTab;
+        const posTab = btn.dataset.posTab;
+        if (posTab) switchPosTab(posTab);
+        switchSellerTab(tab, { posTab: posTab || 'sell' });
+      });
     });
+    document.querySelectorAll('.pos-tab').forEach(btn => {
+      btn.addEventListener('click', () => switchPosTab(btn.dataset.posTab));
+    });
+    $('posSearch')?.addEventListener('input', e => {
+      posSearchQuery = e.target.value || '';
+      renderPosProductGrid();
+    });
+    $('posCashPaid')?.addEventListener('input', updatePosCashChange);
+    $('posRefreshReceiptsBtn')?.addEventListener('click', renderPosReceipts);
+    $('syncMenuToPosBtn')?.addEventListener('click', syncMenuPricesToPos);
+    $('salePayment')?.addEventListener('change', updatePosCashChange);
     document.querySelectorAll('.seller-pay-btn').forEach(btn => {
       btn.addEventListener('click', () => setSellerPayment(btn.dataset.pay));
     });
@@ -3332,6 +3911,9 @@
       if (file) importBackupFile(file);
       e.target.value = '';
     });
+    $('saveCloudConfigBtn')?.addEventListener('click', saveCloudConfigFromAdmin);
+    $('testCloudConfigBtn')?.addEventListener('click', testCloudConfigFromAdmin);
+    $('downloadCloudConfigBtn')?.addEventListener('click', downloadCloudConfigFile);
     $('addToSaleCartBtn')?.addEventListener('click', addToSaleCart);
     $('recordSaleCartBtn')?.addEventListener('click', recordSaleCart);
     $('clearSaleCartBtn')?.addEventListener('click', clearSaleCart);
@@ -3369,6 +3951,18 @@
     $('adminDialogBackdrop')?.addEventListener('click', closeAdminDialog);
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && $('adminDialog')?.classList.contains('open')) closeAdminDialog();
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        const active = document.activeElement;
+        const inPos = $('salesPanel') && !$('salesPanel').classList.contains('hidden');
+        const dialogOpen = $('adminDialog')?.classList.contains('open');
+        if (inPos && !dialogOpen && hasPerm('sales') && posActiveTab === 'sell') {
+          const tag = active?.tagName?.toLowerCase();
+          if (tag !== 'textarea' && tag !== 'button' && active?.type !== 'submit') {
+            e.preventDefault();
+            recordSale();
+          }
+        }
+      }
     });
   }
 

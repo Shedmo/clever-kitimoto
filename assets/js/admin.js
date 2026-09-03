@@ -29,8 +29,8 @@
   ];
 
   const PERMS = {
-    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'stock_add', 'branches', 'staff_manage', 'backup', 'eod'],
-    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'stock_add', 'branches', 'eod'],
+    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'sales_manage', 'stock_add', 'branches', 'staff_manage', 'backup', 'eod'],
+    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'sales_manage', 'stock_add', 'branches', 'eod'],
     seller: ['dashboard', 'sales', 'stock_view']
   };
 
@@ -1802,17 +1802,227 @@
     }
   }
 
-  function getSalesLog() {
+  function getBranchSalesLog() {
     try {
       const saved = loadBranchData(SALES_LOG_KEY, '[]');
-      const local = Array.isArray(saved) ? saved : [];
-      if (cloudSalesCache && window.CleverOrdersCloud?.isEnabled()) {
-        return mergeSalesLogs(local, cloudSalesCache);
-      }
-      return local;
+      return Array.isArray(saved) ? saved : [];
     } catch {
       return [];
     }
+  }
+
+  function persistSalesLog(log) {
+    saveBranchData(SALES_LOG_KEY, log);
+    if (cloudSalesCache) cloudSalesCache = log.slice();
+  }
+
+  function findSaleById(saleId) {
+    return getSalesLog().find(s => s.id === saleId) || null;
+  }
+
+  function canManageSales() {
+    return hasPerm('sales_manage');
+  }
+
+  function refreshAfterSaleChange() {
+    renderSales();
+    renderStock();
+    renderDashboard();
+    populateSaleItemSelect();
+    updateSellerQuickUI();
+    renderPosUI();
+    renderProfitReport();
+  }
+
+  async function removeSaleFromCloud(saleId) {
+    const cloud = window.CleverOrdersCloud;
+    if (!cloud?.isEnabled() || !saleId) return;
+    try {
+      await cloud.deleteSale(saleId);
+    } catch (err) {
+      console.warn('Cloud sale delete failed', err);
+      showAdminToast('Imefutwa kwa simu — cloud: ' + (err.message || 'imeshindwa'), 'warn');
+    }
+  }
+
+  function restoreSaleStock(sale) {
+    const item = getAllSalesItems().find(x => x.id === sale.itemId && x.active !== false);
+    if (!item || item.trackStock === false) return;
+    updateItemStock(sale.itemId, Number(sale.qty) || 0, 'adjust', 'Rudisha stock — mauzo yamefutwa', sale.id);
+  }
+
+  function adjustSaleStock(sale, oldQty, newQty) {
+    const item = getAllSalesItems().find(x => x.id === sale.itemId && x.active !== false);
+    if (!item || item.trackStock === false) return true;
+    const delta = (Number(oldQty) || 0) - (Number(newQty) || 0);
+    if (!delta) return true;
+    const avail = Number(item.stock) || 0;
+    if (delta < 0 && Math.abs(delta) > avail) {
+      showAdminToast('Stock haitoshi kwa kiasi hiki. Ipo: ' + formatStockQty(avail, item.unit), 'warn');
+      return false;
+    }
+    updateItemStock(sale.itemId, delta, 'adjust', 'Marekebisho mauzo', sale.id);
+    return true;
+  }
+
+  async function deleteSaleRecord(saleId) {
+    if (!canManageSales()) return;
+    const sale = findSaleById(saleId);
+    if (!sale) {
+      showAdminToast('Mauzo hayajapatikana.', 'warn');
+      return;
+    }
+    if (!confirm('Futa mauzo: ' + sale.itemName + ' (' + sale.qty + ' ' + sale.unit + ') — TSH ' + formatMoney(sale.total) + '?')) return;
+    restoreSaleStock(sale);
+    persistSalesLog(getBranchSalesLog().filter(s => s.id !== saleId));
+    await removeSaleFromCloud(saleId);
+    refreshAfterSaleChange();
+    showAdminToast('✓ Mauzo yamefutwa');
+  }
+
+  async function deleteReceiptRecord(receiptId) {
+    if (!canManageSales() || !receiptId) return;
+    const sales = getSalesLog().filter(s => s.receiptId === receiptId);
+    if (!sales.length) {
+      showAdminToast('Risiti haijapatikana.', 'warn');
+      return;
+    }
+    const total = sales.reduce((s, x) => s + (Number(x.total) || 0), 0);
+    if (!confirm('Futa risiti nzima (' + sales.length + ' bidhaa, TSH ' + formatMoney(total) + ')? Stock itarudishwa.')) return;
+    const ids = new Set(sales.map(s => s.id));
+    sales.forEach(restoreSaleStock);
+    persistSalesLog(getBranchSalesLog().filter(s => !ids.has(s.id)));
+    await Promise.all(sales.map(s => removeSaleFromCloud(s.id)));
+    refreshAfterSaleChange();
+    showAdminToast('✓ Risiti imefutwa');
+  }
+
+  let editSaleId = null;
+  let adminDialogOkHandler = null;
+
+  function showEditSaleDialog(saleId) {
+    if (!canManageSales()) return;
+    const sale = findSaleById(saleId);
+    if (!sale) {
+      showAdminToast('Mauzo hayajapatikana.', 'warn');
+      return;
+    }
+    editSaleId = saleId;
+    const body = $('adminDialogBody');
+    const dialog = $('adminDialog');
+    const okBtn = $('adminDialogOk');
+    const cancelBtn = $('adminDialogCancel');
+    if (!body || !dialog || !okBtn) return;
+
+    body.innerHTML = `
+      <div class="edit-sale-dialog">
+        <h3 class="ssd-title" id="adminDialogTitle">✏ Hariri Mauzo</h3>
+        <p class="ssd-sub">${escapeHtml(sale.itemName)} · ${escapeHtml(formatOrderDate(sale.at))}${sale.receiptId ? ' · Risiti ' + escapeHtml(sale.receiptId) : ''}</p>
+        <div class="edit-sale-grid">
+          <label class="field"><span>Kiasi</span>
+            <input id="editSaleQty" type="number" min="0.01" step="0.01" value="${escapeHtml(String(sale.qty))}">
+          </label>
+          <label class="field"><span>Jumla (TSH)</span>
+            <input id="editSaleTotal" type="number" min="1" step="1" value="${Number(sale.total) || 0}">
+          </label>
+          <label class="field"><span>Malipo</span>
+            <select id="editSalePayment">
+              <option value="cash"${sale.payment === 'cash' ? ' selected' : ''}>Cash</option>
+              <option value="mpesa"${sale.payment === 'mpesa' ? ' selected' : ''}>M-Pesa</option>
+              <option value="lipa"${sale.payment === 'lipa' ? ' selected' : ''}>Lipa namba</option>
+            </select>
+          </label>
+          <label class="field"><span>Simu</span>
+            <input id="editSalePhone" type="tel" value="${escapeHtml(sale.phone || '')}" placeholder="07XX XXX XXX">
+          </label>
+          <label class="field field-wide"><span>Maelezo</span>
+            <input id="editSaleNotes" type="text" value="${escapeHtml(sale.notes || '')}">
+          </label>
+        </div>
+      </div>`;
+
+    cancelBtn?.classList.remove('hidden');
+    okBtn.textContent = '💾 Hifadhi';
+    if (adminDialogTimer) {
+      clearTimeout(adminDialogTimer);
+      adminDialogTimer = null;
+    }
+    if (adminDialogOkHandler) okBtn.removeEventListener('click', adminDialogOkHandler);
+    adminDialogOkHandler = () => saveEditedSale();
+    dialog.classList.add('open');
+    dialog.setAttribute('aria-hidden', 'false');
+  }
+
+  async function saveEditedSale() {
+    if (!editSaleId || !canManageSales()) return;
+    const sale = findSaleById(editSaleId);
+    if (!sale) {
+      closeAdminDialog();
+      return;
+    }
+    const qty = parseFloat($('editSaleQty')?.value);
+    const total = parseInt($('editSaleTotal')?.value, 10);
+    const payment = $('editSalePayment')?.value || 'cash';
+    const phone = ($('editSalePhone')?.value || '').trim();
+    const notes = ($('editSaleNotes')?.value || '').trim();
+    if (!qty || qty <= 0) { showAdminToast('Weka kiasi sahihi.', 'warn'); return; }
+    if (!total || total <= 0) { showAdminToast('Weka jumla sahihi.', 'warn'); return; }
+    const oldQty = Number(sale.qty) || 0;
+    if (!adjustSaleStock(sale, oldQty, qty)) return;
+
+    const item = getAllSalesItems().find(x => x.id === sale.itemId);
+    const econ = buildSaleEconomicsFields(item || { costPrice: sale.costPrice }, qty, total);
+    const session = getSession();
+    const updated = {
+      ...sale,
+      qty,
+      total,
+      unitPrice: qty ? Math.round(total / qty) : sale.unitPrice,
+      payment,
+      phone,
+      notes,
+      costPrice: econ.costPrice,
+      costTotal: econ.costTotal,
+      profit: econ.profit,
+      marginPct: econ.marginPct,
+      editedAt: new Date().toISOString(),
+      editedBy: session?.user || 'staff'
+    };
+
+    persistSalesLog(getBranchSalesLog().map(s => s.id === editSaleId ? updated : s));
+    const cloud = window.CleverOrdersCloud;
+    if (cloud?.isEnabled()) {
+      try {
+        await cloud.saveSale(updated);
+      } catch (err) {
+        showAdminToast('Imehifadhiwa kwa simu tu: ' + (err.message || 'cloud imeshindwa'), 'warn');
+      }
+    }
+    editSaleId = null;
+    closeAdminDialog();
+    refreshAfterSaleChange();
+    showAdminToast('✓ Mauzo yamebadilishwa');
+  }
+
+  function renderSaleManageActions(sale) {
+    if (!canManageSales()) return '';
+    return `<div class="sale-manage-actions">
+      <button type="button" class="btn btn-back btn-sm" data-edit-sale="${escapeHtml(sale.id)}">✏ Hariri</button>
+      <button type="button" class="btn btn-delete btn-sm" data-delete-sale="${escapeHtml(sale.id)}">🗑 Futa</button>
+    </div>`;
+  }
+
+  function bindSaleManageEvents(root) {
+    if (!root || !canManageSales()) return;
+    root.querySelectorAll('[data-edit-sale]').forEach(btn => {
+      btn.addEventListener('click', () => showEditSaleDialog(btn.dataset.editSale));
+    });
+    root.querySelectorAll('[data-delete-sale]').forEach(btn => {
+      btn.addEventListener('click', () => deleteSaleRecord(btn.dataset.deleteSale));
+    });
+    root.querySelectorAll('[data-delete-receipt]').forEach(btn => {
+      btn.addEventListener('click', () => deleteReceiptRecord(btn.dataset.deleteReceipt));
+    });
   }
 
   function getItemCostPrice(itemOrId) {
@@ -2433,11 +2643,13 @@
           ${r.lines.map(l => `<li>${escapeHtml(String(l.qty))} ${escapeHtml(l.unit)} ${escapeHtml(l.itemName)} · TSH ${formatMoney(l.total)}</li>`).join('')}
         </ul>
         <button type="button" class="btn btn-back btn-sm" data-print-receipt="${escapeHtml(r.receiptId)}">🖨 Chapisha Risiti</button>
+        ${canManageSales() ? `<button type="button" class="btn btn-delete btn-sm" data-delete-receipt="${escapeHtml(r.receiptId)}">🗑 Futa Risiti</button>` : ''}
       </article>
     `).join('');
     el.querySelectorAll('[data-print-receipt]').forEach(btn => {
       btn.addEventListener('click', () => printReceipt(btn.dataset.printReceipt));
     });
+    bindSaleManageEvents(el);
   }
 
   function buildReceiptHtml(receiptId) {
@@ -2999,23 +3211,26 @@
       el.innerHTML = '<div class="empty">Hakuna mauzo bado. Rekodi mauzo kwenye sehemu ya Mauzo ya Nyama.</div>';
       return;
     }
-    el.innerHTML = sales.slice(0, 50).map(x => `
+    el.innerHTML = sales.slice(0, 100).map(x => `
       <article class="order-card sales-card">
         <div class="order-card-head">
           <div>
             <strong>${escapeHtml(formatOrderDate(x.at))}</strong>
-            <span class="order-meta">${escapeHtml(x.category)} · ${escapeHtml(paymentLabel(x.payment))} · ${escapeHtml(x.seller || 'staff')}${x.branchName ? ' · ' + escapeHtml(x.branchName) : ''}</span>
+            <span class="order-meta">${escapeHtml(x.category)} · ${escapeHtml(paymentLabel(x.payment))} · ${escapeHtml(x.seller || 'staff')}${x.branchName ? ' · ' + escapeHtml(x.branchName) : ''}${x.editedAt ? ' · ✏ imehaririwa' : ''}</span>
           </div>
           <strong class="order-total">TSH ${formatMoney(x.total)}</strong>
         </div>
         <div class="order-card-body">
           <div class="order-row"><span>Bidhaa</span><b>${escapeHtml(x.itemName)}</b></div>
           <div class="order-row"><span>Kiasi</span><b>${escapeHtml(String(x.qty))} ${escapeHtml(x.unit)}</b></div>
+          ${x.receiptId ? '<div class="order-row"><span>Risiti</span><b>' + escapeHtml(x.receiptId) + '</b></div>' : ''}
           ${x.phone ? '<div class="order-row"><span>Simu</span><b>' + escapeHtml(x.phone) + '</b></div>' : ''}
           ${x.notes ? '<div class="order-row"><span>Maelezo</span><b>' + escapeHtml(x.notes) + '</b></div>' : ''}
         </div>
+        ${renderSaleManageActions(x)}
       </article>
     `).join('');
+    bindSaleManageEvents(el);
   }
 
   function exportSalesCsv() {
@@ -3072,6 +3287,11 @@
       clearTimeout(adminDialogTimer);
       adminDialogTimer = null;
     }
+    editSaleId = null;
+    const okBtn = $('adminDialogOk');
+    adminDialogOkHandler = null;
+    if (okBtn) okBtn.textContent = 'Sawa ✓';
+    $('adminDialogCancel')?.classList.add('hidden');
   }
 
   function showAdminToast(msg, type) {
@@ -4824,7 +5044,11 @@ alter table public.app_storage replica identity full;`;
       });
     });
     $('exportProfitBtn')?.addEventListener('click', exportProfitCsv);
-    $('adminDialogOk')?.addEventListener('click', closeAdminDialog);
+    $('adminDialogOk')?.addEventListener('click', () => {
+      if (adminDialogOkHandler) adminDialogOkHandler();
+      else closeAdminDialog();
+    });
+    $('adminDialogCancel')?.addEventListener('click', closeAdminDialog);
     $('adminDialogBackdrop')?.addEventListener('click', closeAdminDialog);
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && $('adminDialog')?.classList.contains('open')) closeAdminDialog();

@@ -23,10 +23,12 @@ alter table public.orders enable row level security;
 drop policy if exists "orders_public_read" on public.orders;
 drop policy if exists "orders_public_insert" on public.orders;
 drop policy if exists "orders_public_update" on public.orders;
+drop policy if exists "orders_public_delete" on public.orders;
 
 create policy "orders_public_read" on public.orders for select using (true);
 create policy "orders_public_insert" on public.orders for insert with check (true);
 create policy "orders_public_update" on public.orders for update using (true);
+create policy "orders_public_delete" on public.orders for delete using (true);
 
 -- Realtime (admin sees new orders instantly)
 alter table public.orders replica identity full;
@@ -62,6 +64,7 @@ drop policy if exists "sales_public_update" on public.sales;
 create policy "sales_public_read" on public.sales for select using (true);
 create policy "sales_public_insert" on public.sales for insert with check (true);
 create policy "sales_public_update" on public.sales for update using (true);
+create policy "sales_public_delete" on public.sales for delete using (true);
 
 alter table public.sales replica identity full;
 

@@ -27,9 +27,11 @@ alter table public.sales enable row level security;
 drop policy if exists "sales_public_read" on public.sales;
 drop policy if exists "sales_public_insert" on public.sales;
 drop policy if exists "sales_public_update" on public.sales;
+drop policy if exists "sales_public_delete" on public.sales;
 
 create policy "sales_public_read" on public.sales for select using (true);
 create policy "sales_public_insert" on public.sales for insert with check (true);
 create policy "sales_public_update" on public.sales for update using (true);
+create policy "sales_public_delete" on public.sales for delete using (true);
 
 alter table public.sales replica identity full;

@@ -2003,6 +2003,38 @@ body {
 .sales-items-list { margin-top: 18px; }
 .sales-list { display: flex; flex-direction: column; gap: 10px; }
 .sales-card { border-left: 4px solid var(--maroon); }
+.sale-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e8dfd4;
+}
+.edit-sale-dialog .ssd-sub { margin-bottom: 16px; }
+.edit-sale-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.edit-sale-grid .field-wide { grid-column: 1 / -1; }
+.edit-sale-grid .field span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.edit-sale-grid input,
+.edit-sale-grid select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+#adminDialogCancel.hidden { display: none; }
 .sales-breakdown { margin-bottom: 16px; }
 .sales-breakdown-head {
   font-size: 0.75rem;
@@ -2076,7 +2108,8 @@ body {
 .admin-dialog-actions {
   margin-top: 16px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 .admin-dialog-actions .btn {
   min-width: 140px;

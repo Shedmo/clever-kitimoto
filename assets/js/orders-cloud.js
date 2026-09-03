@@ -304,6 +304,27 @@
     throw saleSaveError(error);
   }
 
+  async function deleteSale(saleId) {
+    if (!init()) throw new Error('Cloud not configured');
+    if (!saleId) return;
+    const { error } = await client.from(SALES_TABLE).delete().eq('id', saleId);
+    if (!error) return 'sales';
+    if (isTableMissing(error)) {
+      const { error: orderErr } = await client.from(TABLE).delete().eq('id', saleId);
+      if (orderErr) throw orderErr;
+      return 'orders';
+    }
+    throw error;
+  }
+
+  async function deleteSales(saleIds) {
+    const ids = (saleIds || []).filter(Boolean);
+    if (!ids.length) return;
+    for (const id of ids) {
+      await deleteSale(id);
+    }
+  }
+
   function saleSaveError(error) {
     if (isTableMissing(error)) {
       return new Error('Jedwali sales halipo — run supabase/sales-migration.sql kwenye Supabase SQL Editor');
@@ -448,6 +469,8 @@
     updateOrder,
     saveSale,
     saveSales,
+    deleteSale,
+    deleteSales,
     fetchSales,
     testConnection,
     subscribeOrders,

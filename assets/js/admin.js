@@ -12,6 +12,7 @@
   const STAFF_BRANCHES_KEY = 'cleverKitimotoStaffBranchesV1';
   const STAFF_ACCOUNTS_KEY = 'cleverKitimotoStaffAccountsV1';
   const CURRENT_BRANCH_KEY = 'cleverKitimotoCurrentBranchV1';
+  const ALL_BRANCHES_ID = '__all__';
   const SESSION_KEY = 'cleverKitimotoAdminSession';
   const MAX_ATTEMPTS = 5;
   const LOCK_MS = 60000;
@@ -273,17 +274,76 @@
     if (changed) saveStaffBranchMap(map);
   }
 
+  function canViewAllBranches() {
+    return !isBranchLocked() && getBranches().length > 1
+      && (hasPerm('branches') || hasPerm('reports') || hasPerm('dashboard'));
+  }
+
+  function isAllBranchesMode() {
+    return getCurrentBranchId() === ALL_BRANCHES_ID;
+  }
+
+  function requireSingleBranch(actionLabel) {
+    if (!isAllBranchesMode()) return getCurrentBranchId();
+    showAdminToast('Chagua tawi moja kwenye juu ili ' + (actionLabel || 'kufanya hii'), 'warn');
+    return null;
+  }
+
+  function loadAllBranchesData(baseKey, fallback) {
+    const merged = [];
+    getBranches().forEach(b => {
+      const data = loadBranchDataFor(baseKey, b.id, fallback);
+      const arr = Array.isArray(data) ? data : [];
+      arr.forEach(row => {
+        merged.push({
+          ...row,
+          branchId: row.branchId || b.id,
+          branchName: row.branchName || b.name
+        });
+      });
+    });
+    return merged.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
+  }
+
+  function loadSalesItemsForBranch(branchId) {
+    const saved = loadBranchDataFor(SALES_ITEMS_KEY, branchId, '[]');
+    return Array.isArray(saved) ? saved : [];
+  }
+
+  function findItemBranchId(itemId) {
+    if (!isAllBranchesMode()) return getCurrentBranchId();
+    for (const b of getBranches()) {
+      if (loadSalesItemsForBranch(b.id).some(x => x.id === itemId)) return b.id;
+    }
+    return getCurrentBranchId();
+  }
+
+  function getSaleBranchId(sale) {
+    return sale?.branchId || getCurrentBranchId();
+  }
+
   function getCurrentBranchId() {
     if (isBranchLocked()) {
       const assigned = getAssignedBranchId();
       if (assigned && getBranches().some(b => b.id === assigned)) return assigned;
     }
     const id = sessionStorage.getItem(CURRENT_BRANCH_KEY) || localStorage.getItem(CURRENT_BRANCH_KEY);
+    if (id === ALL_BRANCHES_ID && canViewAllBranches()) return ALL_BRANCHES_ID;
     if (id && getBranches().some(b => b.id === id)) return id;
+    if (canViewAllBranches()) return ALL_BRANCHES_ID;
     return getBranches()[0]?.id || '';
   }
 
   function getCurrentBranch() {
+    if (isAllBranchesMode()) {
+      const n = getBranches().length;
+      return {
+        id: ALL_BRANCHES_ID,
+        name: 'Matawi Yote',
+        location: n + ' matawi — muhtasari wa pamoja',
+        phone: ''
+      };
+    }
     return getBranchById(getCurrentBranchId());
   }
 
@@ -321,6 +381,15 @@
         return;
       }
     }
+    if (branchId === ALL_BRANCHES_ID) {
+      if (!canViewAllBranches()) return;
+      setCurrentBranchId(ALL_BRANCHES_ID);
+      populateBranchSelect();
+      updateBranchBar();
+      refreshBranchViews();
+      showAdminToast('📊 Matawi Yote — unaona data ya kila tawi pamoja');
+      return;
+    }
     if (!getBranchById(branchId)) return;
     setCurrentBranchId(branchId);
     populateBranchSelect();
@@ -353,9 +422,14 @@
       ? getBranches().filter(b => b.id === getAssignedBranchId())
       : getBranches();
     const current = getCurrentBranchId();
-    sel.innerHTML = branches.map(b =>
+    let html = '';
+    if (canViewAllBranches()) {
+      html += `<option value="${ALL_BRANCHES_ID}"${current === ALL_BRANCHES_ID ? ' selected' : ''}>📊 Matawi Yote (${branches.length})</option>`;
+    }
+    html += branches.map(b =>
       `<option value="${escapeHtml(b.id)}"${b.id === current ? ' selected' : ''}>${escapeHtml(b.name)}</option>`
     ).join('');
+    sel.innerHTML = html;
     sel.disabled = locked;
   }
 
@@ -365,14 +439,18 @@
     const sub = $('branchBarSub');
     const barLabel = document.querySelector('.branch-bar-label');
     if (barLabel) {
-      barLabel.textContent = isBranchLocked() ? 'Tawi lako' : 'Tawi la kazi';
+      barLabel.textContent = isBranchLocked() ? 'Tawi lako' : (isAllBranchesMode() ? 'Muhtasari' : 'Tawi la kazi');
     }
     if (label) label.textContent = b?.name || '—';
     if (sub && b) {
-      sub.textContent = isBranchLocked()
+      sub.textContent = isAllBranchesMode()
+        ? 'Dashboard, ripoti, stock, na mauzo — matawi yote kwa pamoja'
+        : isBranchLocked()
         ? ([b.location, b.phone].filter(Boolean).join(' · ') || 'Umepewa tawi hili')
         : ([b.location, b.phone].filter(Boolean).join(' · ') || 'Chagua tawi la kufanya kazi');
     }
+    $('app')?.classList.toggle('all-branches-mode', isAllBranchesMode());
+    $('branchBar')?.classList.toggle('branch-bar-all', isAllBranchesMode());
     $('branchBar')?.classList.toggle('branch-bar-locked', isBranchLocked());
     $('branchBarRight')?.classList.toggle('hidden', isBranchLocked());
   }
@@ -458,8 +536,20 @@
       el.innerHTML = '<div class="empty">Hakuna matawi. Ongeza tawi la kwanza hapo juu.</div>';
       return;
     }
-    el.innerHTML = list.map(b => {
-      const isCurrent = b.id === getCurrentBranchId();
+    el.innerHTML = (canViewAllBranches() ? `
+      <article class="branch-card branch-all-card${isAllBranchesMode() ? ' branch-current' : ''}">
+        <div class="branch-card-main">
+          <div class="branch-card-head">
+            <strong>📊 Matawi Yote</strong>
+            ${isAllBranchesMode() ? '<span class="branch-now">Inaonekana sasa</span>' : ''}
+          </div>
+          <div class="branch-meta">Angalia mauzo, stock, faida, na ripoti za matawi ${list.length} kwa pamoja</div>
+        </div>
+        <div class="branch-card-actions">
+          ${!isAllBranchesMode() ? `<button type="button" class="btn btn-save btn-sm" data-switch-branch="${ALL_BRANCHES_ID}">Fungua Yote</button>` : ''}
+        </div>
+      </article>` : '') + list.map(b => {
+      const isCurrent = !isAllBranchesMode() && b.id === getCurrentBranchId();
       const sales = loadBranchDataFor(SALES_LOG_KEY, b.id, []);
       const branchSales = Array.isArray(sales) ? sales : [];
       const revenue = branchSales.reduce((s, x) => s + (Number(x.total) || 0), 0);
@@ -1392,14 +1482,56 @@
     applyRoleUI();
   }
 
-  function save() {
+  function normalisePrice(value) {
+    const clean = String(value ?? '').replace(/TSH/gi, '').replace(/,/g, '').trim();
+    if (!/^\d+(?:\.\d{1,2})?$/.test(clean)) return null;
+    const amount = Number(clean);
+    if (!Number.isFinite(amount) || amount < 0) return null;
+    return String(Math.round(amount));
+  }
+
+  async function saveToStorage(key, value) {
+    const raw = JSON.stringify(value);
+    localStorage.setItem(key, raw);
+
+    // The local copy makes the app usable offline.  When cloud storage is
+    // enabled, also wait for this specific write so success is truthful.
+    if (window.CleverCloudSync?.isEnabled?.()) {
+      await window.CleverCloudSync.pushKey(key, value);
+    }
+  }
+
+  async function save() {
     if (!hasPerm('save')) { alert('Huna ruhusa ya kuhifadhi bei.'); return; }
     const d = {};
+    const invalid = [];
     document.querySelectorAll('[data-key]').forEach(i => {
-      d[i.dataset.key] = i.value.replace(/TSH/gi, '').trim();
+      const price = normalisePrice(i.value);
+      if (price === null) invalid.push(i.previousElementSibling?.textContent || 'bei');
+      else d[i.dataset.key] = price;
     });
-    localStorage.setItem(KEY, JSON.stringify(d));
-    alert('Bei zimehifadhiwa! Fungua menu kuona mabadiliko.');
+    if (invalid.length) {
+      alert('Weka bei sahihi (namba isiyo hasi) kwenye: ' + invalid.join(', '));
+      return;
+    }
+
+    const button = $('saveBtn');
+    const oldLabel = button?.innerHTML;
+    if (button) { button.disabled = true; button.textContent = '⏳ Inahifadhi...'; }
+    try {
+      await saveToStorage(KEY, d);
+      // Keep the POS price list aligned with the menu as soon as prices change.
+      if (hasPerm('sales_items')) syncMenuPricesToPos();
+      render();
+      alert(window.CleverCloudSync?.isEnabled?.()
+        ? 'Bei zimehifadhiwa kwenye simu na mtandaoni.'
+        : 'Bei zimehifadhiwa kwenye kifaa hiki.');
+    } catch (err) {
+      console.error('Could not save menu prices online', err);
+      alert('Bei zimehifadhiwa kwenye kifaa hiki, lakini kuhifadhi mtandaoni kumeshindikana. Jaribu tena ukiwa na intaneti.');
+    } finally {
+      if (button) { button.disabled = false; button.innerHTML = oldLabel; }
+    }
   }
 
   function resetPrices() {
@@ -1414,21 +1546,32 @@
     try { return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]'); } catch { return []; }
   }
 
-  function addMenu() {
+  async function addMenu() {
     if (!hasPerm('menus')) return;
     const name = $('newName').value.trim();
     const category = $('newCategory').value;
-    const price = $('newPrice').value.trim();
+    const price = normalisePrice($('newPrice').value);
     const size = $('newSize').value.trim();
     const desc = $('newDesc').value.trim();
     const image = $('newImage').value.trim();
-    if (!name || !price) { alert('Tafadhali weka jina la menu na bei.'); return; }
+    if (!name || price === null || price === '0') { alert('Tafadhali weka jina la menu na bei sahihi.'); return; }
     const list = getCustom();
     list.push({ id: Date.now().toString(), name, category, price, size, desc, image, active: true });
-    localStorage.setItem(CUSTOM_KEY, JSON.stringify(list));
-    ['newName', 'newPrice', 'newSize', 'newDesc', 'newImage'].forEach(id => { if ($(id)) $(id).value = ''; });
-    renderCustom();
-    alert('Menu mpya imeongezwa.');
+    const button = $('addMenuBtn');
+    const oldLabel = button?.innerHTML;
+    if (button) { button.disabled = true; button.textContent = '⏳ Inaongeza...'; }
+    try {
+      await saveToStorage(CUSTOM_KEY, list);
+      ['newName', 'newPrice', 'newSize', 'newDesc', 'newImage'].forEach(id => { if ($(id)) $(id).value = ''; });
+      renderCustom();
+      alert(window.CleverCloudSync?.isEnabled?.() ? 'Menu mpya imeongezwa na kuhifadhiwa mtandaoni.' : 'Menu mpya imeongezwa.');
+    } catch (err) {
+      console.error('Could not save custom menu online', err);
+      renderCustom();
+      alert('Menu imehifadhiwa kwenye kifaa hiki, lakini haijafika mtandaoni. Jaribu tena ukiwa na intaneti.');
+    } finally {
+      if (button) { button.disabled = false; button.innerHTML = oldLabel; }
+    }
   }
 
   function renderCustom() {
@@ -1447,10 +1590,17 @@
     });
   }
 
-  function deleteMenu(id) {
+  async function deleteMenu(id) {
     if (!confirm('Futa menu hii?')) return;
-    localStorage.setItem(CUSTOM_KEY, JSON.stringify(getCustom().filter(x => x.id !== id)));
-    renderCustom();
+    const list = getCustom().filter(x => x.id !== id);
+    try {
+      await saveToStorage(CUSTOM_KEY, list);
+      renderCustom();
+    } catch (err) {
+      console.error('Could not delete custom menu online', err);
+      renderCustom();
+      alert('Menu imeondolewa kwenye kifaa hiki, lakini mabadiliko hayajahifadhiwa mtandaoni.');
+    }
   }
 
   const DEFAULT_SALES_ITEMS = [
@@ -1471,6 +1621,15 @@
 
   function getSalesItems() {
     try {
+      if (isAllBranchesMode()) {
+        const items = [];
+        getBranches().forEach(b => {
+          loadSalesItemsForBranch(b.id).filter(x => x.active !== false).forEach(x => {
+            items.push({ ...x, branchId: b.id, branchName: b.name });
+          });
+        });
+        return items;
+      }
       const saved = loadBranchData(SALES_ITEMS_KEY, '[]');
       return Array.isArray(saved) ? saved.filter(x => x.active !== false) : [];
     } catch {
@@ -1480,6 +1639,15 @@
 
   function getAllSalesItems() {
     try {
+      if (isAllBranchesMode()) {
+        const items = [];
+        getBranches().forEach(b => {
+          loadSalesItemsForBranch(b.id).forEach(x => {
+            items.push({ ...x, branchId: b.id, branchName: b.name });
+          });
+        });
+        return items;
+      }
       const saved = loadBranchData(SALES_ITEMS_KEY, '[]');
       return Array.isArray(saved) ? saved : [];
     } catch {
@@ -1499,7 +1667,15 @@
   }
 
   function migrateStockFields() {
-    const list = getAllSalesItems();
+    if (isAllBranchesMode()) {
+      getBranches().forEach(b => migrateStockFieldsForBranch(b.id));
+      return;
+    }
+    migrateStockFieldsForBranch(getCurrentBranchId());
+  }
+
+  function migrateStockFieldsForBranch(branchId) {
+    const list = loadSalesItemsForBranch(branchId);
     let changed = false;
     const migrated = list.map(x => {
       if (x.stock != null && x.lowStock != null && x.trackStock != null) return x;
@@ -1512,11 +1688,14 @@
         trackStock: x.trackStock !== false
       };
     });
-    if (changed) saveSalesItemsList(migrated);
+    if (changed) saveBranchData(SALES_ITEMS_KEY, migrated, branchId);
   }
 
   function getStockLog() {
     try {
+      if (isAllBranchesMode()) {
+        return loadAllBranchesData(STOCK_LOG_KEY, []);
+      }
       const saved = loadBranchData(STOCK_LOG_KEY, '[]');
       return Array.isArray(saved) ? saved : [];
     } catch {
@@ -1542,12 +1721,16 @@
     return v + ' ' + (unit || '');
   }
 
-  function saveSalesItemsList(list) {
-    saveBranchData(SALES_ITEMS_KEY, list);
+  function saveSalesItemsList(list, branchId) {
+    const bid = branchId || findItemBranchId(list[0]?.id) || getCurrentBranchId();
+    if (bid === ALL_BRANCHES_ID) return;
+    saveBranchData(SALES_ITEMS_KEY, list, bid);
   }
 
   function updateItemStock(itemId, delta, type, note, ref) {
-    const list = getAllSalesItems();
+    const branchId = findItemBranchId(itemId);
+    if (branchId === ALL_BRANCHES_ID) return null;
+    const list = loadSalesItemsForBranch(branchId);
     const idx = list.findIndex(x => x.id === itemId && x.active !== false);
     if (idx < 0) return null;
     const item = list[idx];
@@ -1556,12 +1739,13 @@
     const before = Number(item.stock) || 0;
     const after = Math.max(0, Math.round((before + delta) * 100) / 100);
     list[idx] = { ...item, stock: after };
-    saveSalesItemsList(list);
+    saveBranchData(SALES_ITEMS_KEY, list, branchId);
 
     const session = getSession();
-    const log = getStockLog();
-    const branch = getCurrentBranch();
-    log.unshift({
+    const branch = getBranchById(branchId);
+    const log = loadBranchDataFor(STOCK_LOG_KEY, branchId, []);
+    const stockLog = Array.isArray(log) ? log : [];
+    stockLog.unshift({
       id: 'stk-' + Date.now(),
       at: new Date().toISOString(),
       type,
@@ -1575,13 +1759,13 @@
       note: note || '',
       ref: ref || '',
       user: session?.user || 'staff',
-      branchId: branch?.id || '',
+      branchId: branch?.id || branchId,
       branchName: branch?.name || ''
     });
-    if (log.length > 500) log.length = 500;
-    saveBranchData(STOCK_LOG_KEY, log);
+    if (stockLog.length > 500) stockLog.length = 500;
+    saveBranchData(STOCK_LOG_KEY, stockLog, branchId);
 
-    return list[idx];
+    return { ...list[idx], branchId, branchName: branch?.name };
   }
 
   function addStockToItem(itemId, qty, note) {
@@ -1711,7 +1895,7 @@
       const status = getStockStatus(x);
       return `
         <div class="stock-alert stock-alert-${status}">
-          <span>${status === 'out' ? '🔴' : '⚠️'} <b>${escapeHtml(x.name)}</b> — ${escapeHtml(formatStockQty(x.stock, x.unit))} (${escapeHtml(stockStatusLabel(status))})</span>
+          <span>${status === 'out' ? '🔴' : '⚠️'} <b>${escapeHtml(x.name)}</b>${x.branchName ? ' · ' + escapeHtml(x.branchName) : ''} — ${escapeHtml(formatStockQty(x.stock, x.unit))} (${escapeHtml(stockStatusLabel(status))})</span>
           ${hasPerm('stock_add') ? `<button type="button" class="btn btn-save btn-sm" data-stock-add="${escapeHtml(x.id)}" data-stock-qty="${x.unit === 'KG' ? '5' : '10'}">+ Ongeza</button>` : ''}
         </div>`;
     }).join('');
@@ -1745,7 +1929,7 @@
             <div class="stock-row-head">
               <div>
                 <strong>${escapeHtml(x.name)}</strong>
-                <span class="stock-meta">${escapeHtml(x.category)} · ${escapeHtml(x.unit)}</span>
+                <span class="stock-meta">${x.branchName ? escapeHtml(x.branchName) + ' · ' : ''}${escapeHtml(x.category)} · ${escapeHtml(x.unit)}</span>
               </div>
               <span class="stock-badge stock-badge-${status}">${escapeHtml(stockStatusLabel(status))}</span>
             </div>
@@ -1791,8 +1975,13 @@
 
   function getSalesLog() {
     try {
-      const saved = loadBranchData(SALES_LOG_KEY, '[]');
-      const local = Array.isArray(saved) ? saved : [];
+      let local;
+      if (isAllBranchesMode()) {
+        local = loadAllBranchesData(SALES_LOG_KEY, []);
+      } else {
+        local = loadBranchData(SALES_LOG_KEY, '[]');
+        local = Array.isArray(local) ? local : [];
+      }
       if (cloudSalesCache && window.CleverOrdersCloud?.isEnabled()) {
         return mergeSalesLogs(local, cloudSalesCache);
       }
@@ -1802,18 +1991,22 @@
     }
   }
 
-  function getBranchSalesLog() {
+  function getBranchSalesLog(branchId) {
     try {
-      const saved = loadBranchData(SALES_LOG_KEY, '[]');
+      const bid = branchId || getCurrentBranchId();
+      if (bid === ALL_BRANCHES_ID) return getSalesLog();
+      const saved = loadBranchDataFor(SALES_LOG_KEY, bid, '[]');
       return Array.isArray(saved) ? saved : [];
     } catch {
       return [];
     }
   }
 
-  function persistSalesLog(log) {
-    saveBranchData(SALES_LOG_KEY, log);
-    if (cloudSalesCache) cloudSalesCache = log.slice();
+  function persistSalesLog(log, branchId) {
+    const bid = branchId || getCurrentBranchId();
+    if (bid === ALL_BRANCHES_ID) return;
+    saveBranchData(SALES_LOG_KEY, log, bid);
+    if (cloudSalesCache && !isAllBranchesMode()) cloudSalesCache = log.slice();
   }
 
   function findSaleById(saleId) {
@@ -1874,7 +2067,8 @@
     }
     if (!confirm('Futa mauzo: ' + sale.itemName + ' (' + sale.qty + ' ' + sale.unit + ') — TSH ' + formatMoney(sale.total) + '?')) return;
     restoreSaleStock(sale);
-    persistSalesLog(getBranchSalesLog().filter(s => s.id !== saleId));
+    const bid = getSaleBranchId(sale);
+    persistSalesLog(getBranchSalesLog(bid).filter(s => s.id !== saleId), bid);
     await removeSaleFromCloud(saleId);
     refreshAfterSaleChange();
     showAdminToast('✓ Mauzo yamefutwa');
@@ -1889,9 +2083,16 @@
     }
     const total = sales.reduce((s, x) => s + (Number(x.total) || 0), 0);
     if (!confirm('Futa risiti nzima (' + sales.length + ' bidhaa, TSH ' + formatMoney(total) + ')? Stock itarudishwa.')) return;
-    const ids = new Set(sales.map(s => s.id));
     sales.forEach(restoreSaleStock);
-    persistSalesLog(getBranchSalesLog().filter(s => !ids.has(s.id)));
+    const byBranch = {};
+    sales.forEach(s => {
+      const bid = getSaleBranchId(s);
+      if (!byBranch[bid]) byBranch[bid] = new Set();
+      byBranch[bid].add(s.id);
+    });
+    Object.entries(byBranch).forEach(([bid, idSet]) => {
+      persistSalesLog(getBranchSalesLog(bid).filter(s => !idSet.has(s.id)), bid);
+    });
     await Promise.all(sales.map(s => removeSaleFromCloud(s.id)));
     refreshAfterSaleChange();
     showAdminToast('✓ Risiti imefutwa');
@@ -1989,7 +2190,7 @@
       editedBy: session?.user || 'staff'
     };
 
-    persistSalesLog(getBranchSalesLog().map(s => s.id === editSaleId ? updated : s));
+    persistSalesLog(getBranchSalesLog(getSaleBranchId(sale)).map(s => s.id === editSaleId ? updated : s), getSaleBranchId(sale));
     const cloud = window.CleverOrdersCloud;
     if (cloud?.isEnabled()) {
       try {
@@ -2145,10 +2346,13 @@
   function updateSalesItemCost(id, costPrice) {
     if (!hasPerm('sales_items')) return;
     const cost = Math.max(0, parseInt(String(costPrice), 10) || 0);
-    const list = getAllSalesItems().map(x =>
+    const item = getAllSalesItems().find(x => x.id === id);
+    const branchId = item?.branchId || findItemBranchId(id);
+    if (branchId === ALL_BRANCHES_ID) return;
+    const list = loadSalesItemsForBranch(branchId).map(x =>
       x.id === id ? { ...x, costPrice: cost } : x
     );
-    saveSalesItemsList(list);
+    saveBranchData(SALES_ITEMS_KEY, list, branchId);
     renderSalesItems();
     renderProfitReport();
     renderDashboard();
@@ -2306,6 +2510,7 @@
 
   function addSalesItem() {
     if (!hasPerm('sales_items')) return;
+    if (!requireSingleBranch('kuongeza bidhaa')) return;
     const name = $('salesItemName')?.value.trim();
     const category = $('salesItemCategory')?.value || 'Nyingine';
     const unit = $('salesItemUnit')?.value || 'KG';
@@ -2342,10 +2547,13 @@
   function deleteSalesItem(id) {
     if (!hasPerm('sales_items')) return;
     if (!confirm('Futa bidhaa hii?')) return;
-    const list = getAllSalesItems().map(x =>
+    const item = getAllSalesItems().find(x => x.id === id);
+    const branchId = item?.branchId || findItemBranchId(id);
+    if (branchId === ALL_BRANCHES_ID) return;
+    const list = loadSalesItemsForBranch(branchId).map(x =>
       x.id === id ? { ...x, active: false } : x
     );
-    saveSalesItemsList(list);
+    saveBranchData(SALES_ITEMS_KEY, list, branchId);
     renderSalesItems();
     populateSaleItemSelect();
     renderStock();
@@ -2572,6 +2780,10 @@
     renderPosSmartSuggestions();
     const el = $('posProductGrid');
     if (!el) return;
+    if (isAllBranchesMode()) {
+      el.innerHTML = '<div class="pos-grid-empty pos-all-branches-msg">📊 Uko kwenye <b>Matawi Yote</b>. Chagua tawi moja juu ili kuuza kwa Smart POS.</div>';
+      return;
+    }
     const items = getPosFilteredItems();
     if (!items.length) {
       el.innerHTML = '<div class="pos-grid-empty">Hakuna bidhaa. Ongeza kwenye Bidhaa za Mauzo.</div>';
@@ -2915,6 +3127,7 @@
 
   function addToSaleCart() {
     if (!hasPerm('sales')) return;
+    if (!requireSingleBranch('kuuza')) return;
     const item = getSelectedSaleItem();
     const qty = parseFloat($('saleQty')?.value);
     const total = parseInt($('saleTotal')?.value, 10);
@@ -2961,13 +3174,15 @@
 
   async function recordSaleCart() {
     if (!hasPerm('sales') || !saleCart.length) return;
+    const writeBranch = requireSingleBranch('kuuza');
+    if (!writeBranch) return;
     const payment = $('salePayment')?.value || 'cash';
     const phone = $('salePhone')?.value.trim() || '';
     const notes = $('saleNotes')?.value.trim() || '';
     const session = getSession();
-    const branch = getCurrentBranch();
+    const branch = getBranchById(writeBranch);
     const receiptId = 'rcpt-' + Date.now();
-    const log = getSalesLog();
+    const log = getBranchSalesLog(writeBranch);
     let grandTotal = 0;
 
     for (const line of saleCart) {
@@ -3020,7 +3235,7 @@
       }
     });
     if (log.length > 500) log.length = 500;
-    saveBranchData(SALES_LOG_KEY, log);
+    saveBranchData(SALES_LOG_KEY, log, writeBranch);
 
     saleCart = [];
     ['salePhone', 'saleNotes'].forEach(id => { if ($(id)) $(id).value = ''; });
@@ -3040,6 +3255,7 @@
 
   async function recordSale() {
     if (!hasPerm('sales')) return;
+    if (!requireSingleBranch('kuuza')) return;
     if (saleCart.length) {
       recordSaleCart();
       return;
@@ -3068,7 +3284,8 @@
       }
     }
 
-    const branch = getCurrentBranch();
+    const writeBranch = getCurrentBranchId();
+    const branch = getBranchById(writeBranch);
     const receiptId = 'rcpt-' + Date.now();
     const econ = buildSaleEconomicsFields(item, qty, total);
     const sale = {
@@ -3094,10 +3311,10 @@
       branchName: branch?.name || ''
     };
 
-    const log = getSalesLog();
+    const log = getBranchSalesLog(writeBranch);
     log.unshift(sale);
     if (log.length > 500) log.length = 500;
-    saveBranchData(SALES_LOG_KEY, log);
+    saveBranchData(SALES_LOG_KEY, log, writeBranch);
 
     let stockAfter = null;
     if (item.trackStock !== false) {
@@ -3216,7 +3433,7 @@
         <div class="order-card-head">
           <div>
             <strong>${escapeHtml(formatOrderDate(x.at))}</strong>
-            <span class="order-meta">${escapeHtml(x.category)} · ${escapeHtml(paymentLabel(x.payment))} · ${escapeHtml(x.seller || 'staff')}${x.branchName ? ' · ' + escapeHtml(x.branchName) : ''}${x.editedAt ? ' · ✏ imehaririwa' : ''}</span>
+            <span class="order-meta">${escapeHtml(x.category)} · ${escapeHtml(paymentLabel(x.payment))} · ${escapeHtml(x.seller || 'staff')}${(isAllBranchesMode() || x.branchName) ? ' · 🏪 ' + escapeHtml(x.branchName || '—') : ''}${x.editedAt ? ' · ✏ imehaririwa' : ''}</span>
           </div>
           <strong class="order-total">TSH ${formatMoney(x.total)}</strong>
         </div>
@@ -3264,10 +3481,15 @@
 
   function clearSales() {
     if (!hasPerm('sales_clear')) return;
-    const branch = getCurrentBranch();
-    const label = branch?.name || 'tawi hili';
-    if (!confirm('Futa historia yote ya mauzo kwa ' + label + '?')) return;
-    localStorage.removeItem(branchStorageKey(SALES_LOG_KEY));
+    if (isAllBranchesMode()) {
+      if (!confirm('Futa mauzo ya MATAWI YOTE? Hii haiwezi rudishwa.')) return;
+      getBranches().forEach(b => localStorage.removeItem(branchStorageKey(SALES_LOG_KEY, b.id)));
+    } else {
+      const branch = getCurrentBranch();
+      const label = branch?.name || 'tawi hili';
+      if (!confirm('Futa historia yote ya mauzo kwa ' + label + '?')) return;
+      localStorage.removeItem(branchStorageKey(SALES_LOG_KEY));
+    }
     renderSales();
   }
 
@@ -4514,7 +4736,7 @@ alter table public.app_storage replica identity full;`;
       cloudSalesCache = null;
       return;
     }
-    const branchId = getCurrentBranchId();
+    const branchId = isAllBranchesMode() ? null : getCurrentBranchId();
     cloudSalesUnsub = cloud.subscribeSales(branchId, sales => {
       cloudSalesCache = sales;
       updateCloudBadge();

@@ -2409,7 +2409,25 @@ body {
   margin-top: 4px;
 }
 
-.branch-bar-locked {
+.branch-bar-all {
+  background: linear-gradient(135deg, #fff8e7 0%, #f0f7ff 100%);
+  border-color: var(--maroon);
+}
+.branch-all-card {
+  border: 2px dashed var(--maroon);
+  background: linear-gradient(145deg, #fffbea 0%, #fff 100%);
+}
+.pos-all-branches-msg {
+  padding: 24px 16px;
+  text-align: center;
+  line-height: 1.6;
+  color: var(--maroon-dark);
+  background: #fff8e7;
+  border-radius: 12px;
+  border: 1px dashed #dcc07a;
+}
+.all-branches-mode .seller-quick-mode .branch-bar-all { display: flex; }
+
   background: linear-gradient(135deg, #fffbea 0%, #fff 100%);
   border-color: var(--yellow);
 }

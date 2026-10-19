@@ -1945,8 +1945,8 @@
     saveBranchData(SALES_ITEMS_KEY, list, bid);
   }
 
-  function updateItemStock(itemId, delta, type, note, ref) {
-    const branchId = findItemBranchId(itemId);
+  function updateItemStock(itemId, delta, type, note, ref, targetBranchId) {
+    const branchId = targetBranchId || findItemBranchId(itemId);
     if (branchId === ALL_BRANCHES_ID) return null;
     const list = loadSalesItemsForBranch(branchId);
     const idx = list.findIndex(x => x.id === itemId && x.active !== false);
@@ -2009,6 +2009,42 @@
 
   function recordWastage(itemId) {
     showWastageDialog(itemId);
+  }
+
+  function showBranchStockDialog() {
+    if (!hasPerm('stock_add')) return;
+    const branches = isBranchLocked() ? getBranches().filter(b => b.id === getAssignedBranchId()) : getBranches();
+    const body = $('adminDialogBody');
+    const dialog = $('adminDialog');
+    const okBtn = $('adminDialogOk');
+    if (!branches.length || !body || !dialog || !okBtn) return;
+    const initialBranch = branches.some(b => b.id === getCurrentBranchId()) ? getCurrentBranchId() : branches[0].id;
+    body.innerHTML = `<div class="edit-sale-dialog"><h3 class="ssd-title" id="adminDialogTitle">➕ Ongeza Stock kwa Tawi</h3><p class="ssd-sub">Chagua tawi, bidhaa, na kiasi. Stock itahifadhiwa kwenye tawi hilo pekee.</p><div class="edit-sale-grid"><label class="field field-wide"><span>Tawi</span><select id="branchStockBranch">${branches.map(b => `<option value="${escapeHtml(b.id)}"${b.id === initialBranch ? ' selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}</select></label><label class="field field-wide"><span>Bidhaa</span><select id="branchStockItem"></select></label><label class="field"><span>Kiasi cha kuongeza</span><input id="branchStockQty" type="number" min="0.01" step="0.01" placeholder="Mfano: 5"></label><label class="field field-wide"><span>Maelezo (hiari)</span><input id="branchStockNote" placeholder="Mfano: Stock mpya imefika"></label></div></div>`;
+    const itemSelect = $('branchStockItem');
+    const fillItems = () => {
+      const branchId = $('branchStockBranch')?.value;
+      const items = loadSalesItemsForBranch(branchId).filter(x => x.active !== false && x.trackStock !== false);
+      itemSelect.innerHTML = items.length ? items.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)} — iliyopo: ${escapeHtml(formatStockQty(x.stock, x.unit))}</option>`).join('') : '<option value="">Hakuna bidhaa za stock kwenye tawi hili</option>';
+    };
+    fillItems();
+    $('branchStockBranch')?.addEventListener('change', fillItems);
+    $('adminDialogCancel')?.classList.remove('hidden');
+    okBtn.textContent = '💾 Hifadhi Stock';
+    if (adminDialogOkHandler) okBtn.removeEventListener('click', adminDialogOkHandler);
+    adminDialogOkHandler = () => {
+      const branchId = $('branchStockBranch')?.value;
+      const itemId = $('branchStockItem')?.value;
+      const qty = parseFloat($('branchStockQty')?.value);
+      const note = ($('branchStockNote')?.value || '').trim();
+      if (!branchId || !itemId || !qty || qty <= 0) { showAdminToast('Chagua tawi, bidhaa na kiasi sahihi.', 'warn'); return; }
+      const updated = updateItemStock(itemId, qty, 'in', note || 'Ongezeko la stock kwa tawi', '', branchId);
+      if (!updated) { showAdminToast('Imeshindwa kuhifadhi stock.', 'warn'); return; }
+      closeAdminDialog();
+      if (branchId === getCurrentBranchId()) { populateSaleItemSelect(); renderSalesItems(); renderStock(); renderDashboard(); }
+      showAdminToast('✓ Stock imehifadhiwa: ' + updated.name + ' — ' + (getBranchById(branchId)?.name || 'Tawi'));
+    };
+    dialog.classList.add('open');
+    dialog.setAttribute('aria-hidden', 'false');
   }
 
   let stockAdjustmentItemId = null;
@@ -5531,6 +5567,7 @@ alter table public.app_storage replica identity full;`;
 
   function bindEvents() {
     $('smartRefreshBtn')?.addEventListener('click', manualSmartRefresh);
+    $('addBranchStockBtn')?.addEventListener('click', showBranchStockDialog);
     $('adminMenuToggle')?.addEventListener('click', () => {
       $('adminSidebar')?.classList.toggle('open');
       $('adminLayout')?.classList.toggle('sidebar-open');

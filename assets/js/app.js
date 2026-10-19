@@ -285,11 +285,15 @@
 
   function getCheckout() {
     return {
+      name: document.getElementById('custName')?.value.trim() || '',
       phone: document.getElementById('custPhone')?.value.trim() || '',
       address: document.getElementById('custAddress')?.value.trim() || '',
       notes: document.getElementById('custNotes')?.value.trim() || '',
       fulfillment: document.querySelector('#fulfillmentPills .pill.active')?.dataset.val || 'delivery',
-      payment: document.querySelector('#paymentPills .pill.active')?.dataset.val || 'mpesa'
+      payment: document.querySelector('#paymentPills .pill.active')?.dataset.val || 'mpesa',
+      timing: document.querySelector('#timingPills .pill.active')?.dataset.val || 'asap',
+      scheduleDate: document.getElementById('custScheduleDate')?.value || '',
+      scheduleTime: document.getElementById('custScheduleTime')?.value || ''
     };
   }
 
@@ -301,13 +305,18 @@
     try {
       const c = JSON.parse(localStorage.getItem(CUSTOMER_KEY) || '{}');
       const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+      set('custName', c.name);
       set('custPhone', c.phone);
       set('custAddress', c.address);
       set('custNotes', c.notes);
+      set('custScheduleDate', c.scheduleDate);
+      set('custScheduleTime', c.scheduleTime);
       if (c.fulfillment) setPillActive('fulfillmentPills', c.fulfillment);
       if (c.payment) setPillActive('paymentPills', c.payment);
+      if (c.timing) setPillActive('timingPills', c.timing);
       toggleAddressField();
       toggleLipaPanel();
+      toggleScheduleFields();
     } catch { /* noop */ }
   }
 
@@ -327,6 +336,18 @@
     const lipa = document.querySelector('#paymentPills .pill.active')?.dataset.val === 'lipa';
     const panel = document.getElementById('lipaPanel');
     if (panel) panel.classList.toggle('lipa-active', lipa);
+  }
+
+  function toggleScheduleFields() {
+    const scheduled = document.querySelector('#timingPills .pill.active')?.dataset.val === 'scheduled';
+    const fields = document.getElementById('scheduleFields');
+    if (fields) fields.hidden = !scheduled;
+  }
+
+  function scheduleLabel(c) {
+    if (c.timing !== 'scheduled') return 'Sasa hivi';
+    if (!c.scheduleDate || !c.scheduleTime) return 'Muda haujawekwa';
+    return c.scheduleDate + ' saa ' + c.scheduleTime;
   }
 
   function lipaNumbersLine() {
@@ -365,7 +386,11 @@
       channel,
       phone: c.phone,
       address: c.address,
-      notes: c.notes,
+      notes: [
+        c.name ? 'Mteja: ' + c.name : '',
+        'Muda wa oda: ' + scheduleLabel(c),
+        c.notes
+      ].filter(Boolean).join(' · '),
       fulfillment: c.fulfillment,
       payment: c.payment,
       subtotal: getCartTotal(),
@@ -719,8 +744,10 @@
     const lines = ['Habari Clever Kitimoto, naomba kuagiza:', ''];
 
     if (c.phone) lines.push('Simu: ' + c.phone);
+    if (c.name) lines.push('Jina: ' + c.name);
     lines.push('Aina: ' + (c.fulfillment === 'pickup' ? 'Pickup' : 'Delivery'));
     if (c.fulfillment === 'delivery' && c.address) lines.push('Mahali: ' + c.address);
+    lines.push('Muda: ' + scheduleLabel(c));
     lines.push('Malipo: ' + paymentLabel(c.payment));
     if (c.payment === 'lipa') lines.push('Lipa namba: ' + lipaNumbersLine());
     if (c.notes) lines.push('Maelezo: ' + c.notes);
@@ -986,6 +1013,8 @@
 
     document.getElementById('openOrderPanel')?.addEventListener('click', openOrderPanel);
     document.getElementById('cartBarTap')?.addEventListener('click', openOrderPanel);
+    document.getElementById('heroOrder')?.addEventListener('click', openOrderPanel);
+    document.getElementById('bannerOrder')?.addEventListener('click', openOrderPanel);
     document.getElementById('orderPanelClose')?.addEventListener('click', closeOrderPanel);
     document.getElementById('orderPanelBackdrop')?.addEventListener('click', closeOrderPanel);
     document.getElementById('mobileOpenOrder')?.addEventListener('click', e => {
@@ -1029,6 +1058,18 @@
       showToast('Tafadhali weka namba ya simu');
       openOrderPanel();
       document.getElementById('custPhone')?.focus();
+      return;
+    }
+    if (c.fulfillment === 'delivery' && !c.address) {
+      showToast('Weka mahali pa delivery ili tukufikie');
+      openOrderPanel();
+      document.getElementById('custAddress')?.focus();
+      return;
+    }
+    if (c.timing === 'scheduled' && (!c.scheduleDate || !c.scheduleTime)) {
+      showToast('Weka tarehe na muda wa oda yako');
+      openOrderPanel();
+      document.getElementById('custScheduleDate')?.focus();
       return;
     }
     saveCheckout();
@@ -1253,7 +1294,9 @@
 
   function initCheckout() {
     loadCheckout();
-    ['custPhone', 'custAddress', 'custNotes'].forEach(id => {
+    const dateInput = document.getElementById('custScheduleDate');
+    if (dateInput) dateInput.min = new Date().toISOString().slice(0, 10);
+    ['custName', 'custPhone', 'custAddress', 'custNotes', 'custScheduleDate', 'custScheduleTime'].forEach(id => {
       document.getElementById(id)?.addEventListener('input', saveCheckout);
     });
     document.querySelectorAll('.pill-group').forEach(group => {
@@ -1265,6 +1308,7 @@
         saveCheckout();
         if (group.id === 'fulfillmentPills') toggleAddressField();
         if (group.id === 'paymentPills') toggleLipaPanel();
+        if (group.id === 'timingPills') toggleScheduleFields();
       });
     });
     document.querySelectorAll('.lipa-card').forEach(btn => {

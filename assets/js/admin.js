@@ -8,6 +8,7 @@
   const SALES_ITEMS_KEY = 'cleverKitimotoSalesItemsV1';
   const SALES_LOG_KEY = 'cleverKitimotoSalesLogV1';
   const STOCK_LOG_KEY = 'cleverKitimotoStockLogV1';
+  const EXPENSES_KEY = 'cleverKitimotoExpensesV1';
   const BRANCHES_KEY = 'cleverKitimotoBranchesV1';
   const STAFF_BRANCHES_KEY = 'cleverKitimotoStaffBranchesV1';
   const STAFF_ACCOUNTS_KEY = 'cleverKitimotoStaffAccountsV1';
@@ -30,8 +31,8 @@
   ];
 
   const PERMS = {
-    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'sales_manage', 'stock_add', 'branches', 'staff_manage', 'backup', 'eod'],
-    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'sales_manage', 'stock_add', 'branches', 'eod'],
+    admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'sales_manage', 'stock_add', 'expenses', 'branches', 'staff_manage', 'backup', 'eod'],
+    manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'sales_manage', 'stock_add', 'expenses', 'branches', 'eod'],
     seller: ['dashboard', 'sales', 'stock_view']
   };
 
@@ -260,10 +261,10 @@
     return true;
   }
 
-  function reassignStaffFromBranch(branchId) {
+  async function reassignStaffFromBranch(branchId) {
     const map = getStaffBranchMap();
     const fallback = getBranches().find(b => b.id !== branchId)?.id;
-    if (!fallback) return;
+    if (!fallback) return false;
     let changed = false;
     Object.keys(map).forEach(user => {
       if (map[user] === branchId) {
@@ -271,7 +272,8 @@
         changed = true;
       }
     });
-    if (changed) saveStaffBranchMap(map);
+    if (changed) await saveDatabaseFirst(STAFF_BRANCHES_KEY, map);
+    return changed;
   }
 
   function canViewAllBranches() {
@@ -455,35 +457,93 @@
     $('branchBarRight')?.classList.toggle('hidden', isBranchLocked());
   }
 
-  function registerBranch() {
+  async function registerBranch() {
     if (!hasPerm('branches')) return;
-    const name = $('branchName')?.value.trim();
-    const location = $('branchLocation')?.value.trim();
-    const phone = $('branchPhone')?.value.trim();
+    const cloud = window.CleverCloudSync;
+    if (!cloud?.isEnabled?.()) {
+      showAdminToast('Unganisha Supabase kwanza: Zana → Unganisha Supabase. Tawi halijahifadhiwa kwenye simu pekee.', 'warn');
+      return;
+    }
+    const name = ($('branchName')?.value || '').replace(/\s+/g, ' ').trim();
+    const location = ($('branchLocation')?.value || '').replace(/\s+/g, ' ').trim();
+    const phone = ($('branchPhone')?.value || '').replace(/\s+/g, ' ').trim();
     if (!name) {
       showAdminToast('Weka jina la tawi.', 'warn');
+      $('branchName')?.focus();
       return;
     }
-    const list = getAllBranches();
-    if (list.some(b => b.name.toLowerCase() === name.toLowerCase() && b.active !== false)) {
-      showAdminToast('Tawi lenye jina hili lipo tayari.', 'warn');
+    if (phone && !/^[+0-9() -]{7,25}$/.test(phone)) {
+      showAdminToast('Weka namba ya simu sahihi ya tawi.', 'warn');
+      $('branchPhone')?.focus();
       return;
     }
-    const branch = {
-      id: 'br-' + Date.now(),
-      name,
-      location: location || '',
-      phone: phone || '',
-      active: true,
-      createdAt: new Date().toISOString()
-    };
-    list.push(branch);
-    localStorage.setItem(BRANCHES_KEY, JSON.stringify(list));
-    initSalesItemsForBranch(branch.id);
-    ['branchName', 'branchLocation', 'branchPhone'].forEach(id => { if ($(id)) $(id).value = ''; });
-    populateBranchSelect();
-    renderBranches();
-    showAdminToast('✓ Tawi limeandikishwa: ' + name);
+    const button = $('registerBranchBtn');
+    const oldLabel = button?.innerHTML;
+    if (button) { button.disabled = true; button.textContent = '⏳ Inahifadhi database...'; }
+    try {
+      // Refresh before writing so a branch created on another device is not lost.
+      await cloud.pullFromCloud();
+      const list = getAllBranches();
+      const nameKey = name.toLocaleLowerCase();
+      if (list.some(b => String(b.name || '').replace(/\s+/g, ' ').trim().toLocaleLowerCase() === nameKey && b.active !== false)) {
+        showAdminToast('Tawi lenye jina hili lipo tayari.', 'warn');
+        $('branchName')?.focus();
+        return;
+      }
+      const branch = {
+        id: 'br-' + Date.now(),
+        name,
+        location: location || '',
+        phone: phone || '',
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+
+      // Write the initial stock and the branch list to Supabase first. The
+      // browser copy is updated only after each database write succeeds.
+      await seedBranchSalesItemsInDatabase(branch.id);
+      await saveDatabaseFirst(BRANCHES_KEY, [...list, branch]);
+
+      ['branchName', 'branchLocation', 'branchPhone'].forEach(id => { if ($(id)) $(id).value = ''; });
+      updateBranchDraft();
+      switchBranch(branch.id);
+      showAdminToast('✓ Tawi limehifadhiwa Supabase na kufunguliwa: ' + name);
+    } catch (err) {
+      console.error('Could not save branch to database', err);
+      showAdminToast('Tawi halijahifadhiwa. Angalia Supabase/mtandao kisha jaribu tena: ' + (err.message || ''), 'warn');
+    } finally {
+      if (button) { button.disabled = false; button.innerHTML = oldLabel; }
+    }
+  }
+
+  function updateBranchDraft() {
+    const draft = $('branchDraft');
+    if (!draft) return;
+    const name = ($('branchName')?.value || '').replace(/\s+/g, ' ').trim();
+    const location = ($('branchLocation')?.value || '').replace(/\s+/g, ' ').trim();
+    const phone = ($('branchPhone')?.value || '').replace(/\s+/g, ' ').trim();
+    if (!name && !location && !phone) {
+      draft.classList.add('hidden');
+      draft.innerHTML = '';
+      return;
+    }
+    draft.classList.remove('hidden');
+    draft.innerHTML = `
+      <span class="branch-draft-icon" aria-hidden="true">👀</span>
+      <div><strong>Tawi litakaloanzishwa</strong><span>${escapeHtml(name || 'Weka jina la tawi')}${location ? ' · ' + escapeHtml(location) : ''}${phone ? ' · ' + escapeHtml(phone) : ''}</span></div>`;
+  }
+
+  function renderBranchWorkspaceSummary(list) {
+    const summary = $('branchSetupSummary');
+    const badge = $('branchCountBadge');
+    const count = list.length;
+    if (badge) badge.textContent = count + (count === 1 ? ' tawi' : ' matawi');
+    if (!summary) return;
+    const current = getCurrentBranch();
+    summary.innerHTML = `
+      <span class="branch-summary-icon" aria-hidden="true">✨</span>
+      <span><strong>${count ? count + ' ' + (count === 1 ? 'tawi linafanya kazi' : 'matawi yanafanya kazi') : 'Anza kwa kuongeza tawi lako la kwanza'}</strong>
+      ${current?.name ? ' · Tawi lililofunguliwa: ' + escapeHtml(current.name) : ''}</span>`;
   }
 
   function initSalesItemsForBranch(branchId) {
@@ -506,32 +566,65 @@
     localStorage.setItem(key, JSON.stringify(items));
   }
 
-  function deactivateBranch(id) {
+  async function seedBranchSalesItemsInDatabase(branchId) {
+    const key = branchStorageKey(SALES_ITEMS_KEY, branchId);
+    if (localStorage.getItem(key)) return;
+    const mainId = getBranches()[0]?.id;
+    const mainItems = mainId && mainId !== branchId
+      ? localStorage.getItem(branchStorageKey(SALES_ITEMS_KEY, mainId))
+      : null;
+    let items;
+    try { items = mainItems ? JSON.parse(mainItems) : null; } catch { items = null; }
+    if (!Array.isArray(items)) {
+      items = DEFAULT_SALES_ITEMS.map((x, i) => ({
+        id: 'si-' + branchId + '-' + i,
+        ...x,
+        trackStock: true,
+        active: true
+      }));
+    }
+    await saveDatabaseFirst(key, items);
+  }
+
+  async function deactivateBranch(id) {
     if (!hasPerm('branches')) return;
+    const cloud = window.CleverCloudSync;
+    if (!cloud?.isEnabled?.()) {
+      showAdminToast('Unganisha Supabase kwanza. Mabadiliko ya tawi hayafanywi kwenye simu pekee.', 'warn');
+      return;
+    }
     const branches = getBranches();
     if (branches.length <= 1) {
       showAdminToast('Huwezi kufuta tawi la mwisho.', 'warn');
       return;
     }
-    if (!confirm('Futa (zima) tawi hili? Data yake itabaki kwenye kifaa.')) return;
-    const list = getAllBranches().map(b =>
-      b.id === id ? { ...b, active: false } : b
-    );
-    localStorage.setItem(BRANCHES_KEY, JSON.stringify(list));
-    reassignStaffFromBranch(id);
-    if (getCurrentBranchId() === id) {
-      setCurrentBranchId(getBranches()[0]?.id || '');
+    if (!confirm('Zima tawi hili kwenye database? Rekodi zake zitabaki Supabase.')) return;
+    try {
+      await cloud.pullFromCloud();
+      const list = getAllBranches().map(b =>
+        b.id === id ? { ...b, active: false } : b
+      );
+      await reassignStaffFromBranch(id);
+      await saveDatabaseFirst(BRANCHES_KEY, list);
+      if (getCurrentBranchId() === id) {
+        setCurrentBranchId(getBranches()[0]?.id || '');
+      }
+      populateBranchSelect();
+      updateBranchBar();
+      renderBranches();
+      refreshBranchViews();
+      showAdminToast('✓ Tawi limezimwa kwenye Supabase');
+    } catch (err) {
+      console.error('Could not deactivate branch in database', err);
+      showAdminToast('Tawi halijabadilishwa kwenye database. Jaribu tena: ' + (err.message || ''), 'warn');
     }
-    populateBranchSelect();
-    updateBranchBar();
-    renderBranches();
-    refreshBranchViews();
   }
 
   function renderBranches() {
     const el = $('branchesList');
     if (!el) return;
     const list = getBranches();
+    renderBranchWorkspaceSummary(list);
     if (!list.length) {
       el.innerHTML = '<div class="empty">Hakuna matawi. Ongeza tawi la kwanza hapo juu.</div>';
       return;
@@ -1501,6 +1594,18 @@
     }
   }
 
+  async function saveDatabaseFirst(key, value) {
+    const sync = window.CleverCloudSync;
+    if (!sync?.isEnabled?.()) {
+      throw new Error('Supabase haijaunganishwa');
+    }
+    const saved = await sync.pushKey(key, value);
+    if (!saved) throw new Error('Haikuweza kufikia Supabase');
+    // This is only a fast, offline cache. Supabase has already accepted the
+    // data above and remains the source of truth for branches.
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
   async function save() {
     if (!hasPerm('save')) { alert('Huna ruhusa ya kuhifadhi bei.'); return; }
     const d = {};
@@ -1554,17 +1659,38 @@
     const size = $('newSize').value.trim();
     const desc = $('newDesc').value.trim();
     const image = $('newImage').value.trim();
+    const addToPos = $('newAddToPos')?.checked !== false;
+    const unit = $('newUnit')?.value || 'Kifurushi';
+    const costPrice = Math.max(0, parseInt($('newCost')?.value, 10) || 0);
+    const stock = parseFloat($('newStock')?.value);
+    const lowStock = parseFloat($('newLowStock')?.value);
     if (!name || price === null || price === '0') { alert('Tafadhali weka jina la menu na bei sahihi.'); return; }
+    const branchId = addToPos ? requireSingleBranch('kuongeza menu kwenye POS') : null;
+    if (addToPos && !branchId) return;
     const list = getCustom();
-    list.push({ id: Date.now().toString(), name, category, price, size, desc, image, active: true });
+    if (list.some(x => String(x.name || '').trim().toLowerCase() === name.toLowerCase() && x.active !== false)) {
+      alert('Menu yenye jina hili ipo tayari. Badilisha jina au futa menu ya zamani kwanza.');
+      return;
+    }
+    const menu = { id: Date.now().toString(), name, category, price, size, desc, image, active: true, posItems: {} };
     const button = $('addMenuBtn');
     const oldLabel = button?.innerHTML;
     if (button) { button.disabled = true; button.textContent = '⏳ Inaongeza...'; }
     try {
+      if (addToPos) {
+        const item = addMenuToPosItem(menu, { branchId, unit, costPrice, stock, lowStock });
+        if (item) menu.posItems[branchId] = item.id;
+      }
+      list.push(menu);
       await saveToStorage(CUSTOM_KEY, list);
-      ['newName', 'newPrice', 'newSize', 'newDesc', 'newImage'].forEach(id => { if ($(id)) $(id).value = ''; });
+      ['newName', 'newPrice', 'newSize', 'newCost', 'newStock', 'newLowStock', 'newDesc', 'newImage'].forEach(id => { if ($(id)) $(id).value = ''; });
       renderCustom();
-      alert(window.CleverCloudSync?.isEnabled?.() ? 'Menu mpya imeongezwa na kuhifadhiwa mtandaoni.' : 'Menu mpya imeongezwa.');
+      populateSaleItemSelect();
+      renderSalesItems();
+      renderStock();
+      alert(window.CleverCloudSync?.isEnabled?.()
+        ? 'Menu mpya imeongezwa kwenye menu, POS na stock; imehifadhiwa mtandaoni.'
+        : 'Menu mpya imeongezwa kwenye menu, POS na stock.');
     } catch (err) {
       console.error('Could not save custom menu online', err);
       renderCustom();
@@ -1574,6 +1700,33 @@
     }
   }
 
+  function addMenuToPosItem(menu, options) {
+    const branchId = options?.branchId || getCurrentBranchId();
+    const list = loadSalesItemsForBranch(branchId);
+    const existing = list.find(x => String(x.name || '').trim().toLowerCase() === String(menu.name || '').trim().toLowerCase() && x.active !== false);
+    if (existing) {
+      showAdminToast('Menu ipo tayari kwenye POS: ' + menu.name, 'warn');
+      return existing;
+    }
+    const def = defaultStockForUnit(options.unit);
+    const item = {
+      id: 'si-menu-' + menu.id + '-' + Date.now(),
+      name: menu.name,
+      category: menu.category === 'Other' ? 'Nyingine' : menu.category,
+      unit: options.unit,
+      price: parseInt(menu.price, 10),
+      costPrice: options.costPrice,
+      stock: Number.isFinite(options.stock) && options.stock >= 0 ? options.stock : def.stock,
+      lowStock: Number.isFinite(options.lowStock) && options.lowStock >= 0 ? options.lowStock : def.lowStock,
+      trackStock: true,
+      active: true,
+      sourceMenuId: menu.id
+    };
+    list.push(item);
+    saveBranchData(SALES_ITEMS_KEY, list, branchId);
+    return item;
+  }
+
   function renderCustom() {
     const el = $('customMenus');
     if (!el) return;
@@ -1581,7 +1734,7 @@
     if (!list.length) { el.innerHTML = '<div class="empty">Bado hujaongeza menu mpya.</div>'; return; }
     el.innerHTML = list.map(x => `
       <div class="custom-row">
-        <div><b>${escapeHtml(x.name)}</b><div class="mini">${escapeHtml(x.category)} · ${escapeHtml(x.size || '')} · TSH ${escapeHtml(x.price)}</div></div>
+        <div><b>${escapeHtml(x.name)}</b><div class="mini">${escapeHtml(x.category)} · ${escapeHtml(x.size || '')} · TSH ${escapeHtml(x.price)}${Object.keys(x.posItems || {}).length ? ' · ✓ POS & stock' : ''}</div></div>
         <button class="btn btn-delete" type="button" data-delete="${escapeHtml(x.id)}">🗑 Delete</button>
       </div>
     `).join('');
@@ -1592,10 +1745,21 @@
 
   async function deleteMenu(id) {
     if (!confirm('Futa menu hii?')) return;
+    const menu = getCustom().find(x => x.id === id);
     const list = getCustom().filter(x => x.id !== id);
     try {
       await saveToStorage(CUSTOM_KEY, list);
+      // A deleted public menu must not remain sellable by accident in POS.
+      Object.entries(menu?.posItems || {}).forEach(([branchId, itemId]) => {
+        const items = loadSalesItemsForBranch(branchId).map(item =>
+          item.id === itemId ? { ...item, active: false } : item
+        );
+        saveBranchData(SALES_ITEMS_KEY, items, branchId);
+      });
       renderCustom();
+      populateSaleItemSelect();
+      renderSalesItems();
+      renderStock();
     } catch (err) {
       console.error('Could not delete custom menu online', err);
       renderCustom();
@@ -1701,6 +1865,60 @@
     } catch {
       return [];
     }
+  }
+
+  // Expenses are stored per branch just like stock and sales. This makes the
+  // profit figure usable for a real outlet instead of only showing food cost.
+  function getExpenses() {
+    try {
+      if (isAllBranchesMode()) return loadAllBranchesData(EXPENSES_KEY, []);
+      const saved = loadBranchData(EXPENSES_KEY, '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function addExpense() {
+    if (!hasPerm('expenses')) return;
+    const branchId = requireSingleBranch('kuongeza gharama');
+    if (!branchId) return;
+    const amount = Math.round(Number($('expenseAmount')?.value) || 0);
+    const category = $('expenseCategory')?.value || 'Nyingine';
+    const note = ($('expenseNote')?.value || '').trim();
+    const dateValue = $('expenseDate')?.value;
+    if (amount <= 0) {
+      showAdminToast('Weka kiasi sahihi cha gharama.', 'warn');
+      $('expenseAmount')?.focus();
+      return;
+    }
+    const branch = getBranchById(branchId);
+    const at = dateValue ? new Date(dateValue + 'T12:00:00').toISOString() : new Date().toISOString();
+    const list = loadBranchDataFor(EXPENSES_KEY, branchId, []);
+    list.unshift({
+      id: 'exp-' + Date.now(), at, amount, category, note,
+      user: getSession()?.user || 'staff', branchId,
+      branchName: branch?.name || ''
+    });
+    if (list.length > 500) list.length = 500;
+    saveBranchData(EXPENSES_KEY, list, branchId);
+    if ($('expenseAmount')) $('expenseAmount').value = '';
+    if ($('expenseNote')) $('expenseNote').value = '';
+    renderProfitReport();
+    renderDashboard();
+    showAdminToast('✓ Gharama imehifadhiwa kwa ' + (branch?.name || 'tawi hili'));
+  }
+
+  function deleteExpense(id) {
+    if (!hasPerm('expenses')) return;
+    const expense = getExpenses().find(x => x.id === id);
+    if (!expense || !confirm('Futa gharama hii?')) return;
+    const branchId = expense.branchId || getCurrentBranchId();
+    const list = loadBranchDataFor(EXPENSES_KEY, branchId, []).filter(x => x.id !== id);
+    saveBranchData(EXPENSES_KEY, list, branchId);
+    renderProfitReport();
+    renderDashboard();
+    showAdminToast('Gharama imefutwa.');
   }
 
   function getStockStatus(item) {
@@ -2319,7 +2537,9 @@
       wastageLoss += Math.round(getItemCostPrice(item) * (Number(w.qty) || 0));
     });
 
-    const netProfit = profit - wastageLoss;
+    const expenses = filterByPeriod(getExpenses(), 'at', period);
+    const expenseTotal = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+    const netProfit = profit - wastageLoss - expenseTotal;
     const marginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
     const netMarginPct = revenue > 0 ? Math.round((netProfit / revenue) * 100) : 0;
     const hasCostData = cost > 0 || getSalesItems().some(x => Number(x.costPrice) > 0);
@@ -2332,6 +2552,11 @@
       netProfit,
       wastageLoss,
       wastageCount: wastage.length,
+      expenses,
+      expenseTotal,
+      expenseCount: expenses.length,
+      ownerShare: netProfit > 0 ? Math.round(netProfit * 0.40) : 0,
+      businessShare: netProfit > 0 ? Math.round(netProfit * 0.60) : 0,
       marginPct,
       netMarginPct,
       count: sales.length,
@@ -2388,12 +2613,49 @@
           <strong>TSH ${formatMoney(p.wastageLoss)}</strong>
           <small>${p.wastageCount} rekodi</small>
         </article>
+        <article class="profit-kpi profit-kpi-expense">
+          <span>Gharama Zote</span>
+          <strong>TSH ${formatMoney(p.expenseTotal)}</strong>
+          <small>${p.expenseCount} rekodi za matumizi</small>
+        </article>
         <article class="profit-kpi profit-kpi-net${p.netProfit >= 0 ? ' profit-kpi-net-ok' : ' profit-kpi-loss'}">
-          <span>Faida Halisi (Net)</span>
+          <span>Faida Halisi baada ya gharama</span>
           <strong>TSH ${formatMoney(p.netProfit)}</strong>
           <small>${p.netMarginPct}% net margin</small>
         </article>
       </div>
+      <section class="profit-split-card">
+        <div>
+          <span class="profit-split-kicker">MGAWANYO WA FAIDA HALISI · ${escapeHtml(branch?.name || 'Matawi Yote')}</span>
+          <h3>Baada ya gharama ya bidhaa, uharibifu na matumizi yote</h3>
+          <p>${p.netProfit > 0 ? 'Faida ya kugawa ni TSH ' + formatMoney(p.netProfit) + '.' : 'Hakuna faida ya kugawa hadi faida halisi iwe zaidi ya sifuri.'}</p>
+        </div>
+        <div class="profit-split-values">
+          <div class="profit-share profit-share-owner"><span>40% Mwenye Biashara</span><b>TSH ${formatMoney(p.ownerShare)}</b></div>
+          <div class="profit-share profit-share-business"><span>60% Biashara / Akiba</span><b>TSH ${formatMoney(p.businessShare)}</b></div>
+        </div>
+      </section>
+      <section class="expense-ledger">
+        <div class="expense-ledger-head">
+          <div><h3>🧾 Matumizi ya Tawi</h3><p>Rekodi kodi, mishahara, mkaa, usafiri, ununuzi wa nyama na gharama nyingine. Hizi hupunguzwa kabla ya mgao wa 40% / 60%.</p></div>
+        </div>
+        ${hasPerm('expenses') && !isAllBranchesMode() ? `
+          <div class="expense-form">
+            <label><span>Tarehe</span><input id="expenseDate" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
+            <label><span>Aina ya gharama</span><select id="expenseCategory"><option>Ununuzi wa nyama</option><option>Mshahara</option><option>Kodi</option><option>Mkaa / Gesi</option><option>Usafiri</option><option>Umeme / Maji</option><option>Matengenezo</option><option>Nyingine</option></select></label>
+            <label><span>Kiasi (TSH)</span><input id="expenseAmount" type="number" min="1" step="100" inputmode="numeric" placeholder="Mfano 50000"></label>
+            <label class="expense-note-field"><span>Maelezo</span><input id="expenseNote" maxlength="120" placeholder="Mfano: Mkaa wa leo"></label>
+            <button class="btn btn-save" type="button" id="addExpenseBtn">+ Hifadhi Gharama</button>
+          </div>` : `<p class="expense-ledger-note">${isAllBranchesMode() ? 'Chagua tawi moja juu ili kurekodi gharama.' : 'Huna ruhusa ya kurekodi gharama.'}</p>`}
+        <div class="expense-list">
+          ${p.expenses.length ? p.expenses.slice(0, 30).map(expense => `
+            <div class="expense-row">
+              <div><b>${escapeHtml(expense.category || 'Nyingine')}</b><span>${escapeHtml(formatOrderDate(expense.at))}${expense.branchName ? ' · ' + escapeHtml(expense.branchName) : ''}${expense.note ? ' · ' + escapeHtml(expense.note) : ''}</span></div>
+              <strong>TSH ${formatMoney(expense.amount)}</strong>
+              ${hasPerm('expenses') && !isAllBranchesMode() ? `<button class="btn btn-delete btn-sm" type="button" data-delete-expense="${escapeHtml(expense.id)}">Futa</button>` : ''}
+            </div>`).join('') : '<p class="dash-empty">Hakuna matumizi yaliyorekodiwa kwa kipindi hiki.</p>'}
+        </div>
+      </section>
       <div class="profit-grid-2">
         <article class="profit-card">
           <h3>🏆 Zinazouzwa Zaidi — Mapato</h3>
@@ -2448,6 +2710,10 @@
             </table>` : '<p class="dash-empty">Weka gharama za bidhaa kisha rekodi mauzo.</p>'}
         </article>
       </div>`;
+    $('addExpenseBtn')?.addEventListener('click', addExpense);
+    root.querySelectorAll('[data-delete-expense]').forEach(btn => {
+      btn.addEventListener('click', () => deleteExpense(btn.dataset.deleteExpense));
+    });
   }
 
   function exportProfitCsv() {
@@ -2472,7 +2738,10 @@
     rows.push('');
     rows.push(['JUMLA', '', '', csvEscape(p.count), csvEscape(p.revenue), csvEscape(p.cost), csvEscape(p.profit), csvEscape(p.marginPct)].join(','));
     rows.push(['Uharibifu', '', '', csvEscape(p.wastageCount), '', csvEscape(p.wastageLoss), '', ''].join(','));
+    rows.push(['Matumizi mengine', '', '', csvEscape(p.expenseCount), '', csvEscape(p.expenseTotal), '', ''].join(','));
     rows.push(['FAIDA HALISI', '', '', '', csvEscape(p.revenue), '', csvEscape(p.netProfit), csvEscape(p.netMarginPct)].join(','));
+    rows.push(['MGAO 40% Mwenye Biashara', '', '', '', '', '', csvEscape(p.ownerShare), '40%'].join(','));
+    rows.push(['MGAO 60% Biashara / Akiba', '', '', '', '', '', csvEscape(p.businessShare), '60%'].join(','));
     const slug = (branch?.name || 'faida').replace(/[^\w\-]+/g, '-').slice(0, 24);
     downloadCsv('clever-kitimoto-faida-' + slug + '-' + profitPeriod + '-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
     showAdminToast('✓ Ripoti ya faida imepakuliwa');
@@ -5144,6 +5413,14 @@ alter table public.app_storage replica identity full;`;
       $('adminLayout')?.classList.toggle('sidebar-open');
     });
     $('registerBranchBtn')?.addEventListener('click', registerBranch);
+    ['branchName', 'branchLocation', 'branchPhone'].forEach(id => {
+      $(id)?.addEventListener('input', updateBranchDraft);
+    });
+    $('branchPhone')?.addEventListener('blur', () => {
+      const input = $('branchPhone');
+      if (input) input.value = input.value.replace(/\s+/g, ' ').trim();
+      updateBranchDraft();
+    });
     $('saveStaffBranchBtn')?.addEventListener('click', saveStaffBranchAssignment);
     $('addStaffBtn')?.addEventListener('click', addStaffAccount);
     $('changeStaffPassBtn')?.addEventListener('click', changeStaffPassword);

@@ -69,22 +69,48 @@
 </div>
 
 <section class="hero">
-  <div>
+  <div class="hero-copy">
     <div class="hero-badge" id="openStatusBadge"><span class="hero-badge-dot" id="openStatusDot"></span> <span id="openStatusText">Kitimoto Bora · Bei Poa · Huduma Bora</span></div>
     <h1>Clever <em>Kitimoto</em></h1>
-    <p class="hero-desc">Choma, Choma ya Foil, Rosti, Kavu na Kisinia Packages — served hot, fresh and ready to enjoy.</p>
+    <p class="hero-desc">Kitimoto safi, moto na yenye ladha halisi. Chagua unachopenda, weka oda yako, halafu sisi tunakuletea.</p>
     <div class="hero-stats">
       <div class="stat"><strong>🥩</strong><span>Kitimoto Safi</span></div>
       <div class="stat"><strong>🔥</strong><span>Choma · Rosti · Kavu</span></div>
       <div class="stat"><strong>🛵</strong><span>Delivery DSM</span></div>
     </div>
     <div class="hero-actions">
-      <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 Oda WhatsApp</a>
+      <button class="btn btn-primary" type="button" id="heroOrder">🛒 Weka Oda</button>
       <a class="btn btn-sms" href="#" id="heroSms">💬 Tuma SMS</a>
       <a class="btn btn-ghost" href="#packages">Tazama Packages</a>
       <button class="btn btn-ghost" type="button" id="shareMenuBtn">🔗 Shiriki Menu</button>
     </div>
   </div>
+  <aside class="hero-visual" aria-label="Clever Kitimoto menu highlights">
+    <div class="hero-visual-glow" aria-hidden="true"></div>
+    <div class="hero-visual-heading">
+      <span class="hero-kicker">Leo kwenye jiko</span>
+      <strong>Choma ya<br>kufurahia.</strong>
+      <span class="hero-flame" aria-hidden="true">🔥</span>
+    </div>
+    <div class="hero-dish-grid">
+      <div class="hero-dish hero-dish-main">
+        <span class="hero-dish-icon" aria-hidden="true">🍖</span>
+        <div><b>Kitimoto Choma</b><small>Imepikwa fresh kila oda</small></div>
+      </div>
+      <div class="hero-dish">
+        <span class="hero-dish-icon" aria-hidden="true">🔥</span>
+        <div><b>Rosti &amp; Kavu</b><small>Ladha halisi</small></div>
+      </div>
+      <div class="hero-dish">
+        <span class="hero-dish-icon" aria-hidden="true">🍟</span>
+        <div><b>Chipsi &amp; Sides</b><small>Kwa kila kisinia</small></div>
+      </div>
+    </div>
+    <div class="hero-order-card">
+      <span class="hero-order-icon">⚡</span>
+      <div><b>Oda kwa dakika 1</b><small>Chagua menu · Weka muda · Tuma WhatsApp</small></div>
+    </div>
+  </aside>
 </section>
 
 <div class="delivery-strip">
@@ -544,8 +570,8 @@
 
 <div class="order-banner">
   <div>
-    <div class="kicker">Ready to Order?</div>
-    <h2>Agiza sasa.</h2>
+    <div class="kicker">Ready to order?</div>
+    <h2>Weka oda yako kwa urahisi.</h2>
     <p>Call, WhatsApp au SMS:<br>
       <span class="phone" id="phoneCopy" title="Click to copy">0683 497 330</span> ·
       <span class="phone" id="phoneCopy2" title="Click to copy">0794 607 335</span>
@@ -553,7 +579,7 @@
     <p class="delivery-note-inline">🛵 Delivery DSM — <strong>bei ya delivery ni kwa mteja</strong></p>
   </div>
   <div class="order-banner-actions">
-    <a class="btn btn-primary" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">📲 WhatsApp</a>
+    <button class="btn btn-primary" type="button" id="bannerOrder">🛒 Weka Oda</button>
     <a class="btn btn-sms" href="#" id="orderSms">💬 Tuma SMS</a>
   </div>
 </div>
@@ -626,8 +652,8 @@
     <div class="order-panel-handle"></div>
     <div class="order-panel-head">
       <div>
-        <h2 id="orderPanelTitle">Oda Yako</h2>
-        <p id="orderPanelSubtitle">Chagua menu na uongeze hapa</p>
+        <h2 id="orderPanelTitle">Weka Oda Yako</h2>
+        <p id="orderPanelSubtitle">Chagua menu, weka taarifa, kisha tuma oda</p>
       </div>
       <button class="order-panel-close" id="orderPanelClose" type="button" aria-label="Funga">✕</button>
     </div>
@@ -642,8 +668,10 @@
       </div>
       <div class="order-panel-list" id="orderPanelList"></div>
       <div class="checkout-form" id="checkoutForm">
-      <div class="checkout-title">Taarifa za oda <span class="checkout-hint">— zitaongezwa kwenye ujumbe</span></div>
+      <div class="booking-steps" aria-label="Hatua za kuagiza"><span class="active">1. Menu</span><i></i><span class="active">2. Taarifa</span><i></i><span>3. Tuma oda</span></div>
+      <div class="checkout-title">Taarifa za oda <span class="checkout-hint">— tunatumia kuthibitisha oda yako</span></div>
       <div class="checkout-grid">
+        <label class="ck-field full"><span>Jina lako</span><input id="custName" type="text" placeholder="Mfano: Asha Mushi" autocomplete="name"></label>
         <label class="ck-field full"><span>Simu yako</span><input id="custPhone" type="tel" placeholder="07XX XXX XXX" autocomplete="tel" required></label>
         <label class="ck-field full"><span>Mahali pa delivery</span><input id="custAddress" type="text" placeholder="Mtaa, jengo, alama ya karibu..." autocomplete="street-address"></label>
         <label class="ck-field full"><span>Maelezo ya ziada</span><input id="custNotes" type="text" placeholder="Mfano: bila pilipili, simu kabla ya kuwasilisha..."></label>
@@ -654,6 +682,17 @@
           <button type="button" class="pill active" data-val="delivery">🛵 Delivery</button>
           <button type="button" class="pill" data-val="pickup">🏪 Pickup</button>
         </div>
+      </div>
+      <div class="pill-row">
+        <span class="pill-label">Unahitaji lini?</span>
+        <div class="pill-group" id="timingPills">
+          <button type="button" class="pill active" data-val="asap">⚡ Sasa hivi</button>
+          <button type="button" class="pill" data-val="scheduled">📅 Weka muda</button>
+        </div>
+      </div>
+      <div class="checkout-grid schedule-fields" id="scheduleFields" hidden>
+        <label class="ck-field"><span>Tarehe</span><input id="custScheduleDate" type="date"></label>
+        <label class="ck-field"><span>Muda</span><input id="custScheduleTime" type="time"></label>
       </div>
       <div class="pill-row">
         <span class="pill-label">Malipo</span>
@@ -703,7 +742,7 @@
         <button class="btn btn-ghost" id="cartClear" type="button">Futa zote</button>
         <button class="btn btn-ghost" id="orderRepeatLastBtn" type="button" hidden>🔁 Rudia oda</button>
         <button class="btn btn-sms" id="cartSms" type="button">💬 SMS</button>
-        <button class="btn btn-primary" id="cartSend" type="button">📲 WhatsApp</button>
+        <button class="btn btn-primary" id="cartSend" type="button">✓ Tuma Oda WhatsApp</button>
       </div>
     </div>
   </div>

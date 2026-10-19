@@ -110,17 +110,30 @@
     <div class="panel-head-row">
       <div>
         <h2>🏪 Matawi / Branches</h2>
-        <p class="panel-note panel-note-tight">Sajili matawi mapya — kila tawi lina mauzo, stock, na bidhaa zake</p>
+        <p class="panel-note panel-note-tight">Sajili matawi mapya na uone hali ya kila eneo kwa haraka</p>
       </div>
     </div>
-    <div class="add-grid branch-register-grid" id="branchRegisterForm">
-      <div class="field"><label>Jina la tawi</label><input id="branchName" placeholder="Mfano: Clever Kitimoto — Mbezi"></div>
-      <div class="field"><label>Mahali</label><input id="branchLocation" placeholder="Mfano: Dar es Salaam, Mbezi"></div>
-      <div class="field"><label>Simu</label><input id="branchPhone" type="tel" placeholder="07XX XXX XXX"></div>
+    <div class="branch-create-card" id="branchRegisterForm">
+      <div class="branch-create-head">
+        <div class="branch-create-icon" aria-hidden="true">➕</div>
+        <div>
+          <h3>Ongeza tawi jipya</h3>
+          <p>Kila tawi hupata stock, bidhaa na rekodi zake za mauzo.</p>
+        </div>
+        <span class="branch-count-badge" id="branchCountBadge">0 matawi</span>
+      </div>
+      <div class="add-grid branch-register-grid">
+        <div class="field"><label for="branchName">Jina la tawi <span class="required-mark">*</span></label><input id="branchName" placeholder="Mfano: Clever Kitimoto — Mbezi" autocomplete="organization" maxlength="80"></div>
+        <div class="field"><label for="branchLocation">Mahali</label><input id="branchLocation" placeholder="Mfano: Dar es Salaam, Mbezi" autocomplete="address-level2" maxlength="100"></div>
+        <div class="field"><label for="branchPhone">Simu ya tawi</label><input id="branchPhone" type="tel" inputmode="tel" placeholder="Mfano: 0683 497 330" autocomplete="tel" maxlength="25"></div>
+      </div>
+      <div class="branch-draft hidden" id="branchDraft" aria-live="polite"></div>
+      <div class="branch-create-actions">
+        <p class="branch-create-note">☁️ Matawi mapya huhifadhiwa Supabase kwanza, kisha kufunguliwa moja kwa moja. Unganisha database kwenye Zana kabla ya kusajili.</p>
+        <button class="btn btn-save" type="button" id="registerBranchBtn">🏪 Sajili na Fungua Tawi</button>
+      </div>
     </div>
-    <div class="actions" style="margin-top:14px">
-      <button class="btn btn-save" type="button" id="registerBranchBtn">➕ Sajili Tawi</button>
-    </div>
+    <div class="branch-workspace-summary" id="branchSetupSummary" aria-live="polite"></div>
     <div class="staff-branch-section" id="staffBranchSection">
       <h3 class="staff-branch-title">👤 Weka Muuzaji kwa Tawi</h3>
       <p class="panel-note panel-note-tight">Kila muuzaji anaingia kwenye tawi alilopewa tu</p>
@@ -439,23 +452,29 @@
   <div id="priceForms"></div>
 
   <div class="panel hidden" id="menuSection">
-    <h2>➕ Add New Menu</h2>
+    <h2>➕ Ongeza Menu Smart</h2>
+    <p class="panel-note">Ongeza menu kwenye ukurasa wa wateja, POS, bei ya gharama na stock kwa hatua moja.</p>
     <div class="add-grid">
-      <div class="field"><label>Menu Name</label><input id="newName" placeholder="Mfano: Kisinia Special"></div>
-      <div class="field"><label>Category</label>
+      <div class="field"><label>Jina la menu</label><input id="newName" placeholder="Mfano: Kisinia Special"></div>
+      <div class="field"><label>Aina</label>
         <select id="newCategory">
           <option>Kitimoto</option><option>Choma</option><option>Choma ya Foil</option>
           <option>Rosti</option><option>Kavu</option><option>Kisinia Packages</option>
           <option>Mixed Packages</option><option>Zege</option><option>Sides</option><option>Other</option>
         </select>
       </div>
-      <div class="field"><label>Price (TSH)</label><input id="newPrice" type="number" min="0" placeholder="25000"></div>
+      <div class="field"><label>Bei ya kuuza (TSH)</label><input id="newPrice" type="number" min="0" placeholder="25000"></div>
       <div class="field"><label>Serving / Size</label><input id="newSize" placeholder="½ KG"></div>
+      <div class="field"><label>Kipimo cha POS</label><select id="newUnit"><option value="KG">KG (kilo)</option><option value="Kipande">Kipande</option><option value="Sahani">Sahani</option><option value="Kifurushi">Kifurushi</option></select></div>
+      <div class="field"><label>Gharama kwa kipimo (TSH)</label><input id="newCost" type="number" min="0" placeholder="Mfano: 16000"></div>
+      <div class="field"><label>Stock ya kuanza</label><input id="newStock" type="number" min="0" step="0.01" placeholder="Mfano: 10"></div>
+      <div class="field"><label>Onyo stock chini</label><input id="newLowStock" type="number" min="0" step="0.01" placeholder="Mfano: 2"></div>
       <div class="field full"><label>Description</label><textarea id="newDesc" placeholder="Maelezo mafupi ya menu..." rows="3"></textarea></div>
       <div class="field full"><label>Image URL (optional)</label><input id="newImage" placeholder="https://..."></div>
     </div>
+    <label class="smart-menu-pos-toggle"><input id="newAddToPos" type="checkbox" checked> <span>Ongeza pia kwenye POS na uanze kufuatilia stock moja kwa moja</span></label>
     <div class="actions" style="margin-top:16px">
-      <button class="btn btn-save" type="button" id="addMenuBtn">➕ Add Menu</button>
+      <button class="btn btn-save" type="button" id="addMenuBtn">✨ Ongeza Menu Smart</button>
     </div>
   </div>
 

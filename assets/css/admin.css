@@ -3334,7 +3334,9 @@ body {
   font-size: 0.82rem;
   color: var(--ink);
 }
-.pos-receipt-lines li { margin-bottom: 4px; }
+.pos-receipt-lines li { margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.receipt-line-actions, .sales-item-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.btn-xs { padding: 4px 7px; font-size: .63rem; }
 .ssd-print-btn { width: 100%; margin-top: 12px; }
 .ssd-total-inline {
   margin: 12px 0;

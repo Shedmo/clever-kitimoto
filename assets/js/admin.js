@@ -33,7 +33,7 @@
   const PERMS = {
     admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'sales_manage', 'stock_add', 'expenses', 'branches', 'staff_manage', 'backup', 'eod'],
     manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'sales_manage', 'stock_add', 'expenses', 'branches', 'eod'],
-    seller: ['dashboard', 'sales', 'stock_view']
+    seller: ['dashboard', 'sales', 'stock_view', 'sales_manage']
   };
 
   let attempts = 0;
@@ -2828,6 +2828,60 @@
     renderStock();
   }
 
+  let editSalesItemId = null;
+
+  function showEditSalesItemDialog(id) {
+    if (!hasPerm('sales_items')) return;
+    const item = getAllSalesItems().find(x => x.id === id);
+    const body = $('adminDialogBody');
+    const dialog = $('adminDialog');
+    const okBtn = $('adminDialogOk');
+    if (!item || !body || !dialog || !okBtn) return;
+    editSalesItemId = id;
+    body.innerHTML = `
+      <div class="edit-sale-dialog">
+        <h3 class="ssd-title" id="adminDialogTitle">✏ Hariri Bidhaa</h3>
+        <p class="ssd-sub">Badilisha jina, bei, gharama au stock ya bidhaa.</p>
+        <div class="edit-sale-grid">
+          <label class="field field-wide"><span>Jina la bidhaa</span><input id="editItemName" value="${escapeHtml(item.name || '')}"></label>
+          <label class="field"><span>Bei ya kuuza (TSH)</span><input id="editItemPrice" type="number" min="0" value="${Number(item.price) || 0}"></label>
+          <label class="field"><span>Gharama / kipimo (TSH)</span><input id="editItemCost" type="number" min="0" value="${Number(item.costPrice) || 0}"></label>
+          <label class="field"><span>Stock iliyopo</span><input id="editItemStock" type="number" min="0" step="0.01" value="${Number(item.stock) || 0}"></label>
+          <label class="field"><span>Onyo chini ya stock</span><input id="editItemLowStock" type="number" min="0" step="0.01" value="${Number(item.lowStock) || 0}"></label>
+        </div>
+      </div>`;
+    $('adminDialogCancel')?.classList.remove('hidden');
+    okBtn.textContent = '💾 Hifadhi';
+    if (adminDialogOkHandler) okBtn.removeEventListener('click', adminDialogOkHandler);
+    adminDialogOkHandler = () => saveEditedSalesItem();
+    dialog.classList.add('open');
+    dialog.setAttribute('aria-hidden', 'false');
+  }
+
+  function saveEditedSalesItem() {
+    if (!editSalesItemId || !hasPerm('sales_items')) return;
+    const name = ($('editItemName')?.value || '').trim();
+    const price = Number($('editItemPrice')?.value);
+    if (!name || price < 0) { showAdminToast('Weka jina na bei sahihi.', 'warn'); return; }
+    const item = getAllSalesItems().find(x => x.id === editSalesItemId);
+    if (!item) return;
+    const branchId = item.branchId || findItemBranchId(item.id);
+    const updated = {
+      ...item, name, price,
+      costPrice: Math.max(0, Number($('editItemCost')?.value) || 0),
+      stock: Math.max(0, Number($('editItemStock')?.value) || 0),
+      lowStock: Math.max(0, Number($('editItemLowStock')?.value) || 0),
+      editedAt: new Date().toISOString()
+    };
+    saveBranchData(SALES_ITEMS_KEY, loadSalesItemsForBranch(branchId).map(x => x.id === updated.id ? updated : x), branchId);
+    editSalesItemId = null;
+    closeAdminDialog();
+    renderSalesItems();
+    populateSaleItemSelect();
+    renderStock();
+    showAdminToast('✓ Bidhaa imehaririwa');
+  }
+
   function renderSalesItems() {
     const el = $('salesItemsList');
     if (!el) return;
@@ -2841,7 +2895,7 @@
       const cost = Number(x.costPrice) || 0;
       const margin = x.price > 0 && cost > 0 ? Math.round(((x.price - cost) / x.price) * 100) : null;
       const deleteBtn = hasPerm('sales_items')
-        ? `<button class="btn btn-delete" type="button" data-delete-sales="${escapeHtml(x.id)}">🗑 Futa</button>`
+        ? `<div class="sales-item-actions"><button class="btn btn-back" type="button" data-edit-sales="${escapeHtml(x.id)}">✏ Hariri</button><button class="btn btn-delete" type="button" data-delete-sales="${escapeHtml(x.id)}">🗑 Futa</button></div>`
         : '';
       const costField = hasPerm('sales_items')
         ? `<label class="sales-item-cost-edit">Gharama/kipimo
@@ -2861,6 +2915,9 @@
     }).join('');
     el.querySelectorAll('[data-delete-sales]').forEach(btn => {
       btn.addEventListener('click', () => deleteSalesItem(btn.dataset.deleteSales));
+    });
+    el.querySelectorAll('[data-edit-sales]').forEach(btn => {
+      btn.addEventListener('click', () => showEditSalesItemDialog(btn.dataset.editSales));
     });
     el.querySelectorAll('.sales-cost-input').forEach(input => {
       input.addEventListener('change', () => updateSalesItemCost(input.dataset.costItem, input.value));
@@ -3121,7 +3178,7 @@
           <strong class="order-total">TSH ${formatMoney(r.total)}</strong>
         </div>
         <ul class="pos-receipt-lines">
-          ${r.lines.map(l => `<li>${escapeHtml(String(l.qty))} ${escapeHtml(l.unit)} ${escapeHtml(l.itemName)} · TSH ${formatMoney(l.total)}</li>`).join('')}
+          ${r.lines.map(l => `<li><span>${escapeHtml(String(l.qty))} ${escapeHtml(l.unit)} ${escapeHtml(l.itemName)} · TSH ${formatMoney(l.total)}</span>${canManageSales() ? `<span class="receipt-line-actions"><button type="button" class="btn btn-back btn-xs" data-edit-sale="${escapeHtml(l.id)}">Hariri</button><button type="button" class="btn btn-delete btn-xs" data-delete-sale="${escapeHtml(l.id)}">Futa</button></span>` : ''}</li>`).join('')}
         </ul>
         <button type="button" class="btn btn-back btn-sm" data-print-receipt="${escapeHtml(r.receiptId)}">🖨 Chapisha Risiti</button>
         ${canManageSales() ? `<button type="button" class="btn btn-delete btn-sm" data-delete-receipt="${escapeHtml(r.receiptId)}">🗑 Futa Risiti</button>` : ''}

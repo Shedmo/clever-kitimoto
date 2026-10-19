@@ -2011,6 +2011,64 @@
     showWastageDialog(itemId);
   }
 
+  let stockAdjustmentItemId = null;
+
+  function showStockAdjustmentDialog(itemId) {
+    if (!hasPerm('stock_add')) return;
+    const item = getAllSalesItems().find(x => x.id === itemId && x.active !== false);
+    const body = $('adminDialogBody');
+    const dialog = $('adminDialog');
+    const okBtn = $('adminDialogOk');
+    if (!item || !body || !dialog || !okBtn) return;
+    stockAdjustmentItemId = itemId;
+    body.innerHTML = `
+      <div class="edit-sale-dialog">
+        <h3 class="ssd-title" id="adminDialogTitle">✏ Rekebisha Stock</h3>
+        <p class="ssd-sub"><b>${escapeHtml(item.name)}</b> · Iliyopo sasa: ${escapeHtml(formatStockQty(item.stock, item.unit))}</p>
+        <div class="edit-sale-grid">
+          <label class="field"><span>Stock halisi iliyopo (${escapeHtml(item.unit)})</span>
+            <input id="adjustStockValue" type="number" min="0" step="0.01" value="${Number(item.stock) || 0}">
+          </label>
+          <label class="field field-wide"><span>Sababu ya marekebisho</span>
+            <input id="adjustStockNote" placeholder="Mfano: Hesabu ya stoo ya jioni">
+          </label>
+        </div>
+      </div>`;
+    $('adminDialogCancel')?.classList.remove('hidden');
+    okBtn.textContent = '💾 Hifadhi Stock';
+    if (adminDialogOkHandler) okBtn.removeEventListener('click', adminDialogOkHandler);
+    adminDialogOkHandler = () => saveStockAdjustment();
+    dialog.classList.add('open');
+    dialog.setAttribute('aria-hidden', 'false');
+  }
+
+  function saveStockAdjustment() {
+    if (!stockAdjustmentItemId || !hasPerm('stock_add')) return;
+    const item = getAllSalesItems().find(x => x.id === stockAdjustmentItemId && x.active !== false);
+    const target = Number($('adjustStockValue')?.value);
+    const note = ($('adjustStockNote')?.value || '').trim();
+    if (!item || Number.isNaN(target) || target < 0) {
+      showAdminToast('Weka stock sahihi.', 'warn');
+      return;
+    }
+    const delta = Math.round((target - (Number(item.stock) || 0)) * 100) / 100;
+    if (!delta) {
+      closeAdminDialog();
+      showAdminToast('Stock haijabadilika.');
+      return;
+    }
+    const updated = updateItemStock(item.id, delta, 'adjust', note || 'Marekebisho ya stock');
+    stockAdjustmentItemId = null;
+    closeAdminDialog();
+    if (updated) {
+      populateSaleItemSelect();
+      renderSalesItems();
+      renderStock();
+      renderDashboard();
+      showAdminToast('✓ Stock imerekebishwa: ' + updated.name + ' → ' + formatStockQty(updated.stock, updated.unit));
+    }
+  }
+
   function renderStockLog() {
     const section = $('stockLogSection');
     const el = $('stockLogList');
@@ -2163,7 +2221,9 @@
               <input type="number" min="0.01" step="0.01" placeholder="+" data-stock-input="${escapeHtml(x.id)}" aria-label="Ongeza stock ${escapeHtml(x.name)}">
               <button type="button" class="btn btn-back btn-sm" data-stock-custom="${escapeHtml(x.id)}">Ongeza</button>
             </div>
+            <button type="button" class="btn btn-back btn-sm" data-stock-edit="${escapeHtml(x.id)}">✏ Rekebisha</button>
             <button type="button" class="btn btn-reset btn-sm" data-stock-waste="${escapeHtml(x.id)}">− Uharibifu</button>
+            <button type="button" class="btn btn-delete btn-sm" data-stock-delete="${escapeHtml(x.id)}">🗑 Ondoa</button>
           </div>` : `
           <div class="stock-row-view">${x.trackStock === false ? 'Haifuatiliwi' : 'Angalia tu'}</div>`}
         </article>`;
@@ -2181,6 +2241,12 @@
     });
     el.querySelectorAll('[data-stock-waste]').forEach(btn => {
       btn.addEventListener('click', () => recordWastage(btn.dataset.stockWaste));
+    });
+    el.querySelectorAll('[data-stock-edit]').forEach(btn => {
+      btn.addEventListener('click', () => showStockAdjustmentDialog(btn.dataset.stockEdit));
+    });
+    el.querySelectorAll('[data-stock-delete]').forEach(btn => {
+      btn.addEventListener('click', () => deleteSalesItem(btn.dataset.stockDelete));
     });
   }
 

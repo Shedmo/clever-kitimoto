@@ -269,6 +269,7 @@
       <span>Jumla ya Mauzo</span>
       <strong id="sellerTotalBig">TSH 0</strong>
     </div>
+    <div id="saleStockPreview" class="sale-stock-preview hidden" aria-live="polite"></div>
     <div class="sales-qty-presets" id="saleQtyPresets"></div>
     <button type="button" class="seller-more-toggle hidden" id="sellerMoreToggle">+ Simu / Maelezo (hiari)</button>
     <div class="sale-cart-wrap hidden" id="saleCartWrap">
@@ -310,23 +311,31 @@
     <div class="panel-head-row">
       <div>
         <h2>📦 Bidhaa za Mauzo</h2>
-        <p class="panel-note panel-note-tight">Ongeza au futa bidhaa za nyama na menu</p>
+        <p class="panel-note panel-note-tight">Simamia nyama, vinywaji, matunda na bidhaa nyingine kwa bei na stock za kila tawi</p>
       </div>
     </div>
     <div class="add-grid">
       <div class="field"><label>Jina la bidhaa</label><input id="salesItemName" placeholder="Mfano: Choma"></div>
       <div class="field"><label>Aina</label>
         <select id="salesItemCategory">
-          <option>Choma</option><option>Choma ya Foil</option><option>Rosti</option><option>Kavu</option>
-          <option>Nyama</option><option>Kisinia</option><option>Mix</option><option>Zege</option><option>Sides</option><option>Nyingine</option>
+          <option>Vinywaji</option><option>Matunda</option><option>Mboga</option><option>Choma</option><option>Choma ya Foil</option><option>Rosti</option><option>Kavu</option>
+          <option>Nyama</option><option>Kisinia</option><option>Mix</option><option>Zege</option><option>Chakula</option><option>Sides</option><option>Nyingine</option>
         </select>
+        <input id="salesItemCategoryCustom" class="hidden" placeholder="Andika aina nyingine" maxlength="40" aria-label="Aina nyingine ya bidhaa">
       </div>
-      <div class="field"><label>Kipimo</label>
+      <div class="field"><label>Kipimo cha kuuza na stock</label>
         <select id="salesItemUnit">
           <option value="KG">KG (kilo)</option>
+          <option value="Lita">Lita</option>
+          <option value="Chupa">Chupa</option>
+          <option value="Kopo">Kopo</option>
+          <option value="Glasi">Glasi</option>
           <option value="Kipande">Kipande</option>
+          <option value="Tunda">Tunda</option>
+          <option value="Fungu">Fungu</option>
           <option value="Sahani">Sahani</option>
           <option value="Kifurushi">Kifurushi</option>
+          <option value="Pakiti">Pakiti</option>
         </select>
       </div>
       <div class="field"><label>Bei ya kuuza (TSH)</label><input id="salesItemPrice" type="number" min="0" placeholder="18000"></div>
@@ -341,16 +350,22 @@
     <div id="salesItemsList" class="sales-items-list"></div>
   </section>
 
-  <section class="panel admin-view hidden" id="stockPanel" data-view-title="Stock" data-view-sub="Fuatilia na simamia stoo ya nyama">
+  <section class="panel admin-view hidden" id="stockPanel" data-view-title="Stock" data-view-sub="Fuatilia na simamia stock ya bidhaa kwa tawi">
     <div class="panel-head-row">
       <div>
         <h2>📦 Stoo / Stock</h2>
-        <p class="panel-note panel-note-tight" id="stockPanelNote">Ongeza stock, fuatilia kilo zilizobaki — mauzo hupunguza otomatiki</p>
+        <p class="panel-note panel-note-tight" id="stockPanelNote">Ongeza stock ya bidhaa yoyote, fuatilia kiasi kilichobaki — mauzo hupunguza otomatiki</p>
       </div>
       <button class="btn btn-save" type="button" id="addBranchStockBtn">➕ Ongeza Stock kwa Tawi</button>
     </div>
     <div class="report-summary" id="stockSummary"></div>
     <div id="stockAlerts" class="stock-alerts"></div>
+    <div class="stock-toolbar">
+      <input id="stockSearch" type="search" placeholder="Tafuta bidhaa au aina..." aria-label="Tafuta bidhaa kwenye stock">
+      <select id="stockStatusFilter" aria-label="Chuja stock kwa hali">
+        <option value="all">Bidhaa zote</option><option value="low">Stock chini</option><option value="out">Imeisha</option><option value="ok">Stock salama</option>
+      </select>
+    </div>
     <div id="stockList" class="stock-list"></div>
     <div class="stock-log-section hidden" id="stockLogSection">
       <div class="panel-head-row stock-log-head">

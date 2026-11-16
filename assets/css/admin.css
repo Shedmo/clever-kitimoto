@@ -1051,6 +1051,20 @@ body {
   font-weight: 800;
   color: var(--maroon);
 }
+.sale-stock-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  border-radius: 10px;
+  background: #edf7ef;
+  color: #245a32;
+  font-size: 0.84rem;
+}
+.sale-stock-preview small { color: inherit; opacity: 0.8; text-align: right; }
+.sale-stock-preview.warn { background: #fff3e4; color: #8a4d00; }
 .seller-more-toggle {
   width: 100%;
   margin-top: 8px;
@@ -1848,6 +1862,21 @@ body {
   border: 1px solid rgba(192, 57, 43, 0.3);
 }
 .stock-list { display: flex; flex-direction: column; gap: 10px; }
+.stock-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+  gap: 8px;
+  margin: 14px 0;
+}
+.stock-toolbar input, .stock-toolbar select {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
 
 .stock-view-only {
   padding: 16px 18px;
@@ -1935,6 +1964,21 @@ body {
 .stock-badge-ok { background: rgba(30, 126, 52, 0.12); color: #1e7e34; }
 .stock-badge-low { background: rgba(255, 204, 0, 0.35); color: #7a5c00; }
 .stock-badge-out { background: rgba(192, 57, 43, 0.15); color: var(--danger); }
+.stock-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0 8px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #edf7ef;
+  color: #1e6b32;
+}
+.stock-count span { font-size: 0.68rem; font-weight: 800; letter-spacing: .04em; }
+.stock-count strong { font-size: 1.25rem; font-weight: 900; }
+.stock-count.is-low { background: #fff7df; color: #805d00; }
+.stock-count.is-out { background: #fff0ee; color: var(--danger); }
 .stock-bar-wrap { display: flex; flex-direction: column; gap: 4px; }
 .stock-bar {
   height: 8px;
@@ -1985,6 +2029,11 @@ body {
   border: 1px solid var(--line-strong);
   font-family: var(--font-body);
   font-size: 0.78rem;
+}
+@media (max-width: 560px) {
+  .stock-toolbar { grid-template-columns: 1fr; }
+  .stock-row { padding: 12px; }
+  .stock-row-actions { min-width: 0; }
 }
 .stock-row-view {
   font-size: 0.75rem;

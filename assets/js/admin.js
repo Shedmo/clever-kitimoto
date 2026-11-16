@@ -40,6 +40,8 @@
   let lockedUntil = 0;
   let userFilter = 'all';
   let userQuery = '';
+  let stockQuery = '';
+  let stockStatusFilter = 'all';
   let saleCart = [];
   let posActiveTab = 'sell';
   let posCatFilter = 'all';
@@ -1939,6 +1941,11 @@
     return v + ' ' + (unit || '');
   }
 
+  function stockQuantityIsValid(item, qty) {
+    if (!item || !Number.isFinite(qty) || qty <= 0) return false;
+    return item.unit === 'KG' || item.unit === 'Lita' || Number.isInteger(qty);
+  }
+
   function saveSalesItemsList(list, branchId) {
     const bid = branchId || findItemBranchId(list[0]?.id) || getCurrentBranchId();
     if (bid === ALL_BRANCHES_ID) return;
@@ -1992,8 +1999,9 @@
       return null;
     }
     const amount = parseFloat(qty);
-    if (!amount || amount <= 0) {
-      showAdminToast('Weka kiasi cha stock sahihi.', 'warn');
+    const item = getAllSalesItems().find(x => x.id === itemId && x.active !== false);
+    if (!stockQuantityIsValid(item, amount)) {
+      showAdminToast(item && !['KG', 'Lita'].includes(item.unit) ? 'Weka idadi kamili ya bidhaa.' : 'Weka kiasi cha stock sahihi.', 'warn');
       return null;
     }
     const updated = updateItemStock(itemId, amount, 'in', note || 'Ongezeko la stock');
@@ -2002,7 +2010,7 @@
       renderSalesItems();
       renderStock();
       renderDashboard();
-      showAdminToast('✓ Stock imeongezwa: ' + updated.name + ' → ' + formatStockQty(updated.stock, updated.unit));
+      showAdminToast('✓ Stock imepokelewa: ' + updated.name + ' → ' + formatStockQty(updated.stock, updated.unit));
     }
     return updated;
   }
@@ -2036,7 +2044,8 @@
       const itemId = $('branchStockItem')?.value;
       const qty = parseFloat($('branchStockQty')?.value);
       const note = ($('branchStockNote')?.value || '').trim();
-      if (!branchId || !itemId || !qty || qty <= 0) { showAdminToast('Chagua tawi, bidhaa na kiasi sahihi.', 'warn'); return; }
+      const item = loadSalesItemsForBranch(branchId).find(x => x.id === itemId && x.active !== false);
+      if (!branchId || !itemId || !stockQuantityIsValid(item, qty)) { showAdminToast(item && !['KG', 'Lita'].includes(item.unit) ? 'Weka idadi kamili ya bidhaa.' : 'Chagua tawi, bidhaa na kiasi sahihi.', 'warn'); return; }
       const updated = updateItemStock(itemId, qty, 'in', note || 'Ongezeko la stock kwa tawi', '', branchId);
       if (!updated) { showAdminToast('Imeshindwa kuhifadhi stock.', 'warn'); return; }
       closeAdminDialog();
@@ -2063,7 +2072,7 @@
         <p class="ssd-sub"><b>${escapeHtml(item.name)}</b> · Iliyopo sasa: ${escapeHtml(formatStockQty(item.stock, item.unit))}</p>
         <div class="edit-sale-grid">
           <label class="field"><span>Stock halisi iliyopo (${escapeHtml(item.unit)})</span>
-            <input id="adjustStockValue" type="number" min="0" step="0.01" value="${Number(item.stock) || 0}">
+          <input id="adjustStockValue" type="number" min="0" step="${item.unit === 'KG' || item.unit === 'Lita' ? '0.01' : '1'}" value="${Number(item.stock) || 0}">
           </label>
           <label class="field field-wide"><span>Sababu ya marekebisho</span>
             <input id="adjustStockNote" placeholder="Mfano: Hesabu ya stoo ya jioni">
@@ -2083,7 +2092,7 @@
     const item = getAllSalesItems().find(x => x.id === stockAdjustmentItemId && x.active !== false);
     const target = Number($('adjustStockValue')?.value);
     const note = ($('adjustStockNote')?.value || '').trim();
-    if (!item || Number.isNaN(target) || target < 0) {
+    if (!item || !Number.isFinite(target) || target < 0 || (item.unit !== 'KG' && item.unit !== 'Lita' && !Number.isInteger(target))) {
       showAdminToast('Weka stock sahihi.', 'warn');
       return;
     }
@@ -2134,46 +2143,24 @@
     const items = getSalesItems().filter(x => x.trackStock !== false);
     let low = 0;
     let out = 0;
-    let totalKg = 0;
     items.forEach(x => {
       const status = getStockStatus(x);
       if (status === 'low') low += 1;
       if (status === 'out') out += 1;
-      if (x.unit === 'KG') totalKg += Number(x.stock) || 0;
     });
     return {
       tracked: items.length,
       low,
       out,
       ok: items.length - low - out,
-      totalKg: Math.round(totalKg * 10) / 10
+      categories: new Set(items.map(x => x.category).filter(Boolean)).size
     };
   }
 
   function renderStock() {
     renderStockSummary();
-    if (hasPerm('stock_add')) {
-      renderStockAlerts();
-      renderStockList();
-    } else if (hasPerm('stock_view')) {
-      const alertsEl = $('stockAlerts');
-      const listEl = $('stockList');
-      if (alertsEl) alertsEl.innerHTML = '';
-      if (listEl) {
-        const s = computeStockStats();
-        listEl.innerHTML = `
-          <div class="stock-view-only">
-            <p class="stock-view-msg">Muuzaji: unaona jumla ya stock tu. Kuhariri au kuongeza, wasiliana na Meneja au Admin.</p>
-            <div class="stock-view-totals">
-              <div class="stock-view-stat"><span>Bidhaa</span><b>${s.tracked}</b></div>
-              <div class="stock-view-stat ok"><span>Salama</span><b>${s.ok}</b></div>
-              <div class="stock-view-stat${s.low ? ' warn' : ''}"><span>Chini</span><b>${s.low}</b></div>
-              <div class="stock-view-stat${s.out ? ' danger' : ''}"><span>Imeisha</span><b>${s.out}</b></div>
-              <div class="stock-view-stat highlight"><span>KG Jumla</span><b>${s.totalKg || '—'}</b></div>
-            </div>
-          </div>`;
-      }
-    }
+    renderStockAlerts();
+    renderStockList();
     renderStockLog();
   }
 
@@ -2186,7 +2173,7 @@
       <div class="summary-chip"><span>Salama</span><b>${s.ok}</b></div>
       <div class="summary-chip ${s.low ? 'warn' : ''}"><span>Chini</span><b>${s.low}</b></div>
       <div class="summary-chip ${s.out ? 'danger' : ''}"><span>Imeisha</span><b>${s.out}</b></div>
-      <div class="summary-chip highlight"><span>KG kwenye stoo</span><b>${s.totalKg || '—'}</b></div>
+      <div class="summary-chip highlight"><span>Aina za bidhaa</span><b>${s.categories}</b></div>
     `;
   }
 
@@ -2208,21 +2195,40 @@
       return `
         <div class="stock-alert stock-alert-${status}">
           <span>${status === 'out' ? '🔴' : '⚠️'} <b>${escapeHtml(x.name)}</b>${x.branchName ? ' · ' + escapeHtml(x.branchName) : ''} — ${escapeHtml(formatStockQty(x.stock, x.unit))} (${escapeHtml(stockStatusLabel(status))})</span>
-          ${hasPerm('stock_add') ? `<button type="button" class="btn btn-save btn-sm" data-stock-add="${escapeHtml(x.id)}" data-stock-qty="${x.unit === 'KG' ? '5' : '10'}">+ Ongeza</button>` : ''}
+          ${hasPerm('stock_add') ? `<button type="button" class="btn btn-back btn-sm" data-stock-jump="${escapeHtml((x.branchId || getCurrentBranchId()) + '::' + x.id)}">Angalia bidhaa ↓</button>` : ''}
         </div>`;
     }).join('');
 
-    el.querySelectorAll('[data-stock-add]').forEach(btn => {
-      btn.addEventListener('click', () => addStockToItem(btn.dataset.stockAdd, btn.dataset.stockQty));
+    el.querySelectorAll('[data-stock-jump]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        stockQuery = '';
+        stockStatusFilter = 'all';
+        if ($('stockSearch')) $('stockSearch').value = '';
+        if ($('stockStatusFilter')) $('stockStatusFilter').value = 'all';
+        renderStockList();
+        const row = Array.from(document.querySelectorAll('[data-stock-row]')).find(x => x.dataset.stockRow === btn.dataset.stockJump);
+        row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row?.querySelector('[data-stock-input]')?.focus();
+      });
     });
   }
 
   function renderStockList() {
     const el = $('stockList');
     if (!el) return;
-    const items = getSalesItems();
+    const query = stockQuery.trim().toLowerCase();
+    const allItems = getSalesItems();
+    const items = allItems.filter(x => {
+      const haystack = `${x.name || ''} ${x.category || ''} ${x.unit || ''}`.toLowerCase();
+      if (query && !haystack.includes(query)) return false;
+      const status = getStockStatus(x);
+      if (stockStatusFilter === 'ok') return status === 'ok';
+      return stockStatusFilter === 'all' || status === stockStatusFilter;
+    });
     if (!items.length) {
-      el.innerHTML = '<div class="empty">Hakuna bidhaa za kufuatilia stock.</div>';
+      el.innerHTML = allItems.length
+        ? '<div class="empty">Hakuna bidhaa zinazolingana na utafutaji au kichujio hiki.</div>'
+        : '<div class="empty">Hakuna bidhaa za kufuatilia stock.</div>';
       return;
     }
 
@@ -2232,36 +2238,41 @@
       const low = Number(x.lowStock) || 0;
       const cap = Math.max(stock, low * 4, 1);
       const pct = Math.min(100, Math.round((stock / cap) * 100));
-      const canAdd = hasPerm('stock_add');
-      const presets = x.unit === 'KG' ? [1, 5, 10] : [5, 10, 20];
+      const canAdd = hasPerm('stock_add') && !isAllBranchesMode();
+      const stockRowKey = (x.branchId || getCurrentBranchId()) + '::' + x.id;
+      const branchName = x.branchName || getBranchById(x.branchId || getCurrentBranchId())?.name || 'Tawi hili';
 
       return `
-        <article class="stock-row stock-${status}">
+        <article class="stock-row stock-${status}" data-stock-row="${escapeHtml(stockRowKey)}">
           <div class="stock-row-main">
             <div class="stock-row-head">
               <div>
                 <strong>${escapeHtml(x.name)}</strong>
-                <span class="stock-meta">${x.branchName ? escapeHtml(x.branchName) + ' · ' : ''}${escapeHtml(x.category)} · ${escapeHtml(x.unit)}</span>
+                <span class="stock-meta">${escapeHtml(branchName)} · ${escapeHtml(x.category)} · ${escapeHtml(x.unit)}</span>
               </div>
               <span class="stock-badge stock-badge-${status}">${escapeHtml(stockStatusLabel(status))}</span>
             </div>
+            <div class="stock-count${status === 'low' ? ' is-low' : ''}${status === 'out' ? ' is-out' : ''}">
+              <span>${x.trackStock === false ? 'HAIFUATILIWI' : 'IMEBAKI'}</span>
+              <strong>${x.trackStock === false ? '—' : escapeHtml(formatStockQty(stock, x.unit))}</strong>
+            </div>
             <div class="stock-bar-wrap">
               <div class="stock-bar"><div class="stock-bar-fill stock-bar-${status}" style="width:${pct}%"></div></div>
-              <span class="stock-qty-label"><b>${escapeHtml(formatStockQty(stock, x.unit))}</b> · onyo &lt; ${escapeHtml(String(low))}</span>
+              <span class="stock-qty-label"><b>${escapeHtml(formatStockQty(stock, x.unit))}</b> · tahadhari kuanzia ${escapeHtml(formatStockQty(low, x.unit))}</span>
             </div>
           </div>
-          ${canAdd ? `
+          ${canAdd && x.trackStock === false ? `
+          <div class="stock-row-actions"><button type="button" class="btn btn-back btn-sm" data-stock-track="${escapeHtml(x.id)}">Washa stock ya bidhaa</button></div>` : canAdd ? `
           <div class="stock-row-actions">
-            ${presets.map(p => `<button type="button" class="stock-add-btn" data-stock-add="${escapeHtml(x.id)}" data-stock-qty="${p}">+${p}</button>`).join('')}
             <div class="stock-custom-add">
-              <input type="number" min="0.01" step="0.01" placeholder="+" data-stock-input="${escapeHtml(x.id)}" aria-label="Ongeza stock ${escapeHtml(x.name)}">
-              <button type="button" class="btn btn-back btn-sm" data-stock-custom="${escapeHtml(x.id)}">Ongeza</button>
+              <input type="number" min="${x.unit === 'KG' || x.unit === 'Lita' ? '0.01' : '1'}" step="${x.unit === 'KG' || x.unit === 'Lita' ? '0.01' : '1'}" placeholder="Kiasi" data-stock-input="${escapeHtml(x.id)}" aria-label="Ongeza stock ${escapeHtml(x.name)}">
+              <button type="button" class="btn btn-save btn-sm" data-stock-custom="${escapeHtml(x.id)}">+ Ongeza</button>
             </div>
-            <button type="button" class="btn btn-back btn-sm" data-stock-edit="${escapeHtml(x.id)}">✏ Rekebisha</button>
-            <button type="button" class="btn btn-reset btn-sm" data-stock-waste="${escapeHtml(x.id)}">− Uharibifu</button>
+            <button type="button" class="btn btn-back btn-sm" data-stock-edit="${escapeHtml(x.id)}">✏ Hesabu upya</button>
+            <button type="button" class="btn btn-reset btn-sm" data-stock-waste="${escapeHtml(x.id)}">− Tupa</button>
             <button type="button" class="btn btn-delete btn-sm" data-stock-delete="${escapeHtml(x.id)}">🗑 Ondoa</button>
           </div>` : `
-          <div class="stock-row-view">${x.trackStock === false ? 'Haifuatiliwi' : 'Angalia tu'}</div>`}
+          <div class="stock-row-view">${isAllBranchesMode() ? 'Chagua tawi moja ili kusimamia stock' : x.trackStock === false ? 'Haifuatiliwi' : 'Angalia tu'}</div>`}
         </article>`;
     }).join('');
 
@@ -2280,6 +2291,9 @@
     });
     el.querySelectorAll('[data-stock-edit]').forEach(btn => {
       btn.addEventListener('click', () => showStockAdjustmentDialog(btn.dataset.stockEdit));
+    });
+    el.querySelectorAll('[data-stock-track]').forEach(btn => {
+      btn.addEventListener('click', () => showEditSalesItemDialog(btn.dataset.stockTrack));
     });
     el.querySelectorAll('[data-stock-delete]').forEach(btn => {
       btn.addEventListener('click', () => deleteSalesItem(btn.dataset.stockDelete));
@@ -2883,7 +2897,7 @@
     if (!hasPerm('sales_items')) return;
     if (!requireSingleBranch('kuongeza bidhaa')) return;
     const name = $('salesItemName')?.value.trim();
-    const category = $('salesItemCategory')?.value || 'Nyingine';
+    const category = $('salesItemCategoryCustom')?.value.trim() || $('salesItemCategory')?.value || 'Nyingine';
     const unit = $('salesItemUnit')?.value || 'KG';
     const price = parseInt($('salesItemPrice')?.value, 10);
     const costPrice = parseInt($('salesItemCost')?.value, 10) || 0;
@@ -2902,13 +2916,13 @@
       unit,
       price,
       costPrice,
-      stock: stock > 0 ? stock : def.stock,
-      lowStock: lowStock > 0 ? lowStock : def.lowStock,
+      stock: Number.isFinite(stock) && stock >= 0 ? stock : def.stock,
+      lowStock: Number.isFinite(lowStock) && lowStock >= 0 ? lowStock : def.lowStock,
       trackStock: true,
       active: true
     });
     saveSalesItemsList(list);
-    ['salesItemName', 'salesItemPrice', 'salesItemCost', 'salesItemStock', 'salesItemLowStock'].forEach(id => { if ($(id)) $(id).value = ''; });
+    ['salesItemName', 'salesItemPrice', 'salesItemCost', 'salesItemStock', 'salesItemLowStock', 'salesItemCategoryCustom'].forEach(id => { if ($(id)) $(id).value = ''; });
     renderSalesItems();
     populateSaleItemSelect();
     renderStock();
@@ -2946,10 +2960,13 @@
         <p class="ssd-sub">Badilisha jina, bei, gharama au stock ya bidhaa.</p>
         <div class="edit-sale-grid">
           <label class="field field-wide"><span>Jina la bidhaa</span><input id="editItemName" value="${escapeHtml(item.name || '')}"></label>
+          <label class="field"><span>Aina</span><input id="editItemCategory" value="${escapeHtml(item.category || 'Nyingine')}" maxlength="40"></label>
+          <label class="field"><span>Kipimo</span><select id="editItemUnit">${['KG','Lita','Chupa','Kopo','Glasi','Kipande','Tunda','Fungu','Sahani','Kifurushi','Pakiti'].map(unit => `<option value="${unit}"${unit === item.unit ? ' selected' : ''}>${unit}</option>`).join('')}${!['KG','Lita','Chupa','Kopo','Glasi','Kipande','Tunda','Fungu','Sahani','Kifurushi','Pakiti'].includes(item.unit) ? `<option selected value="${escapeHtml(item.unit)}">${escapeHtml(item.unit)}</option>` : ''}</select></label>
           <label class="field"><span>Bei ya kuuza (TSH)</span><input id="editItemPrice" type="number" min="0" value="${Number(item.price) || 0}"></label>
           <label class="field"><span>Gharama / kipimo (TSH)</span><input id="editItemCost" type="number" min="0" value="${Number(item.costPrice) || 0}"></label>
           <label class="field"><span>Stock iliyopo</span><input id="editItemStock" type="number" min="0" step="0.01" value="${Number(item.stock) || 0}"></label>
           <label class="field"><span>Onyo chini ya stock</span><input id="editItemLowStock" type="number" min="0" step="0.01" value="${Number(item.lowStock) || 0}"></label>
+          <label class="field field-wide"><span><input id="editItemTrackStock" type="checkbox"${item.trackStock === false ? '' : ' checked'}> Fuatilia stock, mauzo na tahadhari kwa bidhaa hii</span></label>
         </div>
       </div>`;
     $('adminDialogCancel')?.classList.remove('hidden');
@@ -2968,14 +2985,24 @@
     const item = getAllSalesItems().find(x => x.id === editSalesItemId);
     if (!item) return;
     const branchId = item.branchId || findItemBranchId(item.id);
+    const targetStock = Math.max(0, Number($('editItemStock')?.value) || 0);
     const updated = {
       ...item, name, price,
+      category: ($('editItemCategory')?.value || 'Nyingine').trim() || 'Nyingine',
+      unit: $('editItemUnit')?.value || item.unit,
       costPrice: Math.max(0, Number($('editItemCost')?.value) || 0),
-      stock: Math.max(0, Number($('editItemStock')?.value) || 0),
+      stock: Number(item.stock) || 0,
+      trackStock: $('editItemTrackStock')?.checked !== false,
       lowStock: Math.max(0, Number($('editItemLowStock')?.value) || 0),
       editedAt: new Date().toISOString()
     };
+    if (updated.unit !== 'KG' && updated.unit !== 'Lita' && !Number.isInteger(targetStock)) {
+      showAdminToast('Weka idadi kamili ya stock kwa kipimo hiki.', 'warn');
+      return;
+    }
     saveBranchData(SALES_ITEMS_KEY, loadSalesItemsForBranch(branchId).map(x => x.id === updated.id ? updated : x), branchId);
+    const stockDelta = Math.round((targetStock - (Number(item.stock) || 0)) * 100) / 100;
+    if (stockDelta) updateItemStock(updated.id, stockDelta, 'adjust', 'Marekebisho kutoka kuhariri bidhaa');
     editSalesItemId = null;
     closeAdminDialog();
     renderSalesItems();
@@ -3050,6 +3077,12 @@
     return getSalesItems().find(x => x.id === id) || null;
   }
 
+  function saleQtyIsValid(item, qty) {
+    if (!item || !Number.isFinite(qty) || qty <= 0) return false;
+    if (item.unit === 'KG' || item.unit === 'Lita') return true;
+    return Number.isInteger(qty);
+  }
+
   function updateSaleTotalPreview() {
     const item = getSelectedSaleItem();
     const qty = parseFloat($('saleQty')?.value) || 0;
@@ -3060,7 +3093,14 @@
       return;
     }
     const unitPrice = Number(item.price) || 0;
-    const total = item.unit === 'KG'
+    const qtyInput = $('saleQty');
+    const fractionalUnit = item.unit === 'KG' || item.unit === 'Lita';
+    if (qtyInput) {
+      qtyInput.step = fractionalUnit ? '0.01' : '1';
+      qtyInput.min = fractionalUnit ? '0.01' : '1';
+      qtyInput.placeholder = fractionalUnit ? 'Mfano: 0.5 au 1' : 'Weka idadi';
+    }
+    const total = (item.unit === 'KG' || item.unit === 'Lita')
       ? Math.round(unitPrice * qty)
       : Math.round(unitPrice * (qty || 1));
     if (hint) {
@@ -3083,6 +3123,22 @@
     if (big) {
       const shown = totalEl?.value ? Number(totalEl.value) : (qty > 0 && item ? total : 0);
       big.textContent = shown ? 'TSH ' + formatMoney(shown) : '—';
+    }
+    const stockPreview = $('saleStockPreview');
+    if (stockPreview) {
+      const branch = getCurrentBranch();
+      if (!item || item.trackStock === false) {
+        stockPreview.classList.add('hidden');
+        stockPreview.textContent = '';
+      } else {
+        const reserved = saleCart.filter(line => line.itemId === item.id).reduce((sum, line) => sum + (Number(line.qty) || 0), 0);
+        const requested = reserved + qty;
+        const remaining = (Number(item.stock) || 0) - requested;
+        const enough = requested <= 0 || remaining >= 0;
+        stockPreview.classList.remove('hidden');
+        stockPreview.classList.toggle('warn', !enough || remaining <= (Number(item.lowStock) || 0));
+        stockPreview.innerHTML = `<span>📦 Stock ${requested > 0 && enough ? 'baada ya mauzo' : 'iliyopo'}: <b>${escapeHtml(formatStockQty(requested > 0 && enough ? remaining : item.stock, item.unit))}</b></span><small>${escapeHtml(branch?.name || 'Tawi hili')}${requested > 0 && !enough ? ' · Stock haitoshi' : ''}</small>`;
+      }
     }
     updatePosCashChange();
   }
@@ -3149,9 +3205,7 @@
     sel.value = itemId;
     if ($('saleTotal')) delete $('saleTotal').dataset.manual;
     const item = getSelectedSaleItem();
-    if (item && $('saleQty') && !$('saleQty').value) {
-      $('saleQty').value = item.unit === 'KG' ? '1' : '1';
-    }
+    if (item && $('saleQty') && !$('saleQty').value) $('saleQty').value = '1';
     updateSaleTotalPreview();
     renderSaleQtyPresets();
     document.querySelectorAll('.pos-product-tile').forEach(el => {
@@ -3429,20 +3483,21 @@
         <h3 class="ssd-title" id="adminDialogTitle">− Rekodi Uharibifu</h3>
         <p class="ssd-sub">${escapeHtml(item.name)} · Stoo: ${escapeHtml(formatStockQty(item.stock, item.unit))}</p>
         <div class="field"><label>Kiasi (${escapeHtml(item.unit)})</label>
-          <input id="wastageQty" type="number" min="0.01" step="0.01" value="${item.unit === 'KG' ? '0.5' : '1'}"></div>
+          <input id="wastageQty" type="number" min="${item.unit === 'KG' || item.unit === 'Lita' ? '0.01' : '1'}" step="${item.unit === 'KG' || item.unit === 'Lita' ? '0.01' : '1'}" value="${item.unit === 'KG' || item.unit === 'Lita' ? '0.5' : '1'}"></div>
         <div class="field"><label>Sababu</label>
-          <input id="wastageReason" type="text" value="Uharibifu wa nyama" placeholder="Sababu ya uharibifu"></div>
+          <input id="wastageReason" type="text" value="Uharibifu" placeholder="Sababu ya uharibifu"></div>
       </div>`;
     dialog.classList.add('open');
     dialog.setAttribute('aria-hidden', 'false');
     const okBtn = $('adminDialogOk');
     if (okBtn) {
       okBtn.textContent = 'Rekodi Uharibifu';
-      okBtn.onclick = () => {
+      if (adminDialogOkHandler) okBtn.removeEventListener('click', adminDialogOkHandler);
+      adminDialogOkHandler = () => {
         const qty = parseFloat($('wastageQty')?.value);
         const reason = $('wastageReason')?.value.trim() || 'Uharibifu';
-        if (!qty || qty <= 0) {
-          showAdminToast('Weka kiasi sahihi.', 'warn');
+        if (!stockQuantityIsValid(item, qty)) {
+          showAdminToast(item.unit === 'KG' || item.unit === 'Lita' ? 'Weka kiasi sahihi.' : 'Weka idadi kamili ya bidhaa.', 'warn');
           return;
         }
         const avail = Number(item.stock) || 0;
@@ -3460,8 +3515,6 @@
           showAdminToast('✓ Uharibifu umerekodiwa: -' + formatStockQty(qty, item.unit));
         }
         closeAdminDialog();
-        if (okBtn) okBtn.onclick = closeAdminDialog;
-        if (okBtn) okBtn.textContent = 'Sawa ✓';
       };
     }
   }
@@ -3498,14 +3551,14 @@
     const wrap = $('saleQtyPresets');
     const item = getSelectedSaleItem();
     if (!wrap) return;
-    if (!item || item.unit !== 'KG') {
+    if (!item || !['KG', 'Lita'].includes(item.unit)) {
       wrap.innerHTML = '';
       wrap.hidden = true;
       return;
     }
     wrap.hidden = false;
-    wrap.innerHTML = [0.5, 1, 1.5, 2].map(kg =>
-      `<button type="button" class="sales-qty-btn" data-qty="${kg}">${kg} KG</button>`
+    wrap.innerHTML = [0.5, 1, 1.5, 2].map(qty =>
+      `<button type="button" class="sales-qty-btn" data-qty="${qty}">${qty} ${escapeHtml(item.unit)}</button>`
     ).join('');
     wrap.querySelectorAll('.sales-qty-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -3560,7 +3613,7 @@
     const qty = parseFloat($('saleQty')?.value);
     const total = parseInt($('saleTotal')?.value, 10);
     if (!item) { showAdminToast('Chagua bidhaa kwanza.', 'warn'); return; }
-    if (!qty || qty <= 0) { showAdminToast('Weka kiasi sahihi.', 'warn'); return; }
+    if (!saleQtyIsValid(item, qty)) { showAdminToast(item.unit === 'KG' || item.unit === 'Lita' ? 'Weka kiasi sahihi.' : 'Weka idadi kamili ya bidhaa.', 'warn'); return; }
     if (!total || total <= 0) { showAdminToast('Weka bei ya mauzo.', 'warn'); return; }
     if (item.trackStock !== false) {
       const inCart = saleCart.filter(x => x.itemId === item.id).reduce((s, x) => s + x.qty, 0);
@@ -3613,15 +3666,20 @@
     const log = getBranchSalesLog(writeBranch);
     let grandTotal = 0;
 
+    const currentItems = getAllSalesItems();
+    const cartQtyByItem = new Map();
     for (const line of saleCart) {
-      const item = getAllSalesItems().find(x => x.id === line.itemId && x.active !== false);
-      if (!item) continue;
-      if (item.trackStock !== false) {
-        const avail = Number(item.stock) || 0;
-        if (line.qty > avail) {
-          showAdminToast('Stock haitoshi kwa ' + item.name + '. Angalia risiti.', 'warn');
-          return;
-        }
+      cartQtyByItem.set(line.itemId, (cartQtyByItem.get(line.itemId) || 0) + (Number(line.qty) || 0));
+    }
+    for (const [itemId, requestedQty] of cartQtyByItem) {
+      const item = currentItems.find(x => x.id === itemId && x.active !== false);
+      if (!item) {
+        showAdminToast('Bidhaa kwenye risiti haipatikani tena. Ondoa na ongeza tena.', 'warn');
+        return;
+      }
+      if (item.trackStock !== false && requestedQty > (Number(item.stock) || 0)) {
+        showAdminToast('Stock haitoshi kwa ' + item.name + '. Ipo: ' + formatStockQty(item.stock, item.unit), 'warn');
+        return;
       }
     }
 
@@ -3629,7 +3687,7 @@
     const newSales = [];
     saleCart.forEach(line => {
       const econ = buildSaleEconomicsFields(
-        getAllSalesItems().find(x => x.id === line.itemId),
+        currentItems.find(x => x.id === line.itemId),
         line.qty,
         line.total
       );
@@ -3697,7 +3755,7 @@
     const session = getSession();
 
     if (!item) { showAdminToast('Chagua bidhaa kwanza.', 'warn'); return; }
-    if (!qty || qty <= 0) { showAdminToast('Weka kiasi sahihi.', 'warn'); return; }
+    if (!saleQtyIsValid(item, qty)) { showAdminToast(item.unit === 'KG' || item.unit === 'Lita' ? 'Weka kiasi sahihi.' : 'Weka idadi kamili ya bidhaa.', 'warn'); return; }
     if (!total || total <= 0) { showAdminToast('Weka bei ya mauzo.', 'warn'); return; }
 
     if (item.trackStock !== false) {
@@ -5568,6 +5626,14 @@ alter table public.app_storage replica identity full;`;
   function bindEvents() {
     $('smartRefreshBtn')?.addEventListener('click', manualSmartRefresh);
     $('addBranchStockBtn')?.addEventListener('click', showBranchStockDialog);
+    $('stockSearch')?.addEventListener('input', e => {
+      stockQuery = e.target.value || '';
+      renderStockList();
+    });
+    $('stockStatusFilter')?.addEventListener('change', e => {
+      stockStatusFilter = e.target.value || 'all';
+      renderStockList();
+    });
     $('adminMenuToggle')?.addEventListener('click', () => {
       $('adminSidebar')?.classList.toggle('open');
       $('adminLayout')?.classList.toggle('sidebar-open');
@@ -5665,6 +5731,10 @@ alter table public.app_storage replica identity full;`;
     $('clearSaleCartBtn')?.addEventListener('click', clearSaleCart);
     $('recordSaleBtn')?.addEventListener('click', recordSale);
     $('addSalesItemBtn')?.addEventListener('click', addSalesItem);
+    $('salesItemCategory')?.addEventListener('change', e => {
+      $('salesItemCategoryCustom')?.classList.toggle('hidden', e.target.value !== 'Nyingine');
+      if (e.target.value !== 'Nyingine' && $('salesItemCategoryCustom')) $('salesItemCategoryCustom').value = '';
+    });
     $('clearSalesBtn')?.addEventListener('click', clearSales);
     $('saleItemSelect')?.addEventListener('change', () => {
       if ($('saleTotal')) delete $('saleTotal').dataset.manual;

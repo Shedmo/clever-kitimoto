@@ -832,6 +832,7 @@
   function renderStaffManagement() {
     const el = $('staffList');
     if (!el || !hasPerm('staff_manage')) return;
+    renderStaffSalesPerformance();
     populateStaffFormSelects();
     const branches = getBranches();
     const staff = getAllAccounts().slice().sort((a, b) => {
@@ -872,6 +873,106 @@
     el.querySelectorAll('[data-staff-branch]').forEach(sel => {
       sel.addEventListener('change', () => changeStaffBranch(sel.dataset.staffBranch, sel.value));
     });
+  }
+
+  function darDateKey(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: 'Africa/Dar_es_Salaam', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(date);
+    const part = type => parts.find(x => x.type === type)?.value || '';
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  }
+
+  function salesDateKey(iso) {
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? '' : darDateKey(date);
+  }
+
+  function renderStaffSalesPerformance() {
+    const listEl = $('staffSalesPerformance');
+    const summaryEl = $('staffSalesSummary');
+    const mixEl = $('staffSalesPaymentMix');
+    const dateEl = $('staffSalesDate');
+    if (!listEl || !summaryEl || !mixEl) return;
+    if (dateEl && !dateEl.value) dateEl.value = darDateKey();
+    const selectedDate = dateEl?.value || darDateKey();
+    const allSales = getSalesLog().filter(sale => salesDateKey(sale.at) === selectedDate);
+    const staffAccounts = getAllAccounts().filter(account => ['admin', 'manager', 'seller'].includes(account.role));
+    const groups = new Map();
+    staffAccounts.forEach(account => {
+      const key = String(account.user || '').trim().toLowerCase();
+      if (key) groups.set(key, { name: account.user, role: account.role, sales: [] });
+    });
+    allSales.forEach(sale => {
+      const rawName = String(sale.seller || 'staff').trim() || 'staff';
+      const key = rawName.toLowerCase();
+      if (!groups.has(key)) groups.set(key, { name: rawName, role: '', sales: [] });
+      groups.get(key).sales.push(sale);
+    });
+
+    const methods = [
+      { key: 'cash', label: 'Cash', icon: '💵' },
+      { key: 'mpesa', label: 'M-Pesa', icon: '📱' },
+      { key: 'lipa', label: 'Lipa namba', icon: '💳' },
+      { key: 'other', label: 'Nyingine', icon: '💰' }
+    ];
+    const getMethod = payment => ['cash', 'mpesa', 'lipa'].includes(payment) ? payment : 'other';
+    const total = allSales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
+    const receipts = new Set(allSales.map(sale => sale.receiptId || sale.id).filter(Boolean)).size;
+    const methodTotals = Object.fromEntries(methods.map(method => [method.key, 0]));
+    allSales.forEach(sale => { methodTotals[getMethod(sale.payment)] += Number(sale.total) || 0; });
+
+    summaryEl.innerHTML = `
+      <div class="staff-sales-stat highlight"><span>Mauzo yote</span><strong>TSH ${formatMoney(total)}</strong></div>
+      <div class="staff-sales-stat"><span>Risiti</span><strong>${receipts}</strong></div>
+      <div class="staff-sales-stat"><span>Bidhaa zilizouzwa</span><strong>${allSales.length}</strong></div>
+      <div class="staff-sales-stat"><span>Tarehe · ${escapeHtml(getCurrentBranch()?.name || 'Tawi')}</span><strong>${escapeHtml(selectedDate)}</strong></div>`;
+
+    mixEl.innerHTML = `<div class="staff-payment-title"><span>Mgao wa malipo ya siku</span><small>Asilimia huhesabiwa kwa thamani ya mauzo</small></div>
+      <div class="staff-payment-grid">${methods.map(method => {
+        const amount = methodTotals[method.key];
+        const pct = total ? Math.round(amount / total * 100) : 0;
+        return `<div class="staff-payment-card">
+          <div class="staff-payment-card-head"><span>${method.icon} ${method.label}</span><b>${pct}%</b></div>
+          <strong>TSH ${formatMoney(amount)}</strong>
+          <div class="staff-payment-track"><i style="width:${pct}%"></i></div>
+        </div>`;
+      }).join('')}</div>`;
+
+    const sorted = Array.from(groups.values()).sort((a, b) => {
+      const totalA = a.sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
+      const totalB = b.sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
+      return totalB - totalA || a.name.localeCompare(b.name);
+    });
+    if (!sorted.length) {
+      listEl.innerHTML = '<div class="staff-sales-empty">Hakuna wafanyakazi au mauzo ya kuonyesha.</div>';
+      return;
+    }
+    listEl.innerHTML = sorted.map(person => {
+      const personTotal = person.sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
+      const personReceipts = new Set(person.sales.map(sale => sale.receiptId || sale.id).filter(Boolean)).size;
+      const personMethods = Object.fromEntries(methods.map(method => [method.key, 0]));
+      person.sales.forEach(sale => { personMethods[getMethod(sale.payment)] += Number(sale.total) || 0; });
+      const role = ROLE_LABELS[person.role] || (person.role ? person.role : 'Rekodi ya mauzo');
+      return `<article class="staff-performance-card">
+        <div class="staff-performance-head">
+          <div><strong>${escapeHtml(person.name)}</strong><span>${escapeHtml(role)}${isAllBranchesMode() ? ' · Matawi yote' : ''}</span></div>
+          <div class="staff-performance-total"><small>Mauzo yake</small><b>TSH ${formatMoney(personTotal)}</b></div>
+        </div>
+        <div class="staff-performance-meta"><span>🧾 ${personReceipts} risiti</span><span>📦 ${person.sales.length} bidhaa</span></div>
+        <div class="staff-performance-payments">${methods.map(method => {
+          const amount = personMethods[method.key];
+          const pct = personTotal ? Math.round(amount / personTotal * 100) : 0;
+          return `<div><span>${method.icon} ${method.label}</span><b>${pct}% · TSH ${formatMoney(amount)}</b></div>`;
+        }).join('')}</div>
+        ${person.sales.length ? `<details class="staff-performance-details">
+          <summary>Ona mauzo yote (${person.sales.length})</summary>
+          <div class="staff-transaction-list">${person.sales.slice().sort((a, b) => new Date(b.at) - new Date(a.at)).map(sale => `
+            <div class="staff-transaction"><div><strong>${escapeHtml(sale.itemName || 'Bidhaa')}</strong><span>${escapeHtml(String(sale.qty || 0))} ${escapeHtml(sale.unit || '')} · ${escapeHtml(paymentLabel(sale.payment))}${isAllBranchesMode() ? ' · ' + escapeHtml(sale.branchName || 'Tawi') : ''}</span></div><b>TSH ${formatMoney(sale.total)}</b></div>
+          `).join('')}</div>
+        </details>` : '<div class="staff-no-sales">Hakuna mauzo siku hii.</div>'}
+      </article>`;
+    }).join('');
   }
 
   function populateStaffAssignSelects() {
@@ -3956,6 +4057,7 @@
   function renderSales() {
     renderSalesSummary();
     renderSalesBreakdown();
+    renderStaffSalesPerformance();
     renderDashboard();
     const el = $('salesList');
     if (!el) return;
@@ -5713,6 +5815,7 @@ alter table public.app_storage replica identity full;`;
     $('addStaffBtn')?.addEventListener('click', addStaffAccount);
     $('changeStaffPassBtn')?.addEventListener('click', changeStaffPassword);
     $('staffAddRole')?.addEventListener('change', toggleStaffAddBranchField);
+    $('staffSalesDate')?.addEventListener('change', renderStaffSalesPerformance);
     $('branchSelect')?.addEventListener('change', e => {
       if (e.target.value) switchBranch(e.target.value);
     });

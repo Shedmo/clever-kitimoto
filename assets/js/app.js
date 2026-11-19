@@ -514,13 +514,13 @@
     saveCheckout();
   }
 
-  function applyOrderToCart(order, opts = {}) {
+  async function applyOrderToCart(order, opts = {}) {
     const { restoreCheckout = true, openPanel = true } = opts;
     if (!order?.items?.length) {
       showToast('Imeshindwa kupakia oda hii');
       return false;
     }
-    if (cart.length && !confirm('Oda yako ya sasa itabadilishwa na oda hii. Endelea?')) {
+    if (cart.length && !(await confirmReplaceOrder(order))) {
       return false;
     }
     cart = order.items.map(i => ({
@@ -536,6 +536,56 @@
     showToast('🔁 Oda imerudiwa — angalia na tuma tena!');
     if (openPanel) openOrderPanel();
     return true;
+  }
+
+  function confirmReplaceOrder(order) {
+    const overlay = document.getElementById('orderReplaceDialog');
+    const cancelBtn = document.getElementById('orderReplaceCancel');
+    const replaceBtn = document.getElementById('orderReplaceConfirm');
+    const currentCount = document.getElementById('replaceCurrentCount');
+    const nextCount = document.getElementById('replaceNextCount');
+    const returnFocus = document.activeElement;
+    if (!overlay || !cancelBtn || !replaceBtn) return Promise.resolve(window.confirm('Oda yako ya sasa itabadilishwa na oda hii. Endelea?'));
+
+    if (currentCount) currentCount.textContent = cart.length + (cart.length === 1 ? ' bidhaa' : ' bidhaa');
+    if (nextCount) nextCount.textContent = order.items.length + (order.items.length === 1 ? ' bidhaa' : ' bidhaa');
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add('is-open'));
+    document.body.classList.add('dialog-open');
+
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = accepted => {
+        if (settled) return;
+        settled = true;
+        overlay.classList.remove('is-open');
+        document.body.classList.remove('dialog-open');
+        setTimeout(() => {
+          overlay.hidden = true;
+          if (returnFocus?.isConnected) returnFocus.focus();
+        }, 180);
+        cancelBtn.removeEventListener('click', cancel);
+        replaceBtn.removeEventListener('click', accept);
+        overlay.removeEventListener('click', backdrop);
+        document.removeEventListener('keydown', onKeydown);
+        resolve(accepted);
+      };
+      const cancel = () => finish(false);
+      const accept = () => finish(true);
+      const backdrop = event => { if (event.target === overlay) finish(false); };
+      const onKeydown = event => {
+        if (event.key === 'Escape') finish(false);
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          (document.activeElement === cancelBtn ? replaceBtn : cancelBtn).focus();
+        }
+      };
+      cancelBtn.addEventListener('click', cancel);
+      replaceBtn.addEventListener('click', accept);
+      overlay.addEventListener('click', backdrop);
+      document.addEventListener('keydown', onKeydown);
+      cancelBtn.focus();
+    });
   }
 
   function reorderLast() {

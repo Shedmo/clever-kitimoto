@@ -748,6 +748,25 @@
   </div>
 </div>
 
+<div class="order-replace-dialog" id="orderReplaceDialog" hidden>
+  <div class="order-replace-backdrop" aria-hidden="true"></div>
+  <section class="order-replace-card" role="alertdialog" aria-modal="true" aria-labelledby="orderReplaceTitle" aria-describedby="orderReplaceDescription">
+    <div class="order-replace-mark" aria-hidden="true">↻</div>
+    <p class="order-replace-eyebrow">KURUDIA ODA</p>
+    <h2 id="orderReplaceTitle">Badilisha oda yako?</h2>
+    <p id="orderReplaceDescription">Oda mpya itachukua nafasi ya bidhaa ulizoweka sasa. Bado unaweza kuikagua kabla ya kuituma.</p>
+    <div class="order-replace-summary" aria-live="polite">
+      <div><span>Oda ya sasa</span><strong id="replaceCurrentCount">—</strong></div>
+      <span class="order-replace-arrow" aria-hidden="true">↓</span>
+      <div><span>Oda utakayopakia</span><strong id="replaceNextCount">—</strong></div>
+    </div>
+    <div class="order-replace-actions">
+      <button type="button" class="order-replace-cancel" id="orderReplaceCancel">Endelea na oda yangu</button>
+      <button type="button" class="order-replace-confirm" id="orderReplaceConfirm">Badilisha oda <span aria-hidden="true">→</span></button>
+    </div>
+  </section>
+</div>
+
 <div class="order-toast" id="orderToast" aria-live="polite"></div>
 
 <button class="scroll-top" id="scrollTop" type="button" aria-label="Rudi juu" hidden>↑</button>

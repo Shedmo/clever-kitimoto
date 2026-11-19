@@ -2977,14 +2977,18 @@
     dialog.setAttribute('aria-hidden', 'false');
   }
 
-  function saveEditedSalesItem() {
+  async function saveEditedSalesItem() {
     if (!editSalesItemId || !hasPerm('sales_items')) return;
     const name = ($('editItemName')?.value || '').trim();
     const price = Number($('editItemPrice')?.value);
-    if (!name || price < 0) { showAdminToast('Weka jina na bei sahihi.', 'warn'); return; }
+    if (!name || !Number.isFinite(price) || price < 0) { showAdminToast('Weka jina na bei sahihi.', 'warn'); return; }
     const item = getAllSalesItems().find(x => x.id === editSalesItemId);
     if (!item) return;
     const branchId = item.branchId || findItemBranchId(item.id);
+    if (!branchId || branchId === ALL_BRANCHES_ID) {
+      showAdminToast('Chagua tawi moja kabla ya kuhifadhi bidhaa.', 'warn');
+      return;
+    }
     const targetStock = Math.max(0, Number($('editItemStock')?.value) || 0);
     const updated = {
       ...item, name, price,
@@ -3000,9 +3004,47 @@
       showAdminToast('Weka idadi kamili ya stock kwa kipimo hiki.', 'warn');
       return;
     }
-    saveBranchData(SALES_ITEMS_KEY, loadSalesItemsForBranch(branchId).map(x => x.id === updated.id ? updated : x), branchId);
+    const cloud = window.CleverCloudSync;
+    if (!cloud?.isEnabled?.()) {
+      showAdminToast('Unganisha Supabase kwanza. Bidhaa haijahifadhiwa.', 'warn');
+      return;
+    }
+    const itemKey = branchStorageKey(SALES_ITEMS_KEY, branchId);
+    const stockKey = branchStorageKey(STOCK_LOG_KEY, branchId);
+    const items = loadSalesItemsForBranch(branchId).map(x => x.id === updated.id ? updated : x);
     const stockDelta = Math.round((targetStock - (Number(item.stock) || 0)) * 100) / 100;
-    if (stockDelta) updateItemStock(updated.id, stockDelta, 'adjust', 'Marekebisho kutoka kuhariri bidhaa');
+    const stockLog = loadBranchDataFor(STOCK_LOG_KEY, branchId, []);
+    const nextStockLog = Array.isArray(stockLog) ? stockLog.slice() : [];
+    if (stockDelta) {
+      const branch = getBranchById(branchId);
+      nextStockLog.unshift({
+        id: 'stk-' + Date.now(), at: new Date().toISOString(), type: 'adjust',
+        itemId: updated.id, itemName: updated.name, unit: updated.unit,
+        qty: Math.abs(stockDelta), delta: stockDelta, before: Number(item.stock) || 0,
+        after: targetStock, note: 'Marekebisho kutoka kuhariri bidhaa',
+        user: getSession()?.user || 'staff', branchId, branchName: branch?.name || ''
+      });
+      if (nextStockLog.length > 500) nextStockLog.length = 500;
+    }
+    const okBtn = $('adminDialogOk');
+    const previousLabel = okBtn?.textContent;
+    if (okBtn) { okBtn.disabled = true; okBtn.textContent = '⏳ Inahifadhi database...'; }
+    try {
+      const itemSaved = await cloud.pushKey(itemKey, items);
+      if (!itemSaved) throw new Error('Supabase haijakubali kuhifadhi bidhaa.');
+      if (stockDelta) {
+        const logSaved = await cloud.pushKey(stockKey, nextStockLog);
+        if (!logSaved) throw new Error('Supabase haijakubali kuhifadhi historia ya stock.');
+      }
+      localStorage.setItem(itemKey, JSON.stringify(items));
+      if (stockDelta) localStorage.setItem(stockKey, JSON.stringify(nextStockLog));
+    } catch (err) {
+      console.error('Product save to Supabase failed', err);
+      showAdminToast('Haijahifadhiwa database: ' + (err.message || 'Angalia muunganisho wa Supabase.'), 'warn');
+      if (okBtn) { okBtn.disabled = false; okBtn.textContent = previousLabel || '💾 Hifadhi'; }
+      return;
+    }
+    if (okBtn) { okBtn.disabled = false; okBtn.textContent = previousLabel || '💾 Hifadhi'; }
     editSalesItemId = null;
     closeAdminDialog();
     renderSalesItems();

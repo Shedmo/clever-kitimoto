@@ -689,7 +689,7 @@
     if (wrap) wrap.classList.toggle('hidden', role !== 'seller');
   }
 
-  function addStaffAccount() {
+  async function addStaffAccount() {
     if (!hasPerm('staff_manage')) return;
     const user = ($('staffAddUser')?.value || '').trim().toLowerCase();
     const pass = $('staffAddPass')?.value || '';
@@ -717,6 +717,10 @@
       showAdminToast('Chagua jukumu: Meneja au Muuzaji.', 'warn');
       return;
     }
+    if (role === 'seller' && (!getBranchById(branchId) || getBranchById(branchId).active === false)) {
+      showAdminToast('Chagua tawi linalofanya kazi kwa muuzaji.', 'warn');
+      return;
+    }
 
     const list = getAllAccountsIncludingInactive();
     if (list.some(a => a.user === user && a.active !== false)) {
@@ -732,11 +736,12 @@
       protected: false,
       createdAt: new Date().toISOString()
     };
+    const branchMap = getStaffBranchMap();
     if (role === 'seller') {
       entry.branchId = branchId;
-      const map = getStaffBranchMap();
-      map[user] = branchId;
-      saveStaffBranchMap(map);
+      branchMap[user] = branchId;
+    } else {
+      delete branchMap[user];
     }
 
     const inactiveIdx = list.findIndex(a => a.user === user && a.active === false);
@@ -745,7 +750,24 @@
     } else {
       list.push(entry);
     }
-    saveStaffAccountsRaw(list);
+    const cloud = window.CleverCloudSync;
+    if (!cloud?.isEnabled?.()) {
+      showAdminToast('Akaunti haijahifadhiwa. Unganisha Supabase kwanza.', 'warn');
+      return;
+    }
+    const button = $('addStaffBtn');
+    const oldLabel = button?.innerHTML;
+    if (button) { button.disabled = true; button.textContent = '⏳ Inahifadhi database...'; }
+    try {
+      await saveDatabaseFirst(STAFF_BRANCHES_KEY, branchMap);
+      await saveDatabaseFirst(STAFF_ACCOUNTS_KEY, list);
+    } catch (err) {
+      console.error('Could not register staff account in database', err);
+      showAdminToast('Akaunti haijahifadhiwa database: ' + (err.message || 'Angalia Supabase kisha ujaribu tena.'), 'warn');
+      return;
+    } finally {
+      if (button) { button.disabled = false; button.innerHTML = oldLabel; }
+    }
 
     ['staffAddUser', 'staffAddPass', 'staffAddPass2'].forEach(id => { if ($(id)) $(id).value = ''; });
     renderStaffManagement();

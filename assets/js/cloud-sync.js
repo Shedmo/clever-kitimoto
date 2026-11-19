@@ -5,15 +5,45 @@
   const PREFIX = 'cleverKitimoto';
   const SKIP_KEYS = new Set([
     'cleverKitimotoCloudConfigV1',
-    'cleverKitimotoCurrentBranchV1'
+    'cleverKitimotoCurrentBranchV1',
+    PREFIX + 'CloudPendingKeysV1'
   ]);
+  const PENDING_KEY = PREFIX + 'CloudPendingKeysV1';
 
   let client = null;
+  let clientConfig = '';
   let unsub = null;
   let connected = false;
   let syncing = false;
-  const pushTimers = {};
   const PUSH_MS = 400;
+  const MAX_RETRY_MS = 60000;
+  let retryTimer = null;
+  let retryDelay = 1000;
+  let lastError = '';
+  const originalSetItem = Storage.prototype.setItem;
+
+  function pendingKeys() {
+    try { return new Set(JSON.parse(localStorage.getItem(PENDING_KEY) || '[]')); }
+    catch { return new Set(); }
+  }
+
+  function storePending(keys) {
+    originalSetItem.call(localStorage, PENDING_KEY, JSON.stringify(Array.from(keys)));
+    announceSyncState();
+  }
+
+  function clearPendingIfUnchanged(key, raw) {
+    if (localStorage.getItem(key) !== raw) return false;
+    const pending = pendingKeys();
+    if (!pending.delete(key)) return true;
+    storePending(pending);
+    return true;
+  }
+
+  function announceSyncState() {
+    const detail = { pending: pendingKeys().size, error: lastError };
+    document.dispatchEvent(new CustomEvent('clever-cloud-storage-sync', { detail }));
+  }
 
   function config() {
     return window.CleverOrdersCloud?.config?.() || window.CLEVER_KITIMOTO_CLOUD || {};
@@ -33,7 +63,13 @@
     const lib = window.supabase?.createClient ? window.supabase : null;
     if (!lib) return false;
     const c = config();
-    if (!client) client = lib.createClient(c.supabaseUrl, c.supabaseAnonKey);
+    const identity = c.supabaseUrl + '|' + c.supabaseAnonKey;
+    if (!client || clientConfig !== identity) {
+      if (client && unsub) { unsub(); unsub = null; }
+      client = lib.createClient(c.supabaseUrl, c.supabaseAnonKey);
+      clientConfig = identity;
+      connected = false;
+    }
     return !!client;
   }
 
@@ -42,25 +78,34 @@
     try { return JSON.parse(raw); } catch { return raw; }
   }
 
+  function cacheLocal(key, value) {
+    syncing = true;
+    try { originalSetItem.call(localStorage, key, typeof value === 'string' ? value : JSON.stringify(value)); }
+    finally { syncing = false; }
+    const pending = pendingKeys();
+    if (pending.delete(key)) storePending(pending);
+  }
+
   function schedulePush(key, rawValue) {
     if (syncing || !shouldSyncKey(key)) return;
-    if (pushTimers[key]) clearTimeout(pushTimers[key]);
-    pushTimers[key] = setTimeout(() => {
-      delete pushTimers[key];
-      pushKey(key, parseValue(rawValue)).catch(err => {
-        console.warn('Cloud sync push failed:', key, err);
-      });
-    }, PUSH_MS);
+    const pending = pendingKeys();
+    pending.add(key);
+    storePending(pending);
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => flushPending().catch(() => {}), PUSH_MS);
   }
 
   function installLocalStorageHook() {
     if (localStorage.__cleverCloudHook) return;
-    const orig = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      orig.call(this, key, value);
+      originalSetItem.call(this, key, value);
       if (this === localStorage) schedulePush(key, value);
     };
     localStorage.__cleverCloudHook = true;
+    window.addEventListener('online', () => {
+      retryDelay = 1000;
+      flushPending().catch(() => {});
+    });
   }
 
   async function pushKey(key, data) {
@@ -73,7 +118,36 @@
     const { error } = await client.from(TABLE).upsert(payload);
     if (error) throw storageError(error);
     connected = true;
+    lastError = '';
     return true;
+  }
+
+  async function flushPending() {
+    if (!isEnabled()) return 0;
+    const pending = pendingKeys();
+    let sent = 0;
+    try {
+      for (const key of pending) {
+        const raw = localStorage.getItem(key);
+        if (raw == null) { pending.delete(key); continue; }
+        await pushKey(key, parseValue(raw));
+        clearPendingIfUnchanged(key, raw);
+        sent += 1;
+      }
+      storePending(pendingKeys());
+      retryDelay = 1000;
+      lastError = '';
+      announceSyncState();
+      return sent;
+    } catch (err) {
+      lastError = err?.message || String(err);
+      console.warn('Cloud storage sync is pending:', lastError);
+      announceSyncState();
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => flushPending().catch(() => {}), retryDelay);
+      retryDelay = Math.min(retryDelay * 2, MAX_RETRY_MS);
+      throw err;
+    }
   }
 
   async function pushAllLocal() {
@@ -82,7 +156,9 @@
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!shouldSyncKey(key)) continue;
-      await pushKey(key, parseValue(localStorage.getItem(key)));
+      const raw = localStorage.getItem(key);
+      await pushKey(key, parseValue(raw));
+      clearPendingIfUnchanged(key, raw);
       count += 1;
     }
     return count;
@@ -102,11 +178,13 @@
   async function pullFromCloud() {
     if (!initClient()) return { changed: 0 };
     const rows = await fetchAll();
+    const dirtyKeys = pendingKeys();
     let changed = 0;
     syncing = true;
     try {
       rows.forEach(row => {
         if (!row?.storage_key || !shouldSyncKey(row.storage_key)) return;
+        if (dirtyKeys.has(row.storage_key)) return;
         const raw = JSON.stringify(row.data);
         if (localStorage.getItem(row.storage_key) !== raw) {
           localStorage.setItem(row.storage_key, raw);
@@ -124,11 +202,13 @@
     if (!initClient()) return { pulled: 0, uploaded: 0 };
     const rows = await fetchAll();
     const cloudKeys = new Set();
+    const dirtyKeys = pendingKeys();
     syncing = true;
     try {
       rows.forEach(row => {
         if (!row?.storage_key || !shouldSyncKey(row.storage_key)) return;
         cloudKeys.add(row.storage_key);
+        if (dirtyKeys.has(row.storage_key)) return;
         localStorage.setItem(row.storage_key, JSON.stringify(row.data));
       });
     } finally {
@@ -137,8 +217,10 @@
     let uploaded = 0;
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (!shouldSyncKey(key) || cloudKeys.has(key)) continue;
-      await pushKey(key, parseValue(localStorage.getItem(key)));
+      if (!shouldSyncKey(key) || (cloudKeys.has(key) && !dirtyKeys.has(key))) continue;
+      const raw = localStorage.getItem(key);
+      await pushKey(key, parseValue(raw));
+      clearPendingIfUnchanged(key, raw);
       uploaded += 1;
     }
     connected = true;
@@ -176,8 +258,10 @@
         try {
           syncing = true;
           const rows = await fetchAll();
+          const dirtyKeys = pendingKeys();
           rows.forEach(row => {
             if (!row?.storage_key || !shouldSyncKey(row.storage_key)) return;
+            if (dirtyKeys.has(row.storage_key)) return;
             localStorage.setItem(row.storage_key, JSON.stringify(row.data));
           });
           syncing = false;
@@ -203,7 +287,8 @@
       unsub();
       unsub = null;
     }
-    Object.keys(pushTimers).forEach(k => clearTimeout(pushTimers[k]));
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
   }
 
   function isConnected() {
@@ -217,7 +302,10 @@
     isConnected,
     shouldSyncKey,
     pushKey,
+    cacheLocal,
     pushAllLocal,
+    flushPending,
+    getSyncState: () => ({ pending: pendingKeys().size, error: lastError }),
     pullFromCloud,
     syncBootstrap,
     testConnection,

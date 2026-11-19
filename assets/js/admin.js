@@ -1458,6 +1458,8 @@
       return true;
     } catch (err) {
       console.warn('Cloud storage bootstrap failed', err);
+      sync.flushPending?.().catch(() => {});
+      updateCloudBadge();
       return false;
     }
   }
@@ -1586,14 +1588,11 @@
   }
 
   async function saveToStorage(key, value) {
-    const raw = JSON.stringify(value);
-    localStorage.setItem(key, raw);
-
-    // The local copy makes the app usable offline.  When cloud storage is
-    // enabled, also wait for this specific write so success is truthful.
-    if (window.CleverCloudSync?.isEnabled?.()) {
-      await window.CleverCloudSync.pushKey(key, value);
-    }
+    const cloud = window.CleverCloudSync;
+    if (!cloud?.isEnabled?.()) throw new Error('Unganisha Supabase kwanza. Data haijahifadhiwa kwenye database.');
+    const saved = await cloud.pushKey(key, value);
+    if (!saved) throw new Error('Supabase haijakubali kuhifadhi data.');
+    cloud.cacheLocal(key, value);
   }
 
   async function saveDatabaseFirst(key, value) {
@@ -1605,7 +1604,7 @@
     if (!saved) throw new Error('Haikuweza kufikia Supabase');
     // This is only a fast, offline cache. Supabase has already accepted the
     // data above and remains the source of truth for branches.
-    localStorage.setItem(key, JSON.stringify(value));
+    sync.cacheLocal(key, value);
   }
 
   async function save() {
@@ -1627,15 +1626,19 @@
     if (button) { button.disabled = true; button.textContent = '⏳ Inahifadhi...'; }
     try {
       await saveToStorage(KEY, d);
-      // Keep the POS price list aligned with the menu as soon as prices change.
-      if (hasPerm('sales_items')) syncMenuPricesToPos();
       render();
-      alert(window.CleverCloudSync?.isEnabled?.()
-        ? 'Bei zimehifadhiwa kwenye simu na mtandaoni.'
-        : 'Bei zimehifadhiwa kwenye kifaa hiki.');
     } catch (err) {
       console.error('Could not save menu prices online', err);
-      alert('Bei zimehifadhiwa kwenye kifaa hiki, lakini kuhifadhi mtandaoni kumeshindikana. Jaribu tena ukiwa na intaneti.');
+      alert('Bei hazijahifadhiwa. Database haikukubali mabadiliko; jaribu tena baada ya kuangalia Supabase na intaneti.');
+      return;
+    }
+    try {
+      // Keep the POS price list aligned with the menu as soon as prices change.
+      if (hasPerm('sales_items')) await syncMenuPricesToPos();
+      alert('Bei za menu na POS zimehifadhiwa database.');
+    } catch (err) {
+      console.error('Menu prices saved but POS price sync failed', err);
+      alert('Bei za menu zimehifadhiwa database, lakini POS haijasawazishwa: ' + (err.message || 'Jaribu tena.'));
     } finally {
       if (button) { button.disabled = false; button.innerHTML = oldLabel; }
     }
@@ -1680,7 +1683,7 @@
     if (button) { button.disabled = true; button.textContent = '⏳ Inaongeza...'; }
     try {
       if (addToPos) {
-        const item = addMenuToPosItem(menu, { branchId, unit, costPrice, stock, lowStock });
+        const item = await addMenuToPosItem(menu, { branchId, unit, costPrice, stock, lowStock });
         if (item) menu.posItems[branchId] = item.id;
       }
       list.push(menu);
@@ -1690,19 +1693,17 @@
       populateSaleItemSelect();
       renderSalesItems();
       renderStock();
-      alert(window.CleverCloudSync?.isEnabled?.()
-        ? 'Menu mpya imeongezwa kwenye menu, POS na stock; imehifadhiwa mtandaoni.'
-        : 'Menu mpya imeongezwa kwenye menu, POS na stock.');
+      alert('Menu imehifadhiwa kwenye database, POS na stock.');
     } catch (err) {
       console.error('Could not save custom menu online', err);
       renderCustom();
-      alert('Menu imehifadhiwa kwenye kifaa hiki, lakini haijafika mtandaoni. Jaribu tena ukiwa na intaneti.');
+      alert('Menu haijahifadhiwa database. Angalia Supabase na ujaribu tena.');
     } finally {
       if (button) { button.disabled = false; button.innerHTML = oldLabel; }
     }
   }
 
-  function addMenuToPosItem(menu, options) {
+  async function addMenuToPosItem(menu, options) {
     const branchId = options?.branchId || getCurrentBranchId();
     const list = loadSalesItemsForBranch(branchId);
     const existing = list.find(x => String(x.name || '').trim().toLowerCase() === String(menu.name || '').trim().toLowerCase() && x.active !== false);
@@ -1725,7 +1726,7 @@
       sourceMenuId: menu.id
     };
     list.push(item);
-    saveBranchData(SALES_ITEMS_KEY, list, branchId);
+    await saveDatabaseFirst(branchStorageKey(SALES_ITEMS_KEY, branchId), list);
     return item;
   }
 
@@ -1750,14 +1751,14 @@
     const menu = getCustom().find(x => x.id === id);
     const list = getCustom().filter(x => x.id !== id);
     try {
-      await saveToStorage(CUSTOM_KEY, list);
       // A deleted public menu must not remain sellable by accident in POS.
-      Object.entries(menu?.posItems || {}).forEach(([branchId, itemId]) => {
+      for (const [branchId, itemId] of Object.entries(menu?.posItems || {})) {
         const items = loadSalesItemsForBranch(branchId).map(item =>
           item.id === itemId ? { ...item, active: false } : item
         );
-        saveBranchData(SALES_ITEMS_KEY, items, branchId);
-      });
+        await saveDatabaseFirst(branchStorageKey(SALES_ITEMS_KEY, branchId), items);
+      }
+      await saveToStorage(CUSTOM_KEY, list);
       renderCustom();
       populateSaleItemSelect();
       renderSalesItems();
@@ -3036,8 +3037,8 @@
         const logSaved = await cloud.pushKey(stockKey, nextStockLog);
         if (!logSaved) throw new Error('Supabase haijakubali kuhifadhi historia ya stock.');
       }
-      localStorage.setItem(itemKey, JSON.stringify(items));
-      if (stockDelta) localStorage.setItem(stockKey, JSON.stringify(nextStockLog));
+      cloud.cacheLocal(itemKey, items);
+      if (stockDelta) cloud.cacheLocal(stockKey, nextStockLog);
     } catch (err) {
       console.error('Product save to Supabase failed', err);
       showAdminToast('Haijahifadhiwa database: ' + (err.message || 'Angalia muunganisho wa Supabase.'), 'warn');
@@ -3471,8 +3472,10 @@
     }
   }
 
-  function syncMenuPricesToPos() {
+  async function syncMenuPricesToPos() {
     if (!hasPerm('sales_items')) return;
+    const branchId = requireSingleBranch('kusawazisha bei za POS');
+    if (!branchId) throw new Error('Chagua tawi moja kwanza.');
     const saved = getSavedMenuPrices();
     const list = getAllSalesItems();
     let updated = 0;
@@ -3503,11 +3506,16 @@
       }
     });
     if (updated) {
-      saveSalesItemsList(list);
+      const cloud = window.CleverCloudSync;
+      if (!cloud?.isEnabled?.()) throw new Error('Unganisha Supabase kwanza.');
+      const key = branchStorageKey(SALES_ITEMS_KEY, branchId);
+      const saved = await cloud.pushKey(key, list);
+      if (!saved) throw new Error('Supabase haijakubali bei za POS.');
+      cloud.cacheLocal(key, list);
       populateSaleItemSelect();
       renderSalesItems();
       renderPosUI();
-      showAdminToast('✓ Bei ' + updated + ' zimesasishwa kutoka Menu');
+      showAdminToast('✓ Bei ' + updated + ' zimehifadhiwa database na kusasishwa POS');
     } else {
       showAdminToast('Bei ziko sawa na Menu tayari.', 'warn');
     }
@@ -5246,13 +5254,25 @@ alter table public.app_storage replica identity full;`;
   function updateCloudBadge() {
     const badge = $('cloudBadge');
     if (!badge) return;
-    const cloud = window.CleverOrdersCloud;
-    const on = cloud?.isEnabled() && cloud?.isConnected();
-    badge.classList.toggle('hidden', !on);
-    badge.classList.toggle('cloud-badge-live', on);
-    badge.title = on ? 'Data yote inahifadhiwa mtandaoni (oda, mauzo, stock, menu)' : '';
+    const cloud = window.CleverCloudSync;
+    const enabled = cloud?.isEnabled?.();
+    const connected = cloud?.isConnected?.();
+    const state = cloud?.getSyncState?.() || { pending: 0, error: '' };
+    const show = !!enabled;
+    badge.classList.toggle('hidden', !show);
+    badge.classList.toggle('cloud-badge-live', !!connected && state.pending === 0);
+    badge.textContent = state.pending
+      ? '☁️ Inasubiri ' + state.pending
+      : connected ? '☁️ Database' : '☁️ Offline';
+    badge.title = state.error
+      ? 'Data bado iko kwenye kifaa; database imeshindwa: ' + state.error
+      : state.pending
+      ? 'Kuna mabadiliko yanayosubiri kuhifadhiwa kwenye database.'
+      : connected ? 'Database imeunganishwa; data inahifadhiwa Supabase.' : show ? 'Supabase imewekwa lakini haijaunganishwa kwa sasa.' : '';
     renderCloudStatus();
   }
+
+  document.addEventListener('clever-cloud-storage-sync', updateCloudBadge);
 
   function initCloudSales() {
     const cloud = window.CleverOrdersCloud;
@@ -5730,7 +5750,9 @@ alter table public.app_storage replica identity full;`;
     });
     $('posCashPaid')?.addEventListener('input', updatePosCashChange);
     $('posRefreshReceiptsBtn')?.addEventListener('click', renderPosReceipts);
-    $('syncMenuToPosBtn')?.addEventListener('click', syncMenuPricesToPos);
+    $('syncMenuToPosBtn')?.addEventListener('click', () => {
+      syncMenuPricesToPos().catch(err => showAdminToast('Bei hazijasawazishwa: ' + (err.message || 'Angalia database.'), 'warn'));
+    });
     $('salePayment')?.addEventListener('change', updatePosCashChange);
     document.querySelectorAll('.seller-pay-btn').forEach(btn => {
       btn.addEventListener('click', () => setSellerPayment(btn.dataset.pay));

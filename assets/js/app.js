@@ -95,13 +95,18 @@
     single: '20,000', couple: '35,000', family: '65,000',
     mixedhalf: '25,000', mixedone: '35,000', mixedtwo: '65,000',
     zegeSingle: '15,000', zegeCouple: '30,000', zegeSpecial: '35,000',
-    chipsiKavu: '2,000', chipsiYai: '3,000', ndizi: '500', ugali: '1,000', kachumbari: '1,000'
+    chipsiKavu: '2,000', chipsiYai: '3,000', chipsiPlainMasala: '7,000',
+    ndizi: '500', ndiziChoma: '2,500', ugali: '1,000', ugaliDona: '2,500', ugaliSembe: '2,500', kachumbari: '1,000'
   };
 
   const SIDE_OPTIONS = [
     { key: 'ugali', name: 'Ugali', icon: '🍚', priceKey: 'ugali' },
+    { key: 'ugaliDona', name: 'Ugali dona', icon: '🍚', priceKey: 'ugaliDona' },
+    { key: 'ugaliSembe', name: 'Ugali sembe', icon: '🍚', priceKey: 'ugaliSembe' },
     { key: 'ndizi', name: 'Ndizi', icon: '🍌', priceKey: 'ndizi' },
+    { key: 'ndiziChoma', name: 'Ndizi choma', icon: '🍌', priceKey: 'ndiziChoma' },
     { key: 'chipsiKavu', name: 'Chipsi kavu', icon: '🍟', priceKey: 'chipsiKavu' },
+    { key: 'chipsiPlainMasala', name: 'Chipsi plain masala', icon: '🍟', priceKey: 'chipsiPlainMasala' },
     { key: 'chipsiYai', name: 'Chipsi yai', icon: '🍳', priceKey: 'chipsiYai' },
     { key: 'kachumbari', name: 'Kachumbari', icon: '🥗', priceKey: 'kachumbari' }
   ];
@@ -109,6 +114,9 @@
   let cart = loadCart();
   let activeFilter = 'all';
   let toastTimer = null;
+  let customizerItem = null;
+  let customizerSourceEl = null;
+  let customizerOpenCartAfterAdd = false;
 
   function cartId(name, detail) {
     return name + '::' + (detail || '');
@@ -266,7 +274,7 @@
 
       const hint = document.createElement('p');
       hint.className = 'size-hint';
-      hint.innerHTML = '👆 Bonyeza ukubwa kuongeza — <strong>0.5 KG</strong> hadi 2 KG';
+      hint.innerHTML = '👆 Chagua ukubwa, kisha weka vionjo — <strong>0.5 KG</strong> hadi 2 KG';
       grid.after(hint);
 
       const addBtn = card.querySelector('.card-actions .btn-add');
@@ -445,7 +453,7 @@
       qty: i.qty,
       addons: (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => ({
         key: addon.key,
-        name: addon.name,
+        name: addonName(addon),
         qty: Number(addon.qty),
         price: addonPrice(addon)
       }))
@@ -566,7 +574,7 @@
       const quantity = itemQuantityLabel(i);
       const extraDetail = i.detail && !parseKgFromDetail(i.detail) ? ' (' + i.detail + ')' : '';
       const base = i.name + ' — ' + quantity + extraDetail;
-      const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.name + ' (' + addon.qty + ')');
+      const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addonName(addon) + ' (' + addon.qty + ')');
       return base + (sides.length ? ' + ' + sides.join(', ') : '');
     });
     const extra = items.length > 3 ? ' · na ' + (items.length - 3) + ' zaidi' : '';
@@ -616,7 +624,7 @@
       return false;
     }
     cart = order.items.map(i => ({
-      id: cartId(i.name, i.detail),
+      id: i.id || (cartId(i.name, i.detail) + '::' + (customizerAddonSignature(i.addons) || 'plain')),
       name: i.name,
       detail: i.detail || '',
       price: i.price || '',
@@ -912,7 +920,7 @@
       lines.push(line);
       const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0);
       if (sides.length) {
-        lines.push('   Vionjo: ' + sides.map(addon => addon.name + ' (' + addon.qty + ') @ TSH ' + addonPrice(addon)).join(', '));
+        lines.push('   Vionjo: ' + sides.map(addon => addonName(addon) + ' (' + addon.qty + ') @ TSH ' + addonPrice(addon)).join(', '));
       }
     });
 
@@ -963,6 +971,15 @@
     return option ? formatPrice(option.priceKey) : (addon?.price || '');
   }
 
+  function sideOptionName(option) {
+    return String(getPrices()['sideName_' + option.key] || option.name);
+  }
+
+  function addonName(addon) {
+    const option = SIDE_OPTIONS.find(side => side.key === addon?.key);
+    return option ? sideOptionName(option) : (addon?.name || '');
+  }
+
   function lineTotal(item) {
     const unit = parsePrice(item.price);
     const base = unit > 0 ? unit * item.qty : 0;
@@ -1008,7 +1025,7 @@
     saveCart();
     updateCartUI();
     flashAdded(sourceEl);
-    showToast('✓ ' + name + (detail ? ' (' + detail + ')' : '') + ' imeongezwa — fungua oda kuchagua sides');
+    showToast('✓ ' + name + (detail ? ' (' + detail + ')' : '') + ' imeongezwa kwenye oda');
   }
 
   function setAddonQty(itemId, addonKey, qty) {
@@ -1020,7 +1037,7 @@
     let addon = selected.find(side => side.key === addonKey);
     const nextQty = Math.max(0, Math.min(20, Math.floor(Number(qty) || 0)));
     if (!addon && nextQty > 0) {
-      addon = { key: option.key, name: option.name, qty: nextQty, price };
+      addon = { key: option.key, name: sideOptionName(option), qty: nextQty, price };
       selected.push(addon);
     }
     if (!addon) return;
@@ -1032,7 +1049,132 @@
   }
 
   function canAddSides(item) {
-    return /choma|foil|rosti|kavu|kitimoto|mix|kisinia|zege/i.test(item.name || '');
+    const name = String(item.name || '').trim().toLowerCase();
+    if (/^(chipsi|ndizi|ugali|kachumbari)\b/.test(name)) return false;
+    return /choma|foil|rosti|kitimoto|mix|kisinia|zege|kavu/i.test(name);
+  }
+
+  function customizerAddonSignature(addons) {
+    return (addons || []).filter(addon => Number(addon.qty) > 0)
+      .map(addon => addon.key + ':' + Number(addon.qty)).sort().join('|');
+  }
+
+  function openItemCustomizer(payload, opts = {}) {
+    const modal = document.getElementById('itemCustomizer');
+    const title = document.getElementById('itemCustomizerTitle');
+    const meta = document.getElementById('itemCustomizerMeta');
+    const image = document.getElementById('itemCustomizerImage');
+    if (!modal || !payload?.name) return false;
+    customizerSourceEl = payload.el || document.activeElement;
+    customizerOpenCartAfterAdd = !!opts.openCartAfterAdd;
+    customizerItem = {
+      id: cartId(payload.name, payload.detail),
+      name: payload.name,
+      detail: payload.detail || '',
+      price: payload.price || '',
+      qty: 1,
+      addons: []
+    };
+    if (title) title.textContent = customizerItem.name;
+    if (meta) {
+      const detail = customizerItem.detail || itemQuantityLabel(customizerItem);
+      const kg = parseKgFromDetail(customizerItem.detail) || parseKgFromDetail(customizerItem.name);
+      meta.textContent = detail + ' · TSH ' + (customizerItem.price || '—') + ' / ' + (kg ? formatKg(kg) + ' KG' : 'portion');
+    }
+    if (image) {
+      image.replaceChildren();
+      const productImage = customizerSourceEl?.closest('.card')?.querySelector('img');
+      if (productImage?.src) {
+        const preview = document.createElement('img');
+        preview.src = productImage.src;
+        preview.alt = '';
+        image.append(preview);
+      } else {
+        image.textContent = /rosti/i.test(customizerItem.name) ? '🌶️' : /choma/i.test(customizerItem.name) ? '🔥' : '🥩';
+      }
+    }
+    renderItemCustomizer();
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('itemCustomizerClose')?.focus();
+    return true;
+  }
+
+  function closeItemCustomizer() {
+    const modal = document.getElementById('itemCustomizer');
+    if (!modal) return;
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = document.getElementById('orderPanel')?.classList.contains('open') ? 'hidden' : '';
+    customizerItem = null;
+    if (customizerSourceEl?.isConnected) customizerSourceEl.focus?.();
+  }
+
+  function renderItemCustomizer() {
+    if (!customizerItem) return;
+    const quantity = document.getElementById('customizerQuantity');
+    const total = document.getElementById('customizerTotal');
+    const addButton = document.getElementById('itemCustomizerAdd');
+    const sidesList = document.getElementById('customizerSidesList');
+    if (quantity) quantity.textContent = itemQuantityLabel(customizerItem);
+    document.querySelectorAll('[data-customizer-qty]').forEach(button => {
+      const direction = Number(button.dataset.customizerQty);
+      button.disabled = (direction < 0 && customizerItem.qty <= 1) || (direction > 0 && customizerItem.qty >= 20);
+    });
+    const amount = lineTotal(customizerItem);
+    if (total) total.textContent = 'TSH ' + formatMoney(amount);
+    if (addButton) addButton.textContent = '🛒 Ongeza kwenye oda · TSH ' + formatMoney(amount);
+    if (sidesList) {
+      sidesList.innerHTML = SIDE_OPTIONS.map(option => {
+        const qty = Number(customizerItem.addons.find(addon => addon.key === option.key)?.qty) || 0;
+        const price = formatPrice(option.priceKey);
+        return `<div class="customizer-side-row${qty ? ' is-selected' : ''}">
+          <label class="customizer-side-choice">
+            <input type="checkbox" data-customizer-addon data-addon-key="${esc(option.key)}"${qty ? ' checked' : ''}>
+            <span class="customizer-side-name"><span aria-hidden="true">${option.icon}</span><span>${esc(sideOptionName(option))}</span></span>
+          </label>
+          <span class="customizer-side-price">TSH ${esc(price)}</span>
+          <input class="customizer-side-qty" type="number" inputmode="numeric" min="1" max="20" step="1" value="${qty || 1}" aria-label="Idadi ya ${esc(sideOptionName(option))}" data-customizer-addon-qty data-addon-key="${esc(option.key)}"${qty ? '' : ' hidden'}>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  function setCustomizerAddonQty(addonKey, qty) {
+    if (!customizerItem) return;
+    const option = SIDE_OPTIONS.find(side => side.key === addonKey);
+    if (!option) return;
+    const nextQty = Math.max(0, Math.min(20, Math.floor(Number(qty) || 0)));
+    const addons = customizerItem.addons.filter(addon => addon.key !== addonKey);
+    if (nextQty) addons.push({ key: option.key, name: sideOptionName(option), qty: nextQty, price: formatPrice(option.priceKey) });
+    customizerItem.addons = addons;
+    renderItemCustomizer();
+  }
+
+  function addConfiguredItemToCart() {
+    if (!customizerItem) return;
+    const configured = {
+      ...customizerItem,
+      addons: customizerItem.addons.map(addon => ({ ...addon }))
+    };
+    const signature = customizerAddonSignature(configured.addons);
+    const existing = cart.find(item => item.name === configured.name && item.detail === configured.detail &&
+      customizerAddonSignature(item.addons) === signature);
+    if (existing) existing.qty += configured.qty;
+    else {
+      configured.id = cartId(configured.name, configured.detail) + '::' + (signature || 'plain');
+      cart.push(configured);
+    }
+    saveCart();
+    updateCartUI();
+    const openCart = customizerOpenCartAfterAdd;
+    const source = customizerSourceEl;
+    const label = itemQuantityLabel(configured);
+    closeItemCustomizer();
+    flashAdded(source);
+    showToast('✓ ' + configured.name + ' · ' + label + ' imeongezwa kwenye oda');
+    if (openCart) openOrderPanel();
   }
 
   function changeQty(id, delta) {
@@ -1060,10 +1202,10 @@
           const price = formatPrice(option.priceKey);
           return `<div class="order-addon-row${qty ? ' is-selected' : ''}">
             <label class="order-addon-choice">
-              <input type="checkbox" data-addon-select data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}"${qty ? ' checked' : ''}>
-              <span class="order-addon-name"><span aria-hidden="true">${option.icon}</span><span>${esc(option.name)}<small>TSH ${esc(price)} kila moja</small></span></span>
+              <input type="checkbox" data-addon-select data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}" aria-label="Chagua ${esc(sideOptionName(option))}"${qty ? ' checked' : ''}>
+              <span class="order-addon-name"><span aria-hidden="true">${option.icon}</span><span>${esc(sideOptionName(option))}<small>TSH ${esc(price)} kila moja</small></span></span>
             </label>
-            <input class="order-addon-quantity" type="number" inputmode="numeric" min="1" max="20" step="1" value="${qty || 1}" aria-label="Idadi ya ${esc(option.name)}" data-addon-qty data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}"${qty ? '' : ' hidden'}>
+            <input class="order-addon-quantity" type="number" inputmode="numeric" min="1" max="20" step="1" value="${qty || 1}" aria-label="Idadi ya ${esc(sideOptionName(option))}" data-addon-qty data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}"${qty ? '' : ' hidden'}>
           </div>`;
         }).join('')}</div>
       </section>`;
@@ -1091,7 +1233,7 @@
         <div class="order-empty">
           <div class="icon">🛒</div>
           <b>Oda yako haina kitu bado</b>
-          <p>Bonyeza <strong>0.5 KG</strong> hapo juu kuongeza haraka, au chagua menu kutoka orodha.</p>
+          <p>Bonyeza <strong>0.5 KG</strong> au chagua menu kuanza kuweka kiasi na vionjo vyako.</p>
         </div>`;
     } else {
       list.innerHTML = cart.map(item => {
@@ -1171,7 +1313,7 @@
       preview.textContent = cart.map(i => {
         const sub = lineTotal(i);
         let line = i.name + ' — ' + itemQuantityLabel(i) + (i.detail && !parseKgFromDetail(i.detail) ? ' (' + i.detail + ')' : '');
-        const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.name + ' (' + addon.qty + ')');
+        const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addonName(addon) + ' (' + addon.qty + ')');
         if (sides.length) line += ' + ' + sides.join(', ');
         if (sub > 0) line += ' — TSH ' + formatMoney(sub);
         return line;
@@ -1201,6 +1343,10 @@
       if (orderNowEl) {
         e.preventDefault();
         const payload = resolveAddTarget(orderNowEl);
+        if (canAddSides(payload)) {
+          openItemCustomizer(payload, { openCartAfterAdd: true });
+          return;
+        }
         addToCart(payload.name, payload.detail, payload.price, orderNowEl);
         openOrderPanel();
         return;
@@ -1210,7 +1356,18 @@
       if (addEl) {
         e.preventDefault();
         const payload = resolveAddTarget(addEl);
+        if (canAddSides(payload)) {
+          openItemCustomizer(payload, { openCartAfterAdd: addEl.matches('.kisinia-add') });
+          return;
+        }
         addToCart(payload.name, payload.detail, payload.price, addEl);
+        return;
+      }
+
+      const customizerQtyButton = e.target.closest('[data-customizer-qty]');
+      if (customizerQtyButton && customizerItem) {
+        customizerItem.qty = Math.max(1, Math.min(20, customizerItem.qty + parseInt(customizerQtyButton.dataset.customizerQty, 10)));
+        renderItemCustomizer();
         return;
       }
 
@@ -1227,6 +1384,19 @@
     });
 
     document.addEventListener('change', e => {
+      const customizerCheckbox = e.target.closest('[data-customizer-addon]');
+      if (customizerCheckbox) {
+        const qtyInput = customizerCheckbox.closest('.customizer-side-row')?.querySelector('[data-customizer-addon-qty]');
+        setCustomizerAddonQty(customizerCheckbox.dataset.addonKey,
+          customizerCheckbox.checked ? (parseInt(qtyInput?.value, 10) || 1) : 0);
+        return;
+      }
+      const customizerQtyInput = e.target.closest('[data-customizer-addon-qty]');
+      if (customizerQtyInput) {
+        setCustomizerAddonQty(customizerQtyInput.dataset.addonKey,
+          Math.max(1, Math.min(20, parseInt(customizerQtyInput.value, 10) || 1)));
+        return;
+      }
       const checkbox = e.target.closest('[data-addon-select]');
       if (checkbox) {
         const quantityInput = checkbox.closest('.order-addon-row')?.querySelector('[data-addon-qty]');
@@ -1255,13 +1425,19 @@
     });
 
     document.getElementById('cartSend')?.addEventListener('click', () => sendCart());
+    document.getElementById('itemCustomizerClose')?.addEventListener('click', closeItemCustomizer);
+    document.getElementById('itemCustomizerBackdrop')?.addEventListener('click', closeItemCustomizer);
+    document.getElementById('itemCustomizerAdd')?.addEventListener('click', addConfiguredItemToCart);
     document.getElementById('orderConfirmationClose')?.addEventListener('click', closeOrderPanel);
     document.getElementById('orderConfirmationWhatsApp')?.addEventListener('click', () => {
       if (lastSubmittedOrderMessage) openWhatsApp(lastSubmittedOrderMessage);
     });
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') closeOrderPanel();
+      if (e.key === 'Escape') {
+        if (customizerItem) closeItemCustomizer();
+        else closeOrderPanel();
+      }
     });
 
     document.getElementById('shareMenuBtn')?.addEventListener('click', shareMenu);

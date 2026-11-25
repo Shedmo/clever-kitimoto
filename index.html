@@ -608,6 +608,45 @@
 
 </div>
 
+<div class="item-customizer" id="itemCustomizer" aria-hidden="true">
+  <button class="item-customizer-backdrop" id="itemCustomizerBackdrop" type="button" aria-label="Funga uchaguzi"></button>
+  <section class="item-customizer-sheet" role="dialog" aria-modal="true" aria-labelledby="itemCustomizerTitle">
+    <div class="item-customizer-handle"></div>
+    <header class="item-customizer-head">
+      <div class="item-customizer-product">
+        <div class="item-customizer-image" id="itemCustomizerImage" aria-hidden="true">🥩</div>
+        <div>
+          <span class="item-customizer-eyebrow">Tengeneza oda yako</span>
+          <h2 id="itemCustomizerTitle">Chagua chakula</h2>
+          <p id="itemCustomizerMeta"></p>
+        </div>
+      </div>
+      <button class="order-panel-close" id="itemCustomizerClose" type="button" aria-label="Funga">✕</button>
+    </header>
+    <div class="item-customizer-content">
+      <section class="customizer-quantity-section" aria-labelledby="customizerQuantityTitle">
+        <h3 id="customizerQuantityTitle"><span aria-hidden="true">☷</span> Kiasi cha nyama</h3>
+        <div class="customizer-quantity-control">
+          <span>Unahitaji kiasi gani?</span>
+          <div class="qty-stepper">
+            <button type="button" data-customizer-qty="-1" aria-label="Punguza kiasi">−</button>
+            <output id="customizerQuantity">0.5 KG</output>
+            <button type="button" data-customizer-qty="1" aria-label="Ongeza kiasi">+</button>
+          </div>
+        </div>
+      </section>
+      <section class="customizer-sides-section" aria-labelledby="customizerSidesTitle">
+        <h3 id="customizerSidesTitle"><span aria-hidden="true">🍴</span> Vionjo vya pembeni</h3>
+        <div class="customizer-sides-list" id="customizerSidesList"></div>
+      </section>
+    </div>
+    <footer class="item-customizer-footer">
+      <div class="item-customizer-total"><span>Jumla ya bidhaa hii</span><strong id="customizerTotal">TSH 0</strong></div>
+      <button class="btn btn-primary item-customizer-add" id="itemCustomizerAdd" type="button">🛒 Ongeza kwenye oda · TSH 0</button>
+    </footer>
+  </section>
+</div>
+
 <div class="cart-bar" id="cartBar">
   <button class="cart-bar-tap" id="cartBarTap" type="button">
     <div class="cart-inner">
@@ -648,7 +687,7 @@
         <div class="order-repeat-list" id="orderRepeatList"></div>
       </div>
       <div class="order-quick-add" id="orderQuickAdd">
-        <div class="order-quick-label">⚡ Ongeza 0.5 KG haraka</div>
+        <div class="order-quick-label">⚡ Tengeneza oda ya 0.5 KG</div>
         <div class="order-halfkg-strip" id="orderHalfKgStrip"></div>
       </div>
       <div class="order-panel-list" id="orderPanelList"></div>

@@ -96,7 +96,7 @@
     'Kisinia Packages': [['single','Single — Mtu 1','20,000'],['couple','Couple — Watu 2','35,000'],['family','Family — Watu 4','65,000']],
     'Mixed Packages': [['mixedhalf','½ KG Mix','25,000'],['mixedone','1 KG Mix','35,000'],['mixedtwo','2 KG Mix Special','65,000']],
     'Zege': [['zegeSingle','Zege Single','15,000'],['zegeCouple','Zege Couple','30,000'],['zegeSpecial','Zege Special','35,000']],
-    'Sides': [['chipsiKavu','Chipsi Kavu','2,000'],['chipsiYai','Chipsi Yai','3,000'],['ndizi','Ndizi 1','500'],['ugali','Ugali 1','1,000'],['kachumbari','Kachumbari','1,000']]
+    'Sides': [['chipsiKavu','Chipsi kavu','2,000'],['chipsiYai','Chipsi yai','3,000'],['chipsiPlainMasala','Chipsi plain masala','7,000'],['ndizi','Ndizi','500'],['ndiziChoma','Ndizi choma','2,500'],['ugali','Ugali','1,000'],['ugaliDona','Ugali dona','2,500'],['ugaliSembe','Ugali sembe','2,500'],['kachumbari','Kachumbari','1,000']]
   };
 
   const defaults = Object.fromEntries(Object.values(groups).flat().map(x => [x[0], x[2]]));
@@ -1730,9 +1730,17 @@
     const d = { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
     let out = '';
     for (const [g, items] of Object.entries(groups)) {
-      out += `<div class="panel"><h2>${g}</h2><div class="grid">`;
+      out += `<div class="panel"><h2>${g === 'Sides' ? 'Vionjo vya pembeni' : g}</h2>`;
+      if (g === 'Sides') out += '<p class="panel-note">Badilisha jina au bei ya kila kiambatanisho. Bonyeza Save Changes ili wateja waone mabadiliko.</p>';
+      out += '<div class="grid">';
       for (const [k, l, v] of items) {
-        out += `<div class="field"><label>${l}</label><input data-key="${k}" value="${d[k] || v}"></div>`;
+        if (g === 'Sides') {
+          const nameKey = 'sideName_' + k;
+          out += `<div class="field"><label>Jina la kiambatanisho</label><input data-side-name-key="${nameKey}" value="${escapeHtml(d[nameKey] || l)}"></div>`;
+          out += `<div class="field"><label>Bei ya ${escapeHtml(d[nameKey] || l)} (TSH)</label><input data-key="${k}" inputmode="numeric" value="${escapeHtml(d[k] || v)}"></div>`;
+        } else {
+          out += `<div class="field"><label>${l}</label><input data-key="${k}" value="${d[k] || v}"></div>`;
+        }
       }
       out += '</div></div>';
     }
@@ -1777,6 +1785,11 @@
       const price = normalisePrice(i.value);
       if (price === null) invalid.push(i.previousElementSibling?.textContent || 'bei');
       else d[i.dataset.key] = price;
+    });
+    document.querySelectorAll('[data-side-name-key]').forEach(input => {
+      const name = input.value.trim();
+      if (!name || name.length > 60) invalid.push('jina la kiambatanisho');
+      else d[input.dataset.sideNameKey] = name;
     });
     if (invalid.length) {
       alert('Weka bei sahihi (namba isiyo hasi) kwenye: ' + invalid.join(', '));

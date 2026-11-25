@@ -4,6 +4,7 @@
   const CONFIG_KEY = 'cleverKitimotoCloudConfigV1';
   const TABLE = 'orders';
   const SALES_TABLE = 'sales';
+  const ORDER_OUTBOX_KEY = 'cleverKitimotoPendingOrdersV1';
   let client = null;
   let unsubscribe = null;
   let salesUnsubscribe = null;
@@ -85,8 +86,14 @@
       fulfillment: order.fulfillment || '',
       payment: order.payment || '',
       subtotal: Number(order.subtotal) || 0,
+      service_fee: Number(order.serviceFee) || 0,
+      total: Number(order.total) || Number(order.subtotal) || 0,
       items: order.items || [],
       status: order.status || 'pending',
+      payment_status: order.paymentStatus || 'unpaid',
+      payment_reference: order.paymentReference || null,
+      payment_checkout_url: order.paymentCheckoutUrl || null,
+      payment_session_created_at: order.paymentSessionCreatedAt || null,
       status_at: order.statusAt || null,
       status_by: order.statusBy || null
     };
@@ -103,12 +110,54 @@
       fulfillment: row.fulfillment,
       payment: row.payment,
       subtotal: Number(row.subtotal) || 0,
+      serviceFee: Number(row.service_fee) || 0,
+      total: Number(row.total) || Number(row.subtotal) || 0,
       items: row.items || [],
       status: row.status || 'pending',
+      paymentStatus: row.payment_status || 'unpaid',
+      paymentReference: row.payment_reference || '',
+      paymentCheckoutUrl: row.payment_checkout_url || '',
+      paymentSessionCreatedAt: row.payment_session_created_at || '',
       statusAt: row.status_at,
       statusBy: row.status_by
     };
   }
+
+  // Keep a durable browser copy until Supabase confirms the write. This means
+  // a brief network outage never silently drops an order.
+  function readOrderOutbox() {
+    try {
+      const rows = JSON.parse(localStorage.getItem(ORDER_OUTBOX_KEY) || '[]');
+      return Array.isArray(rows) ? rows : [];
+    } catch { return []; }
+  }
+
+  function writeOrderOutbox(rows) {
+    localStorage.setItem(ORDER_OUTBOX_KEY, JSON.stringify(rows));
+  }
+
+  async function flushOrderOutbox() {
+    if (!isEnabled() || !navigator.onLine) return { saved: 0, pending: readOrderOutbox().length };
+    const queued = readOrderOutbox();
+    let saved = 0;
+    for (const order of queued) {
+      try {
+        if (!init()) break;
+        const { error } = await client.from(TABLE).upsert(toRow(order));
+        if (error) throw error;
+        const current = readOrderOutbox().filter(item => item.id !== order.id);
+        writeOrderOutbox(current);
+        saved += 1;
+      } catch (error) {
+        console.warn('Order is safely queued until connection returns:', error);
+        break;
+      }
+    }
+    return { saved, pending: readOrderOutbox().length };
+  }
+
+  window.addEventListener('online', () => { flushOrderOutbox().catch(() => {}); });
+  window.addEventListener('DOMContentLoaded', () => { flushOrderOutbox().catch(() => {}); }, { once: true });
 
   async function fetchOrders() {
     if (!init()) throw new Error('Cloud not ready');
@@ -124,9 +173,45 @@
   }
 
   async function saveOrder(order) {
-    if (!init()) throw new Error('Cloud not configured');
-    const { error } = await client.from(TABLE).upsert(toRow(order));
+    const queued = readOrderOutbox();
+    if (!queued.some(item => item.id === order.id)) queued.push(order);
+    writeOrderOutbox(queued);
+    if (!isEnabled() || !navigator.onLine) {
+      const error = new Error('Oda imehifadhiwa kwenye kifaa na itasawazishwa mtandao ukirudi.');
+      error.queued = true;
+      throw error;
+    }
+    try {
+      if (!init()) throw new Error('Supabase haijaunganishwa');
+      const { error } = await client.from(TABLE).upsert(toRow(order));
+      if (error) throw error;
+      writeOrderOutbox(readOrderOutbox().filter(item => item.id !== order.id));
+    } catch (cause) {
+      const error = new Error('Oda ipo salama kwenye kifaa na itajaribu kuhifadhiwa mtandaoni tena.');
+      error.cause = cause;
+      error.queued = true;
+      throw error;
+    }
+  }
+
+  async function createSnippeCheckout(orderId) {
+    if (!init()) throw new Error('Unganisha Supabase kabla ya kutumia malipo ya Snippe.');
+    const { data, error } = await client.functions.invoke('snippe-checkout', {
+      body: { action: 'create', orderId }
+    });
     if (error) throw error;
+    if (!data?.checkoutUrl) throw new Error(data?.error || 'Kiungo cha malipo hakikupatikana.');
+    return data;
+  }
+
+  async function getOrderPaymentStatus(orderId) {
+    if (!init()) throw new Error('Cloud not ready');
+    const { data, error } = await client.from(TABLE)
+      .select('payment_status,payment_reference')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? { status: data.payment_status || 'pending', reference: data.payment_reference || '' } : null;
   }
 
   async function updateOrder(orderId, patch) {
@@ -466,6 +551,9 @@
     isConnected,
     init,
     saveOrder,
+    createSnippeCheckout,
+    getOrderPaymentStatus,
+    flushOrderOutbox,
     updateOrder,
     saveSale,
     saveSales,

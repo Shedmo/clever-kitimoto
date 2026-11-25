@@ -15,6 +15,7 @@ Oda, mauzo ya POS, **menu, stock, matawi, wafanyakazi, na visits** zote zinahifa
 - **Ulishawahi run schema.sql:** run pia:
   - `supabase/sales-migration.sql` (mauzo POS)
   - `supabase/cloud-storage-migration.sql` (menu, stock, branches, staff, visits)
+  - `supabase/snippe-payment-migration.sql` (ada ya TSh 200 na hali ya malipo ya Snippe)
 - **Database → Replication** → wezesha **orders**, **sales**, **app_storage** (hiari, Realtime)
 
 **3. Unganisha**
@@ -42,8 +43,14 @@ Kwenye **Admin → Menu & Bei → Ongeza Menu Smart**, weka jina, bei, gharama, 
 | `supabase/schema.sql` | SQL kamili (orders + sales + app_storage) |
 | `supabase/sales-migration.sql` | Ongeza jedwali sales |
 | `supabase/cloud-storage-migration.sql` | Ongeza app_storage (data yote) |
+| `supabase/snippe-payment-migration.sql` | Payment status + ada ya huduma |
+| `supabase/functions/snippe-checkout/index.ts` | Snippe hosted checkout + webhook |
 | `assets/js/cloud-config.js` | URL + anon key (enabled: true) |
 | `assets/js/orders-cloud.js` | Oda + mauzo POS |
 | `assets/js/cloud-sync.js` | Menu, stock, branches, staff, visits |
 
 `enabled: false` = oda kwenye browser tu (localStorage).
+
+### Malipo ya Snippe
+
+Checkout ya mteja ina chaguo la **Lipa online**; kila oda ina ada ya huduma ya **TSh 200** mara moja. Ili malipo yaanze, deploy Supabase Edge Function na uweke Snippe API key pamoja na webhook signing secret kama server secrets. Fuata hatua salama kwenye [`supabase/SETUP.md`](supabase/SETUP.md). Usihifadhi API key kwenye faili ya frontend.

@@ -13,6 +13,7 @@
   const STAFF_BRANCHES_KEY = 'cleverKitimotoStaffBranchesV1';
   const STAFF_ACCOUNTS_KEY = 'cleverKitimotoStaffAccountsV1';
   const CURRENT_BRANCH_KEY = 'cleverKitimotoCurrentBranchV1';
+  const POS_DRAFTS_KEY = 'ckPosDraftsV1';
   const ALL_BRANCHES_ID = '__all__';
   const SESSION_KEY = 'cleverKitimotoAdminSession';
   const MAX_ATTEMPTS = 5;
@@ -43,6 +44,7 @@
   let stockQuery = '';
   let stockStatusFilter = 'all';
   let saleCart = [];
+  let saleCartDraftContext = '';
   let posActiveTab = 'sell';
   let posCatFilter = 'all';
   let posSearchQuery = '';
@@ -1068,6 +1070,39 @@
     } catch {
       return null;
     }
+  }
+
+  function getPosDraftContext() {
+    const session = getSession();
+    const branchId = getCurrentBranchId();
+    return branchId && session?.user ? branchId + '::' + session.user : '';
+  }
+
+  function readPosDrafts() {
+    try {
+      const drafts = JSON.parse(localStorage.getItem(POS_DRAFTS_KEY) || '{}');
+      return drafts && typeof drafts === 'object' && !Array.isArray(drafts) ? drafts : {};
+    } catch { return {}; }
+  }
+
+  function saveCurrentPosDraft() {
+    if (!saleCartDraftContext) return;
+    const drafts = readPosDrafts();
+    if (saleCart.length) drafts[saleCartDraftContext] = saleCart;
+    else delete drafts[saleCartDraftContext];
+    localStorage.setItem(POS_DRAFTS_KEY, JSON.stringify(drafts));
+  }
+
+  function restorePosDraftForCurrentContext() {
+    const context = getPosDraftContext();
+    if (!context || context === saleCartDraftContext) return;
+    saveCurrentPosDraft();
+    const drafts = readPosDrafts();
+    const draft = drafts[context];
+    saleCart = Array.isArray(draft) ? draft.filter(line => line && line.itemId && Number(line.qty) > 0) : [];
+    saleCartDraftContext = context;
+    renderSaleCart();
+    if (saleCart.length) showAdminToast('Rasimu ya risiti imerejeshwa — endelea kuuza.');
   }
 
   function hasPerm(perm) {
@@ -3346,7 +3381,11 @@
   }
 
   function getSmartPosSuggestions() {
-    const sales = getSalesLog().filter(x => isToday(x.at));
+    const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const sales = getSalesLog().filter(x => {
+      const at = new Date(x.at || 0).getTime();
+      return Number.isFinite(at) && at >= since;
+    });
     const counts = {};
     sales.forEach(x => {
       const k = x.itemId || x.itemName;
@@ -3408,7 +3447,7 @@
     }
     wrap.classList.remove('hidden');
     wrap.innerHTML = `
-      <span class="pos-suggest-label">⚡ Mauzo ya leo</span>
+      <span class="pos-suggest-label">⚡ Vinavyouzwa zaidi siku 30 zilizopita</span>
       <div class="pos-suggest-row">
         ${suggestions.map(({ item, soldToday }) => {
           const status = getStockStatus(item);
@@ -3582,6 +3621,7 @@
 
   function renderPosUI() {
     if (!hasPerm('sales')) return;
+    restorePosDraftForCurrentContext();
     renderPosProductGrid();
     updatePosCashChange();
     if (posActiveTab === 'receipts') renderPosReceipts();
@@ -3766,17 +3806,52 @@
           <strong>${escapeHtml(line.itemName)}</strong>
           <span>${escapeHtml(String(line.qty))} ${escapeHtml(line.unit)} · TSH ${formatMoney(line.total)}</span>
         </div>
-        <button type="button" class="btn btn-delete btn-sm" data-cart-remove="${idx}">×</button>
+        <div class="sale-cart-line-controls" aria-label="Badilisha kiasi cha ${escapeHtml(line.itemName)}">
+          <button type="button" class="sale-cart-qty" data-cart-down="${idx}" aria-label="Punguza ${escapeHtml(line.itemName)}">−</button>
+          <b>${escapeHtml(String(line.qty))}</b>
+          <button type="button" class="sale-cart-qty" data-cart-up="${idx}" aria-label="Ongeza ${escapeHtml(line.itemName)}">+</button>
+          <button type="button" class="btn btn-delete btn-sm" data-cart-remove="${idx}" aria-label="Ondoa ${escapeHtml(line.itemName)}">×</button>
+        </div>
       </div>
     `).join('');
     if (totalEl) totalEl.textContent = 'TSH ' + formatMoney(getSaleCartTotal());
     list.querySelectorAll('[data-cart-remove]').forEach(btn => {
       btn.addEventListener('click', () => {
         saleCart.splice(Number(btn.dataset.cartRemove), 1);
+        saveCurrentPosDraft();
         renderSaleCart();
       });
     });
+    list.querySelectorAll('[data-cart-down], [data-cart-up]').forEach(btn => {
+      btn.addEventListener('click', () => changeSaleCartQty(Number(btn.dataset.cartDown ?? btn.dataset.cartUp), btn.hasAttribute('data-cart-up') ? 1 : -1));
+    });
     updatePosCashChange();
+  }
+
+  function changeSaleCartQty(index, direction) {
+    const line = saleCart[index];
+    if (!line) return;
+    const step = ['KG', 'Lita'].includes(line.unit) ? 0.5 : 1;
+    const nextQty = Math.round((Number(line.qty) + step * direction) * 100) / 100;
+    if (nextQty <= 0) {
+      saleCart.splice(index, 1);
+    } else {
+      if (line.trackStock !== false) {
+        const item = getAllSalesItems().find(x => x.id === line.itemId);
+        const reservedElsewhere = saleCart.reduce((sum, other, i) => sum + (i !== index && other.itemId === line.itemId ? Number(other.qty) || 0 : 0), 0);
+        const available = Number(item?.stock) || 0;
+        if (reservedElsewhere + nextQty > available) {
+          showAdminToast('Stock haitoshi. Ipo: ' + formatStockQty(available, line.unit), 'warn');
+          return;
+        }
+      }
+      const rate = (Number(line.total) || 0) / (Number(line.qty) || 1);
+      line.qty = nextQty;
+      line.total = Math.round(rate * nextQty);
+    }
+    saveCurrentPosDraft();
+    renderSaleCart();
+    renderPosProductGrid();
   }
 
   function addToSaleCart() {
@@ -3807,6 +3882,7 @@
       total,
       trackStock: item.trackStock !== false
     });
+    saveCurrentPosDraft();
     ['saleQty', 'saleTotal'].forEach(id => {
       if ($(id)) {
         $(id).value = '';
@@ -3823,6 +3899,7 @@
 
   function clearSaleCart() {
     saleCart = [];
+    saveCurrentPosDraft();
     renderSaleCart();
   }
 
@@ -3833,6 +3910,13 @@
     const payment = $('salePayment')?.value || 'cash';
     const phone = $('salePhone')?.value.trim() || '';
     const notes = $('saleNotes')?.value.trim() || '';
+    const paid = Number($('posCashPaid')?.value) || 0;
+    const receiptTotal = getSaleCartTotal();
+    if (payment === 'cash' && paid > 0 && paid < receiptTotal) {
+      showAdminToast('Kiasi kilicholipwa ni kidogo kwa TSH ' + formatMoney(receiptTotal - paid) + '.', 'warn');
+      $('posCashPaid')?.focus();
+      return;
+    }
     const session = getSession();
     const branch = getBranchById(writeBranch);
     const receiptId = 'rcpt-' + Date.now();
@@ -3897,6 +3981,7 @@
     saveBranchData(SALES_LOG_KEY, log, writeBranch);
 
     saleCart = [];
+    saveCurrentPosDraft();
     ['salePhone', 'saleNotes'].forEach(id => { if ($(id)) $(id).value = ''; });
     renderSaleCart();
     renderSales();
@@ -3930,6 +4015,12 @@
     if (!item) { showAdminToast('Chagua bidhaa kwanza.', 'warn'); return; }
     if (!saleQtyIsValid(item, qty)) { showAdminToast(item.unit === 'KG' || item.unit === 'Lita' ? 'Weka kiasi sahihi.' : 'Weka idadi kamili ya bidhaa.', 'warn'); return; }
     if (!total || total <= 0) { showAdminToast('Weka bei ya mauzo.', 'warn'); return; }
+    const paid = Number($('posCashPaid')?.value) || 0;
+    if (payment === 'cash' && paid > 0 && paid < total) {
+      showAdminToast('Kiasi kilicholipwa ni kidogo kwa TSH ' + formatMoney(total - paid) + '.', 'warn');
+      $('posCashPaid')?.focus();
+      return;
+    }
 
     if (item.trackStock !== false) {
       const avail = Number(item.stock) || 0;
@@ -3974,6 +4065,7 @@
     log.unshift(sale);
     if (log.length > 500) log.length = 500;
     saveBranchData(SALES_LOG_KEY, log, writeBranch);
+    saveCurrentPosDraft();
 
     let stockAfter = null;
     if (item.trackStock !== false) {
@@ -4261,7 +4353,7 @@
   function computeStats() {
     const orders = getOrders();
     const visits = getVisits();
-    const totalRevenue = orders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0);
+    const totalRevenue = orders.reduce((s, o) => s + orderAmount(o), 0);
     const todayOrders = orders.filter(o => isToday(o.at));
     const todayVisits = visits.filter(v => isToday(v.at));
     const uniqueVisitors = new Set(visits.map(v => v.visitorId)).size;
@@ -4275,7 +4367,7 @@
       orderCount: orders.length,
       totalRevenue,
       todayOrderCount: todayOrders.length,
-      todayRevenue: todayOrders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0),
+      todayRevenue: todayOrders.reduce((s, o) => s + orderAmount(o), 0),
       visitCount: visits.length,
       todayVisitCount: todayVisits.length,
       uniqueVisitors,
@@ -4322,7 +4414,7 @@
       const daySales = sales.filter(x => x.at && x.at.slice(0, 10) === key);
       const dayOrders = orders.filter(x => x.at && x.at.slice(0, 10) === key);
       const salesTotal = daySales.reduce((sum, x) => sum + (Number(x.total) || 0), 0);
-      const ordersTotal = dayOrders.reduce((sum, o) => sum + (Number(o.subtotal) || 0), 0);
+      const ordersTotal = dayOrders.reduce((sum, o) => sum + orderAmount(o), 0);
       days.push({
         key,
         label,
@@ -4350,7 +4442,7 @@
         at: o.at,
         title: o.phone || 'Oda mpya',
         sub: ((o.items || []).length) + ' bidhaa · ' + (o.channel || '—'),
-        amount: Number(o.subtotal) || 0,
+        amount: orderAmount(o),
         payment: o.payment,
         seller: o.channel
       })) : [])
@@ -4765,7 +4857,7 @@
     const el = $('ordersSummary');
     if (!el) return;
     const orders = getOrders();
-    const total = orders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0);
+    const total = orders.reduce((s, o) => s + orderAmount(o), 0);
     const pending = orders.filter(o => getOrderStatus(o) === 'pending').length;
     const preparing = orders.filter(o => getOrderStatus(o) === 'preparing').length;
     el.innerHTML = `
@@ -4831,7 +4923,7 @@
       }
       const u = map.get(key);
       u.orderCount += 1;
-      u.totalSpent += Number(o.subtotal) || 0;
+      u.totalSpent += orderAmount(o);
       if (o.channel) u.channels.add(o.channel);
       if (new Date(o.at) >= new Date(u.lastAt)) {
         u.lastAt = o.at;
@@ -5024,7 +5116,7 @@
   function exportOrdersCsv() {
     const orders = getOrders();
     if (!orders.length) { alert('Hakuna oda za kupakua.'); return; }
-    const header = ['Tarehe', 'Simu', 'Channel', 'Malipo', 'Aina', 'Mahali', 'Maelezo', 'Jumla TSH', 'Bidhaa'];
+    const header = ['Tarehe', 'Simu', 'Channel', 'Malipo', 'Hali ya malipo', 'Aina', 'Mahali', 'Maelezo', 'Ada TSH', 'Jumla TSH', 'Bidhaa'];
     const rows = [header.join(',')];
     orders.forEach(o => {
       const items = (o.items || []).map(i =>
@@ -5035,10 +5127,12 @@
         csvEscape(o.phone),
         csvEscape(o.channel),
         csvEscape(paymentLabel(o.payment)),
+        csvEscape(o.payment === 'snippe' ? paymentStatusLabel(o.paymentStatus || 'pending') : '—'),
         csvEscape(o.fulfillment === 'pickup' ? 'Pickup' : 'Delivery'),
         csvEscape(o.address),
         csvEscape(o.notes),
-        csvEscape(o.subtotal || 0),
+        csvEscape(o.serviceFee || 0),
+        csvEscape(orderAmount(o)),
         csvEscape(items)
       ].join(','));
     });
@@ -5643,6 +5737,7 @@ alter table public.app_storage replica identity full;`;
     getAllBackupKeys().forEach(k => {
       if (!LOCAL_KEEP_KEYS.has(k)) localStorage.removeItem(k);
     });
+    localStorage.removeItem(POS_DRAFTS_KEY);
 
     Object.entries(kept).forEach(([k, v]) => localStorage.setItem(k, v));
 
@@ -5740,7 +5835,15 @@ alter table public.app_storage replica identity full;`;
   }
 
   function paymentLabel(val) {
-    return ({ mpesa: 'M-Pesa', cash: 'Cash', lipa: 'Lipa namba' }[val] || val || '—');
+    return ({ mpesa: 'M-Pesa', snippe: 'Snippe online', cash: 'Cash', lipa: 'Lipa namba' }[val] || val || '—');
+  }
+
+  function orderAmount(order) {
+    return Number(order?.total) || Number(order?.subtotal) || 0;
+  }
+
+  function paymentStatusLabel(status) {
+    return ({ completed: 'Imelipwa', pending: 'Malipo yanasubiri', failed: 'Malipo yameshindwa', expired: 'Malipo yameisha muda', voided: 'Malipo yameghairiwa' }[status] || 'Haijalipwa');
   }
 
   function renderOrders() {
@@ -5759,7 +5862,7 @@ alter table public.app_storage replica identity full;`;
         '<li>' + escapeHtml(i.qty + '× ' + i.name + (i.detail ? ' — ' + i.detail : '') +
           (i.price ? ' @ TSH ' + i.price : '')) + '</li>'
       ).join('');
-      const sub = o.subtotal ? 'TSH ' + Number(o.subtotal).toLocaleString('en-US') : '—';
+      const sub = orderAmount(o) ? 'TSH ' + formatMoney(orderAmount(o)) : '—';
       const status = getOrderStatus(o);
       const statusActions = renderOrderStatusActions(o);
       return `
@@ -5768,6 +5871,7 @@ alter table public.app_storage replica identity full;`;
             <div>
               <strong>${escapeHtml(formatOrderDate(o.at))}</strong>
               <span class="order-meta">${escapeHtml(o.channel || '—')} · ${escapeHtml(paymentLabel(o.payment))}</span>
+              ${o.payment === 'snippe' ? '<span class="order-payment-badge payment-' + escapeHtml(o.paymentStatus || 'pending') + '">' + escapeHtml(paymentStatusLabel(o.paymentStatus || 'pending')) + '</span>' : ''}
               <span class="order-status-badge status-${status}">${escapeHtml(orderStatusLabel(status))}</span>
             </div>
             <strong class="order-total">${escapeHtml(sub)}</strong>
@@ -5775,6 +5879,7 @@ alter table public.app_storage replica identity full;`;
           <div class="order-card-body">
             <div class="order-row"><span>Simu</span><b>${escapeHtml(o.phone || '—')}</b></div>
             <div class="order-row"><span>Aina</span><b>${escapeHtml(o.fulfillment === 'pickup' ? 'Pickup' : 'Delivery')}</b></div>
+            ${Number(o.serviceFee) > 0 ? '<div class="order-row"><span>Ada ya huduma</span><b>TSH ' + formatMoney(Number(o.serviceFee)) + '</b></div>' : ''}
             ${o.address ? '<div class="order-row"><span>Mahali</span><b>' + escapeHtml(o.address) + '</b></div>' : ''}
             ${o.notes ? '<div class="order-row"><span>Maelezo</span><b>' + escapeHtml(o.notes) + '</b></div>' : ''}
           </div>

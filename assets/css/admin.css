@@ -3469,3 +3469,109 @@ body {
 .seller-quick-mode .seller-add-cart-btn { flex: 1; }
 .seller-quick-mode .seller-record-actions { flex-direction: column; }
 .seller-quick-mode .seller-record-btn { width: 100%; }
+
+/* Mobile clarity and touch comfort across the admin dashboard and POS. */
+@media (max-width: 720px) {
+  body { font-size: 14px; }
+  .wrap { padding: 14px 12px calc(104px + env(safe-area-inset-bottom)); }
+  .admin-header .top { gap: 10px; margin-bottom: 12px; }
+  .brand-row { gap: 9px; }
+  .brand-logo { height: 44px; }
+  .brand { font-size: 1.2rem; }
+  .brand-sub { font-size: 0.68rem; }
+  .admin-menu-toggle { width: 44px; height: 44px; }
+  .admin-page-title { font-size: 1.4rem; }
+  .admin-page-sub { font-size: 0.82rem; line-height: 1.5; }
+  .admin-views .panel, .admin-views .admin-view-group .panel { margin-bottom: 12px; }
+  .panel { padding: 16px; border-radius: 16px; }
+  .field input, .field select, .field textarea,
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .btn, a.btn { min-height: 42px; }
+  .notice { line-height: 1.55; overflow-wrap: anywhere; }
+  .admin-mobile-nav {
+    gap: 2px;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    overscroll-behavior-x: contain;
+  }
+  .admin-mobile-item { min-width: 62px; min-height: 54px; padding: 7px 5px; font-size: 0.64rem; }
+  .admin-mobile-item span { font-size: 1.2rem; }
+  .stock-row { grid-template-columns: minmax(0, 1fr); }
+  .stock-row-actions { width: 100%; }
+  .stock-row-actions .btn { min-height: 42px; }
+  .pos-product-grid { max-height: min(42dvh, 360px); }
+  .report-table-wrap { max-width: 100%; overscroll-behavior-x: contain; }
+  .report-table { min-width: 620px; }
+  .admin-dialog { width: calc(100vw - 24px); max-height: 90dvh; overflow-y: auto; }
+}
+
+@media (max-width: 420px) {
+  .wrap { padding-inline: 10px; }
+  .panel { padding: 13px; }
+  .brand { font-size: 1.05rem; }
+  .admin-mobile-item { min-width: 58px; font-size: 0.6rem; }
+  .report-summary { align-items: stretch; }
+  .summary-chip { justify-content: space-between; border-radius: 12px; }
+}
+
+/* Faster POS cart editing with stock-aware quantity controls. */
+.pos-draft-note {
+  margin: -5px 0 12px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.order-payment-badge {
+  display: inline-flex;
+  margin: 5px 6px 0 0;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #fff3cd;
+  color: #765700;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.order-payment-badge.payment-completed { background: #e7f8ec; color: #176b35; }
+.order-payment-badge.payment-failed,
+.order-payment-badge.payment-expired,
+.order-payment-badge.payment-voided { background: #fdeaea; color: #9b2222; }
+.sale-cart-line-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.sale-cart-qty {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--maroon);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.sale-cart-qty:hover { background: var(--surface-2); border-color: var(--maroon); }
+@media (max-width: 720px) {
+  .sales-panel { padding: 14px; }
+  .pos-smart-tabs { position: sticky; top: 0; z-index: 5; }
+  .pos-search { min-height: 48px; font-size: 16px; }
+  .pos-cat-chips { flex-wrap: nowrap; overflow-x: auto; padding: 2px 1px 7px; scrollbar-width: none; }
+  .pos-cat-chips::-webkit-scrollbar { display: none; }
+  .pos-cat-chip { flex: 0 0 auto; min-height: 38px; }
+  .pos-suggest-row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .pos-suggest-btn { flex: 0 0 auto; min-height: 40px; }
+  .pos-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: min(38dvh, 320px); gap: 7px; }
+  .pos-product-tile { min-height: 92px; padding: 10px; }
+  .pos-tile-name { font-size: 0.78rem; }
+  .sale-cart-line { align-items: center; gap: 8px; }
+  .sale-cart-line-controls { gap: 5px; }
+  .sale-cart-qty { width: 34px; height: 38px; }
+  .sale-cart-footer .btn { min-height: 48px; }
+  .seller-record-actions { gap: 8px; }
+  .seller-record-actions .btn { min-height: 48px; }
+}

@@ -2272,6 +2272,50 @@ footer {
   main, .hero, .toolbar { padding-left: 16px; padding-right: 16px; }
 }
 
+@media (max-width: 680px) {
+  :root { --nav-h: 66px; }
+  .nav { gap: 10px; padding-inline: 14px; }
+  .brand-logo { height: 40px; }
+  .nav-actions { gap: 6px; }
+  .nav-actions .btn-primary { padding: 9px 12px; font-size: 0.72rem; }
+  .cart-nav-btn, .menu-toggle { min-width: 42px; min-height: 42px; }
+  .search-box { flex-basis: 100%; min-width: 0; }
+  .search-box input { min-height: 50px; font-size: 16px; }
+  .filter-pills { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; padding: 2px 1px 8px; scrollbar-width: none; }
+  .filter-pills::-webkit-scrollbar { display: none; }
+  .filter-pill { flex: 0 0 auto; min-height: 42px; }
+  .section { padding-top: 40px; scroll-margin-top: calc(var(--nav-h) + 12px); }
+  .section-head h2 { font-size: clamp(1.55rem, 7vw, 2rem); line-height: 1.2; }
+  .price-cell { min-height: 62px; }
+  .cart-bar { padding-bottom: env(safe-area-inset-bottom); }
+  .order-panel-sheet { max-height: 94dvh; padding-bottom: env(safe-area-inset-bottom); }
+  .order-panel-body { padding-inline: 16px; }
+  .order-panel-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .ck-field input, .ck-field select, .ck-field textarea { min-height: 48px; font-size: 16px; }
+  .order-toast { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); width: auto; max-width: none; padding: 12px 14px; border-radius: 16px; text-align: center; line-height: 1.45; white-space: normal; transform: translateY(20px); }
+  .order-toast.show { transform: translateY(0); }
+  .mobile-panel { padding: 22px 20px calc(24px + env(safe-area-inset-bottom)); }
+  .mobile-panel a { min-height: 48px; display: flex; align-items: center; }
+}
+
+@media (max-width: 400px) {
+  .nav { padding-inline: 10px; }
+  .nav-actions .btn-primary { padding-inline: 9px; }
+  main, .hero, .toolbar { padding-left: 14px; padding-right: 14px; }
+}
+
+.snippe-note {
+  margin: 8px 0 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(30, 126, 52, 0.22);
+  border-radius: 12px;
+  background: #f0fff4;
+  color: #24563a;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
 /* ── Premium customer-menu polish ── */
 body {
   background: #fff7e7;
@@ -2504,4 +2548,36 @@ body::before {
 @media (max-width: 400px) {
   .nav { padding: 0 16px; }
   main, .hero, .toolbar { padding-left: 16px; padding-right: 16px; }
+}
+
+/* Final mobile overrides */
+@media (max-width: 680px) {
+  :root { --nav-h: 66px; }
+  .nav { gap: 10px; padding-inline: 14px; }
+  .brand-logo { height: 40px; }
+  .nav-actions { gap: 6px; }
+  .nav-actions .btn-primary { padding: 9px 12px; font-size: 0.72rem; }
+  .cart-nav-btn, .menu-toggle { min-width: 42px; min-height: 42px; }
+  .search-box { flex-basis: 100%; min-width: 0; }
+  .search-box input { min-height: 50px; font-size: 16px; }
+  .filter-pills { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; padding: 2px 1px 8px; scrollbar-width: none; }
+  .filter-pills::-webkit-scrollbar { display: none; }
+  .filter-pill { flex: 0 0 auto; min-height: 42px; }
+  .section { padding-top: 40px; scroll-margin-top: calc(var(--nav-h) + 12px); }
+  .section-head h2 { font-size: clamp(1.55rem, 7vw, 2rem); line-height: 1.2; }
+  .price-cell { min-height: 62px; }
+  .cart-bar { padding-bottom: env(safe-area-inset-bottom); }
+  .order-panel-sheet { max-height: 94dvh; padding-bottom: env(safe-area-inset-bottom); }
+  .order-panel-body { padding-inline: 16px; }
+  .order-panel-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .ck-field input, .ck-field select, .ck-field textarea { min-height: 48px; font-size: 16px; }
+  .order-toast { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); width: auto; max-width: none; padding: 12px 14px; border-radius: 16px; text-align: center; line-height: 1.45; white-space: normal; transform: translateY(20px); }
+  .order-toast.show { transform: translateY(0); }
+  .mobile-panel { padding: 22px 20px calc(24px + env(safe-area-inset-bottom)); }
+  .mobile-panel a { min-height: 48px; display: flex; align-items: center; }
+}
+@media (max-width: 400px) {
+  .nav { padding-inline: 10px; }
+  .nav-actions .btn-primary { padding-inline: 9px; }
+  main, .hero, .toolbar { padding-left: 14px; padding-right: 14px; }
 }

@@ -9,6 +9,7 @@
   const CUSTOMER_KEY = 'cleverKitimotoCustomerV1';
   const LAST_ORDER_KEY = 'cleverKitimotoLastOrderV1';
   const ORDER_HISTORY_KEY = 'cleverKitimotoOrderHistoryV1';
+  const ORDER_SERVICE_FEE = 200;
   const VISIT_LOG_KEY = 'cleverKitimotoVisitLogV1';
   const VISITOR_ID_KEY = 'cleverKitimotoVisitorIdV1';
   const DELIVERY_NOTE = 'Bei ya delivery ni kwa mteja';
@@ -280,7 +281,7 @@
   }
 
   function paymentLabel(val) {
-    return ({ mpesa: 'M-Pesa', cash: 'Cash', lipa: 'Lipa namba' }[val] || val);
+    return ({ mpesa: 'M-Pesa', snippe: 'Snippe online', cash: 'Cash', lipa: 'Lipa namba' }[val] || val);
   }
 
   function getCheckout() {
@@ -290,7 +291,7 @@
       address: document.getElementById('custAddress')?.value.trim() || '',
       notes: document.getElementById('custNotes')?.value.trim() || '',
       fulfillment: document.querySelector('#fulfillmentPills .pill.active')?.dataset.val || 'delivery',
-      payment: document.querySelector('#paymentPills .pill.active')?.dataset.val || 'mpesa',
+      payment: document.querySelector('#paymentPills .pill.active')?.dataset.val || 'snippe',
       timing: document.querySelector('#timingPills .pill.active')?.dataset.val || 'asap',
       scheduleDate: document.getElementById('custScheduleDate')?.value || '',
       scheduleTime: document.getElementById('custScheduleTime')?.value || ''
@@ -336,6 +337,13 @@
     const lipa = document.querySelector('#paymentPills .pill.active')?.dataset.val === 'lipa';
     const panel = document.getElementById('lipaPanel');
     if (panel) panel.classList.toggle('lipa-active', lipa);
+    const activePay = document.querySelector('#paymentPills .pill.active')?.dataset.val;
+    const sendBtn = document.getElementById('cartSend');
+    if (sendBtn) sendBtn.textContent = activePay === 'snippe' ? '🔒 Lipa na Tuma Oda' : '✓ Tuma Oda WhatsApp';
+    const smsBtn = document.getElementById('cartSms');
+    if (smsBtn) smsBtn.hidden = activePay === 'snippe';
+    const snippeNote = document.getElementById('snippeNote');
+    if (snippeNote) snippeNote.hidden = activePay !== 'snippe';
   }
 
   function toggleScheduleFields() {
@@ -372,7 +380,7 @@
     }
   }
 
-  function saveOrderRecord(channel) {
+  async function saveOrderRecord(channel) {
     const c = getCheckout();
     const items = cart.map(i => ({
       name: i.name,
@@ -381,7 +389,7 @@
       qty: i.qty
     }));
     const record = {
-      id: 'ord-' + Date.now(),
+      id: 'ord-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12)),
       at: new Date().toISOString(),
       channel,
       phone: c.phone,
@@ -397,19 +405,23 @@
       items,
       status: 'pending'
     };
+    record.serviceFee = cart.length ? ORDER_SERVICE_FEE : 0;
+    record.total = record.subtotal + record.serviceFee;
+    record.paymentStatus = 'unpaid';
     const history = loadOrderHistory();
     history.unshift(record);
     if (history.length > 200) history.length = 200;
     localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history));
     renderMyHistory();
 
-    if (window.CleverOrdersCloud?.isEnabled()) {
-      window.CleverOrdersCloud.saveOrder(record).catch(err => {
-        console.warn('Online order save failed', err);
-      });
+    if (!window.CleverOrdersCloud?.isEnabled()) return { record, synced: false, cloud: false };
+    try {
+      await window.CleverOrdersCloud.saveOrder(record);
+      return { record, synced: true, cloud: true };
+    } catch (err) {
+      console.warn('Order is saved locally and will retry cloud sync', err);
+      return { record, synced: false, cloud: true };
     }
-
-    return record;
   }
 
   function parseKgFromDetail(detail) {
@@ -741,8 +753,9 @@
       const channelLabel = channel === 'sms' ? 'SMS' : 'WhatsApp';
       const meta = [
         order.fulfillment === 'pickup' ? 'Pickup' : 'Delivery',
-        paymentLabel(order.payment)
-      ];
+        paymentLabel(order.payment),
+        order.paymentStatus === 'completed' ? 'Imelipwa' : order.paymentStatus === 'pending' && order.payment === 'snippe' ? 'Malipo yanasubiri' : ''
+      ].filter(Boolean);
       if (order.phone) meta.push(order.phone);
       return `
         <article class="history-card history-repeatable" data-reorder-id="${esc(order.id)}"
@@ -756,7 +769,7 @@
             <div class="history-card-meta">${esc(meta.join(' · '))}</div>
           </div>
           <div class="history-card-side">
-            <span class="history-card-total">${order.subtotal ? 'TSH ' + formatMoney(order.subtotal) : '—'}</span>
+            <span class="history-card-total">${(order.total || order.subtotal) ? 'TSH ' + formatMoney(order.total || order.subtotal) : '—'}</span>
             <button type="button" class="btn-reorder" data-reorder-id="${esc(order.id)}">🔁 Rudia oda</button>
           </div>
         </article>`;
@@ -817,7 +830,10 @@
     });
 
     if (moneyTotal > 0) {
-      lines.push('', 'JUMLA: TSH ' + formatMoney(moneyTotal) + ' (bila delivery)');
+      lines.push('', 'Jumla ya menu: TSH ' + formatMoney(moneyTotal));
+      lines.push('Ada ya huduma: TSH ' + formatMoney(ORDER_SERVICE_FEE));
+      lines.push('JUMLA: TSH ' + formatMoney(moneyTotal + ORDER_SERVICE_FEE) + ' (bila delivery)');
+      if (c.payment === 'snippe') lines.push('Malipo salama ya Snippe yatafunguka baada ya kuhifadhi oda.');
     }
     lines.push('', 'Delivery: ' + DELIVERY_NOTE);
     lines.push('', 'Asante!');
@@ -862,6 +878,10 @@
 
   function getCartTotal() {
     return cart.reduce((sum, item) => sum + lineTotal(item), 0);
+  }
+
+  function getCartGrandTotal() {
+    return getCartTotal() + (cart.length ? ORDER_SERVICE_FEE : 0);
   }
 
   function getLivePrice(el) {
@@ -921,6 +941,7 @@
 
     const itemCount = cart.reduce((s, i) => s + i.qty, 0);
     const moneyTotal = getCartTotal();
+    const grandTotal = getCartGrandTotal();
 
     if (subtitle) {
       subtitle.textContent = itemCount
@@ -959,7 +980,9 @@
     }
 
     if (subtotalEl) subtotalEl.textContent = moneyTotal > 0 ? 'TSH ' + formatMoney(moneyTotal) : '—';
-    if (grandEl) grandEl.textContent = moneyTotal > 0 ? 'TSH ' + formatMoney(moneyTotal) : '—';
+    const feeEl = document.getElementById('orderServiceFee');
+    if (feeEl) feeEl.textContent = 'TSH ' + formatMoney(cart.length ? ORDER_SERVICE_FEE : 0);
+    if (grandEl) grandEl.textContent = moneyTotal > 0 ? 'TSH ' + formatMoney(grandTotal) : '—';
     renderOrderHalfKgStrip();
     renderOrderRepeatStrip();
   }
@@ -1097,7 +1120,9 @@
     document.getElementById('shareMenuBtn')?.addEventListener('click', shareMenu);
     document.getElementById('reorderBtn')?.addEventListener('click', reorderLast);
   }
-  function sendCart(channel) {
+  let orderSending = false;
+  async function sendCart(channel) {
+    if (orderSending) return;
     if (!cart.length) {
       showToast('Oda haina kitu — ongeza menu kwanza');
       openOrderPanel();
@@ -1124,17 +1149,46 @@
     }
     saveCheckout();
     localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(cart));
-    saveOrderRecord(channel);
+    orderSending = true;
     document.getElementById('reorderBtn')?.removeAttribute('hidden');
 
     const msg = buildCartMessage();
+    if (c.payment === 'snippe') {
+      try {
+        const result = await saveOrderRecord(channel);
+        if (!result.cloud || !result.synced) {
+          showToast('Oda imehifadhiwa kwenye kifaa. Unganisha Supabase ili kuanza malipo ya Snippe.');
+          orderSending = false;
+          return;
+        }
+        const payment = await window.CleverOrdersCloud.createSnippeCheckout(result.record.id);
+        if (!payment?.checkoutUrl) throw new Error('Snippe haikurudisha kiungo cha malipo.');
+        window.location.assign(payment.checkoutUrl);
+      } catch (err) {
+        console.warn('Snippe checkout could not start', err);
+        openWhatsApp(msg);
+        showToast('Oda imehifadhiwa, lakini malipo hayajaanza. Tumefungua WhatsApp ili tukusaidie.');
+        orderSending = false;
+      }
+      return;
+    }
+    // Open the customer's chosen app while still inside the click gesture;
+    // some browsers block popups after an awaited network request.
     if (channel === 'sms') openSms(msg);
     else openWhatsApp(msg);
-    if (window.CleverOrdersCloud?.isEnabled()) {
-      showToast('Oda imetumwa na imehifadhiwa mtandaoni ✓');
-    } else {
-      showToast('Oda imetumwa — asante!');
+    let result;
+    try {
+      result = await saveOrderRecord(channel);
+    } catch (err) {
+      console.error('Unable to save order on this device', err);
+      showToast('Imeshindikana kuhifadhi oda. Tafadhali jaribu tena.');
+      orderSending = false;
+      return;
     }
+    orderSending = false;
+    if (result.synced) showToast('Oda imetumwa na imehifadhiwa mtandaoni ✓');
+    else if (result.cloud) showToast('Oda imetumwa; imehifadhiwa kwenye kifaa, itasawazishwa mtandao ukirudi.');
+    else showToast('Oda imetumwa na imehifadhiwa kwenye kifaa ✓');
   }
 
   function renderPopularPicks() {
@@ -1372,6 +1426,45 @@
     updateReorderButtons();
   }
 
+  async function handleSnippeReturn() {
+    const params = new URLSearchParams(location.search);
+    if (params.get('snippe_return') !== '1') return;
+    const orderId = params.get('order_id') || '';
+    history.replaceState({}, document.title, location.pathname + location.hash);
+    if (!orderId || !window.CleverOrdersCloud?.getOrderPaymentStatus) {
+      showToast('Umerudi kutoka Snippe. Oda yako imehifadhiwa; hakiki hali ya malipo kwa mgahawa.');
+      return;
+    }
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      try {
+        const payment = await window.CleverOrdersCloud.getOrderPaymentStatus(orderId);
+        if (payment?.status) updateLocalOrderPayment(orderId, payment.status, payment.reference);
+        if (payment?.status === 'completed') {
+          showToast('✓ Malipo yamethibitishwa. Oda yako inasubiri maandalizi.');
+          return;
+        }
+        if (['failed', 'expired', 'voided'].includes(payment?.status)) {
+          showToast('Malipo hayajakamilika. Oda imehifadhiwa; wasiliana nasi kuendelea.');
+          return;
+        }
+      } catch { /* webhook may still be updating the order */ }
+      if (attempt < 7) await new Promise(resolve => setTimeout(resolve, 2500));
+    }
+    showToast('Malipo yanathibitishwa. Oda yako imehifadhiwa; tutakujulisha.');
+  }
+
+  function updateLocalOrderPayment(orderId, status, reference) {
+    try {
+      const history = loadOrderHistory();
+      const order = history.find(item => item.id === orderId);
+      if (!order) return;
+      order.paymentStatus = status;
+      if (reference) order.paymentReference = reference;
+      localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history));
+      renderMyHistory();
+    } catch { /* the cloud record remains authoritative */ }
+  }
+
   function initScrollTop() {
     const btn = document.getElementById('scrollTop');
     if (!btn) return;
@@ -1561,6 +1654,7 @@
     bindHistoryEvents();
     updateOpenStatus();
     initScrollTop();
+    handleSnippeReturn();
   });
 
   window.addEventListener('storage', () => {

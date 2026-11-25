@@ -596,7 +596,7 @@
     </details>
     <details class="faq-item">
       <summary>Nawezaje kulipa?</summary>
-      <p>M-Pesa, cash, au lipa namba. Lipa namba: <b>Airtel 130119369</b> (Shedrack Moshi), <b>Yas 7561346</b> (Clever Restaurant), <b>Vodacom 58674550</b> (Shedrack Moshi). Malipo baada ya kuhakiki oda.</p>
+      <p>Lipa salama online kupitia Snippe, cash, au lipa namba. Lipa namba: <b>Airtel 130119369</b> (Shedrack Moshi), <b>Yas 7561346</b> (Clever Restaurant), <b>Vodacom 58674550</b> (Shedrack Moshi). Malipo ya Snippe yanathibitishwa kabla ya kuandaa oda.</p>
     </details>
     <details class="faq-item">
       <summary>Oda inachukua muda gani?</summary>
@@ -697,11 +697,13 @@
       <div class="pill-row">
         <span class="pill-label">Malipo</span>
         <div class="pill-group" id="paymentPills">
-          <button type="button" class="pill active" data-val="mpesa">📱 M-Pesa</button>
+          <button type="button" class="pill active" data-val="snippe">🔒 Lipa online</button>
+          <button type="button" class="pill" data-val="mpesa">📱 M-Pesa</button>
           <button type="button" class="pill" data-val="cash">💵 Cash</button>
           <button type="button" class="pill" data-val="lipa">💳 Lipa namba</button>
         </div>
       </div>
+      <p class="snippe-note" id="snippeNote" hidden>Malipo salama kupitia Airtel Money, M-Pesa, Mixx by Yas au Halotel. Ada ya huduma ya TSH 200 imejumuishwa kwenye jumla.</p>
       <div class="lipa-panel" id="lipaPanel">
         <div class="lipa-head">
           <div>
@@ -735,6 +737,7 @@
     <div class="order-panel-foot">
       <div class="order-summary">
         <div class="summary-row"><span>Jumla ya menu</span><strong id="orderSubtotal">TSH 0</strong></div>
+        <div class="summary-row"><span>Ada ya huduma</span><strong id="orderServiceFee">TSH 200</strong></div>
         <div class="summary-row muted"><span>🛵 Delivery</span><span>Bei ni kwa mteja</span></div>
         <div class="summary-row total"><span>JUMLA</span><strong id="orderGrandTotal">TSH 0</strong></div>
       </div>

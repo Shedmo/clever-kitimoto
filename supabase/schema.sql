@@ -20,8 +20,14 @@ create table if not exists public.orders (
   fulfillment text,
   payment text,
   subtotal numeric not null default 0,
+  service_fee numeric not null default 0,
+  total numeric not null default 0,
   items jsonb not null default '[]'::jsonb,
   status text not null default 'pending',
+  payment_status text not null default 'unpaid',
+  payment_reference text,
+  payment_checkout_url text,
+  payment_session_created_at timestamptz,
   status_at timestamptz,
   status_by text,
   created_at timestamptz not null default now()
@@ -34,8 +40,14 @@ alter table public.orders add column if not exists notes text;
 alter table public.orders add column if not exists fulfillment text;
 alter table public.orders add column if not exists payment text;
 alter table public.orders add column if not exists subtotal numeric not null default 0;
+alter table public.orders add column if not exists service_fee numeric not null default 0;
+alter table public.orders add column if not exists total numeric not null default 0;
 alter table public.orders add column if not exists items jsonb not null default '[]'::jsonb;
 alter table public.orders add column if not exists status text not null default 'pending';
+alter table public.orders add column if not exists payment_status text not null default 'unpaid';
+alter table public.orders add column if not exists payment_reference text;
+alter table public.orders add column if not exists payment_checkout_url text;
+alter table public.orders add column if not exists payment_session_created_at timestamptz;
 alter table public.orders add column if not exists status_at timestamptz;
 alter table public.orders add column if not exists status_by text;
 alter table public.orders add column if not exists created_at timestamptz not null default now();

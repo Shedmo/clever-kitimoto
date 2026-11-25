@@ -18,19 +18,19 @@ Customer checkout now offers Snippe mobile-money checkout. Each menu order adds 
 1. **Rotate the Snippe API key that was pasted into chat.** Treat that key as exposed. Create a replacement with the `collection:create` scope; do not paste it into this repository or the browser.
 2. In the Snippe dashboard, copy the account's webhook signing secret. Keep both values private.
 3. Run `snippe-payment-migration.sql` in Supabase SQL Editor so the new payment columns exist. A fresh Supabase project can instead run the full `schema.sql`.
-4. Install and sign into the Supabase CLI, then deploy the function with JWT verification disabled (Snippe's webhook cannot send a Supabase JWT):
+4. In the project terminal, sign the Supabase CLI in to your account. This uses a Supabase access token from your Supabase account settings; enter it only into the terminal prompt:
 
    ```sh
-   supabase functions deploy snippe-checkout --no-verify-jwt --project-ref vvtipknififdybbmrduo
+   npx --yes supabase@latest login
    ```
 
-5. Set the secrets from your terminal. Replace the placeholders locally; do not send their values in chat or commit them:
+5. Run the deployment helper:
 
    ```sh
-   supabase secrets set SNIPPE_API_KEY='PASTE_ROTATED_KEY_HERE' SNIPPE_WEBHOOK_SECRET='PASTE_WEBHOOK_SECRET_HERE' SITE_URL='https://your-live-site.example' --project-ref vvtipknififdybbmrduo
+   bash scripts/deploy-snippe.sh
    ```
 
-   `SITE_URL` must be the public HTTPS URL where customers use the menu. The function uses Supabase's server-side service role key supplied to the Edge Function runtime; the Snippe key is never sent to the browser.
+   It asks for your live HTTPS site URL and the **rotated** Snippe API key and webhook signing secret. Secret inputs are hidden; the helper writes them to a temporary permission-restricted file, sends them to project `vvtipknififdybbmrduo`, then deletes that file. It deploys the function with JWT verification disabled so Snippe can deliver webhooks. The function uses Supabase's server-side service-role key; no Snippe key is included in browser code.
 
 After deployment, choose **Lipa online** in the menu. The customer is redirected to Snippe's hosted checkout; the order remains visible in Admin while payment is pending. A return to the menu shows the confirmed status after Snippe's signed webhook updates the order.
 

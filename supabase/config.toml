@@ -1,0 +1,4 @@
+project_id = "clever-kitimoto"
+
+[functions.snippe-checkout]
+verify_jwt = false

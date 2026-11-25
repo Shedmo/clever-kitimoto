@@ -53,4 +53,4 @@ Kwenye **Admin → Menu & Bei → Ongeza Menu Smart**, weka jina, bei, gharama, 
 
 ### Malipo ya Snippe
 
-Checkout ya mteja ina chaguo la **Lipa online**; kila oda ina ada ya huduma ya **TSh 200** mara moja. Ili malipo yaanze, deploy Supabase Edge Function na uweke Snippe API key pamoja na webhook signing secret kama server secrets. Fuata hatua salama kwenye [`supabase/SETUP.md`](supabase/SETUP.md). Usihifadhi API key kwenye faili ya frontend.
+Checkout ya mteja ina chaguo la **Lipa online**; kila oda ina ada ya huduma ya **TSh 200** mara moja. Baada ya kuzungusha API key iliyoonekana kwenye chat, run migration, ingia Supabase CLI, kisha tumia `bash scripts/deploy-snippe.sh` kuweka secrets kwa usalama na ku-deploy function. Fuata [`supabase/SETUP.md`](supabase/SETUP.md). Usihifadhi API key kwenye faili ya frontend.

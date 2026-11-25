@@ -98,6 +98,14 @@
     chipsiKavu: '2,000', chipsiYai: '3,000', ndizi: '500', ugali: '1,000', kachumbari: '1,000'
   };
 
+  const SIDE_OPTIONS = [
+    { key: 'ugali', name: 'Ugali', icon: '🍚', priceKey: 'ugali' },
+    { key: 'ndizi', name: 'Ndizi', icon: '🍌', priceKey: 'ndizi' },
+    { key: 'chipsiKavu', name: 'Chipsi kavu', icon: '🍟', priceKey: 'chipsiKavu' },
+    { key: 'chipsiYai', name: 'Chipsi yai', icon: '🍳', priceKey: 'chipsiYai' },
+    { key: 'kachumbari', name: 'Kachumbari', icon: '🥗', priceKey: 'kachumbari' }
+  ];
+
   let cart = loadCart();
   let activeFilter = 'all';
   let toastTimer = null;
@@ -112,6 +120,7 @@
       if (!Array.isArray(saved)) return [];
       return saved.map(i => ({
         ...i,
+        addons: Array.isArray(i.addons) ? i.addons : [],
         id: i.id || cartId(i.name, i.detail)
       }));
     } catch {
@@ -433,7 +442,13 @@
       name: i.name,
       detail: i.detail || '',
       price: i.price,
-      qty: i.qty
+      qty: i.qty,
+      addons: (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => ({
+        key: addon.key,
+        name: addon.name,
+        qty: Number(addon.qty),
+        price: addonPrice(addon)
+      }))
     }));
     const record = {
       id: 'ord-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12)),
@@ -481,6 +496,20 @@
     return 0;
   }
 
+  function formatKg(amount) {
+    return Number(amount.toFixed(2)).toString();
+  }
+
+  function itemQuantityLabel(item) {
+    const qty = Number(item.qty) || 0;
+    const kgPerItem = parseKgFromDetail(item.detail) || parseKgFromDetail(item.name);
+    if (kgPerItem > 0) {
+      const totalKg = formatKg(kgPerItem * qty);
+      return totalKg + ' KG' + (qty > 1 ? ' (' + qty + ' × ' + formatKg(kgPerItem) + ' KG)' : '');
+    }
+    return qty + (qty === 1 ? ' portion' : ' portions');
+  }
+
   function computeHistoryStats(history) {
     const stats = {
       orderCount: history.length,
@@ -499,7 +528,7 @@
       (order.items || []).forEach(item => {
         const qty = item.qty || 0;
         stats.totalItems += qty;
-        const kg = parseKgFromDetail(item.detail);
+        const kg = parseKgFromDetail(item.detail) || parseKgFromDetail(item.name);
         if (kg > 0) stats.totalKg += kg * qty;
         const key = item.name + (item.detail ? ' (' + item.detail + ')' : '');
         stats.itemCounts[key] = (stats.itemCounts[key] || 0) + qty;
@@ -533,9 +562,13 @@
 
   function summarizeOrderItems(items) {
     if (!items?.length) return 'Hakuna vitu';
-    const lines = items.slice(0, 3).map(i =>
-      (i.qty > 1 ? i.qty + '× ' : '') + i.name + (i.detail ? ' (' + i.detail + ')' : '')
-    );
+    const lines = items.slice(0, 3).map(i => {
+      const quantity = itemQuantityLabel(i);
+      const extraDetail = i.detail && !parseKgFromDetail(i.detail) ? ' (' + i.detail + ')' : '';
+      const base = i.name + ' — ' + quantity + extraDetail;
+      const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.qty + '× ' + addon.name);
+      return base + (sides.length ? ' + ' + sides.join(', ') : '');
+    });
     const extra = items.length > 3 ? ' · na ' + (items.length - 3) + ' zaidi' : '';
     return lines.join(' · ') + extra;
   }
@@ -587,7 +620,8 @@
       name: i.name,
       detail: i.detail || '',
       price: i.price || '',
-      qty: i.qty || 1
+      qty: i.qty || 1,
+      addons: Array.isArray(i.addons) ? i.addons.map(addon => ({ ...addon })) : []
     }));
     saveCart();
     if (restoreCheckout) applyCheckoutFromOrder(order);
@@ -868,12 +902,18 @@
       const unit = parsePrice(i.price);
       const sub = lineTotal(i);
       if (sub > 0) moneyTotal += sub;
-      let line = '• ' + i.qty + '× ' + i.name + (i.detail ? ' — ' + i.detail : '');
+      const extraDetail = i.detail && !parseKgFromDetail(i.detail) ? ' · ' + i.detail : '';
+      let line = '• ' + i.name + ' — ' + itemQuantityLabel(i) + extraDetail;
       if (unit > 0) {
-        line += ' @ TSH ' + i.price;
-        if (i.qty > 1) line += ' = TSH ' + formatMoney(sub);
+        const kgPerItem = parseKgFromDetail(i.detail) || parseKgFromDetail(i.name);
+        line += ' @ TSH ' + i.price + (kgPerItem ? ' / ' + formatKg(kgPerItem) + ' KG' : ' / portion');
+        if (i.qty > 1) line += ' = TSH ' + formatMoney(unit * i.qty);
       }
       lines.push(line);
+      const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0);
+      if (sides.length) {
+        lines.push('   Sides: ' + sides.map(addon => addon.qty + '× ' + addon.name + ' @ TSH ' + addonPrice(addon)).join(', '));
+      }
     });
 
     if (moneyTotal > 0) {
@@ -918,9 +958,16 @@
     return amount.toLocaleString('en-US');
   }
 
+  function addonPrice(addon) {
+    const option = SIDE_OPTIONS.find(side => side.key === addon?.key);
+    return option ? formatPrice(option.priceKey) : (addon?.price || '');
+  }
+
   function lineTotal(item) {
     const unit = parsePrice(item.price);
-    return unit > 0 ? unit * item.qty : 0;
+    const base = unit > 0 ? unit * item.qty : 0;
+    const addons = (item.addons || []).reduce((sum, addon) => sum + parsePrice(addonPrice(addon)) * (Number(addon.qty) || 0), 0);
+    return base + addons;
   }
 
   function getCartTotal() {
@@ -956,12 +1003,35 @@
     if (existing) {
       existing.qty += 1;
     } else {
-      cart.push({ id, name, detail: detail || '', price: price || '', qty: 1 });
+      cart.push({ id, name, detail: detail || '', price: price || '', qty: 1, addons: [] });
     }
     saveCart();
     updateCartUI();
     flashAdded(sourceEl);
-    showToast('✓ ' + name + (detail ? ' (' + detail + ')' : '') + ' imeongezwa');
+    showToast('✓ ' + name + (detail ? ' (' + detail + ')' : '') + ' imeongezwa — fungua oda kuchagua sides');
+  }
+
+  function changeAddonQty(itemId, addonKey, delta) {
+    const item = cart.find(line => line.id === itemId);
+    const option = SIDE_OPTIONS.find(side => side.key === addonKey);
+    if (!item || !option) return;
+    const price = formatPrice(option.priceKey);
+    const selected = item.addons || (item.addons = []);
+    let addon = selected.find(side => side.key === addonKey);
+    if (!addon && delta > 0) {
+      addon = { key: option.key, name: option.name, qty: 0, price };
+      selected.push(addon);
+    }
+    if (!addon) return;
+    addon.qty = Math.max(0, Math.min(20, Number(addon.qty || 0) + delta));
+    if (!addon.qty) item.addons = selected.filter(side => side.key !== addonKey);
+    else addon.price = price;
+    saveCart();
+    updateCartUI();
+  }
+
+  function canAddSides(item) {
+    return /choma|foil|rosti|kavu|kitimoto|mix|kisinia|zege/i.test(item.name || '');
   }
 
   function changeQty(id, delta) {
@@ -977,6 +1047,26 @@
     cart = cart.filter(i => i.id !== id);
     saveCart();
     updateCartUI();
+  }
+
+  function renderAddonChoices(item) {
+    if (!canAddSides(item)) return '';
+    return `
+      <section class="order-addons" aria-label="Chagua sides za ${esc(item.name)}">
+        <div class="order-addons-head"><strong>Ongeza sides</strong><small>Chagua kiasi unachotaka</small></div>
+        <div class="order-addons-grid">${SIDE_OPTIONS.map(option => {
+          const qty = Number(item.addons?.find(addon => addon.key === option.key)?.qty) || 0;
+          const price = formatPrice(option.priceKey);
+          return `<div class="order-addon-row">
+            <span class="order-addon-name"><span aria-hidden="true">${option.icon}</span><span>${esc(option.name)}<small>TSH ${esc(price)}</small></span></span>
+            <div class="order-addon-stepper" aria-label="${esc(option.name)} kiasi">
+              <button type="button" data-addon-change="-1" data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}" aria-label="Punguza ${esc(option.name)}">−</button>
+              <output>${qty}</output>
+              <button type="button" data-addon-change="1" data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}" aria-label="Ongeza ${esc(option.name)}">+</button>
+            </div>
+          </div>`;
+        }).join('')}</div>
+      </section>`;
   }
 
   function renderOrderPanel() {
@@ -1011,13 +1101,14 @@
           <article class="order-line" data-id="${esc(item.id)}">
             <div class="order-line-info">
               <h4>${esc(item.name)}</h4>
-              <div class="order-line-meta">${item.detail ? esc(item.detail) : 'Standard'} · TSH ${esc(item.price || '—')} each</div>
+              <div class="order-line-meta">${item.detail ? esc(item.detail) : (parseKgFromDetail(item.name) ? formatKg(parseKgFromDetail(item.name)) + ' KG' : 'Standard')} · TSH ${esc(item.price || '—')} / ${parseKgFromDetail(item.detail) || parseKgFromDetail(item.name) ? formatKg(parseKgFromDetail(item.detail) || parseKgFromDetail(item.name)) + ' KG' : 'portion'}</div>
               <div class="order-line-price">${sub > 0 ? 'TSH ' + formatMoney(sub) : 'Bei haijulikani'}</div>
+              ${renderAddonChoices(item)}
             </div>
             <div class="order-line-controls">
               <div class="qty-stepper">
                 <button type="button" data-qty-change="-1" data-id="${esc(item.id)}" aria-label="Punguza">−</button>
-                <span>${item.qty}</span>
+                <span class="qty-unit-label">${esc(itemQuantityLabel(item))}</span>
                 <button type="button" data-qty-change="1" data-id="${esc(item.id)}" aria-label="Ongeza">+</button>
               </div>
               <button type="button" class="order-line-remove" data-remove-id="${esc(item.id)}">Ondoa</button>
@@ -1079,7 +1170,9 @@
     if (preview) {
       preview.textContent = cart.map(i => {
         const sub = lineTotal(i);
-        let line = i.qty + '× ' + i.name + (i.detail ? ' (' + i.detail + ')' : '');
+        let line = i.name + ' — ' + itemQuantityLabel(i) + (i.detail && !parseKgFromDetail(i.detail) ? ' (' + i.detail + ')' : '');
+        const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.qty + '× ' + addon.name);
+        if (sides.length) line += ' + ' + sides.join(', ');
         if (sub > 0) line += ' — TSH ' + formatMoney(sub);
         return line;
       }).join(' · ');
@@ -1124,6 +1217,12 @@
       const qtyBtn = e.target.closest('[data-qty-change]');
       if (qtyBtn) {
         changeQty(qtyBtn.dataset.id, parseInt(qtyBtn.dataset.qtyChange, 10));
+        return;
+      }
+
+      const addonBtn = e.target.closest('[data-addon-change]');
+      if (addonBtn) {
+        changeAddonQty(addonBtn.dataset.id, addonBtn.dataset.addonKey, parseInt(addonBtn.dataset.addonChange, 10));
         return;
       }
 

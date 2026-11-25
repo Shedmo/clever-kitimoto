@@ -5126,7 +5126,8 @@
     const rows = [header.join(',')];
     orders.forEach(o => {
       const items = (o.items || []).map(i =>
-        i.qty + 'x ' + i.name + (i.detail ? ' (' + i.detail + ')' : '') + (i.price ? ' @' + i.price : '')
+        orderItemQuantityLabel(i) + ' ' + i.name + (i.detail && !orderItemKg(i) ? ' (' + i.detail + ')' : '') +
+          (i.price ? ' @ TSH ' + i.price + ' / ' + (orderItemKg(i) ? orderItemKg(i) + ' KG' : 'portion') : '')
       ).join('; ');
       rows.push([
         csvEscape(formatOrderDate(o.at)),
@@ -5852,6 +5853,24 @@ alter table public.app_storage replica identity full;`;
     return ({ completed: 'Imelipwa', pending: 'Malipo yanasubiri', failed: 'Malipo yameshindwa', expired: 'Malipo yameisha muda', voided: 'Malipo yameghairiwa' }[status] || 'Haijalipwa');
   }
 
+  function orderItemKg(item) {
+    const text = ((item.detail || '') + ' ' + (item.name || '')).toLowerCase();
+    if (text.includes('0.5') || text.includes('½') || text.includes('nusu')) return 0.5;
+    if (text.includes('1½') || text.includes('1.5')) return 1.5;
+    const match = text.match(/(\d+(?:\.\d+)?)\s*kg/);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function orderItemQuantityLabel(item) {
+    const qty = Number(item.qty) || 0;
+    const kg = orderItemKg(item);
+    if (kg > 0) {
+      const total = Number((kg * qty).toFixed(2));
+      return total + ' KG' + (qty > 1 ? ' (' + qty + ' × ' + kg + ' KG)' : '');
+    }
+    return qty + (qty === 1 ? ' portion' : ' portions');
+  }
+
   function renderOrders() {
     const el = $('ordersList');
     if (!el) return;
@@ -5865,10 +5884,15 @@ alter table public.app_storage replica identity full;`;
       return;
     }
     el.innerHTML = orders.map(o => {
-      const items = (o.items || []).map(i =>
-        '<li>' + escapeHtml(i.qty + '× ' + i.name + (i.detail ? ' — ' + i.detail : '') +
-          (i.price ? ' @ TSH ' + i.price : '')) + '</li>'
-      ).join('');
+      const items = (o.items || []).map(i => {
+        const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon =>
+          escapeHtml(addon.qty + '× ' + addon.name + (addon.price ? ' · TSH ' + addon.price : ''))
+        ).join(', ');
+        const kgPerItem = orderItemKg(i);
+        return '<li>' + escapeHtml(orderItemQuantityLabel(i) + ' ' + i.name + (i.detail && !kgPerItem ? ' — ' + i.detail : '') +
+          (i.price ? ' @ TSH ' + i.price + ' / ' + (kgPerItem ? kgPerItem + ' KG' : 'portion') : '')) +
+          (sides ? '<small class="order-item-addons">Sides: ' + sides + '</small>' : '') + '</li>';
+      }).join('');
       const sub = orderAmount(o) ? 'TSH ' + formatMoney(orderAmount(o)) : '—';
       const status = getOrderStatus(o);
       const statusActions = renderOrderStatusActions(o);

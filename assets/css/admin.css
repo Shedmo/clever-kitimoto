@@ -1807,6 +1807,8 @@ body {
   font-size: 0.82rem;
   color: var(--ink);
 }
+.order-items li { margin: 4px 0; }
+.order-item-addons { display: block; margin-top: 2px; color: var(--maroon); font-size: 0.72rem; font-weight: 700; }
 
 .field-hint {
   display: block;

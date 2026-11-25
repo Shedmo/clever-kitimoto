@@ -1228,6 +1228,30 @@ footer {
   color: var(--maroon);
   margin-top: 4px;
 }
+.order-addons {
+  margin-top: 10px;
+  padding: 10px 11px;
+  border: 1px solid rgba(122, 21, 21, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(140deg, #fffaf0, #fff);
+}
+.order-addons-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+.order-addons-head strong { color: var(--maroon); font-size: 0.72rem; }
+.order-addons-head small { color: var(--muted); font-size: 0.62rem; }
+.order-addons-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; }
+.order-addon-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0; padding: 5px 0; }
+.order-addon-name { display: inline-flex; align-items: center; gap: 5px; min-width: 0; color: var(--ink); font-size: 0.68rem; font-weight: 700; }
+.order-addon-name > span:last-child { display: grid; gap: 1px; }
+.order-addon-name small { color: var(--muted); font-size: 0.57rem; font-weight: 600; }
+.order-addon-stepper { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+.order-addon-stepper button { width: 25px; height: 25px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: var(--maroon); font-weight: 900; cursor: pointer; }
+.order-addon-stepper button:hover { background: var(--maroon); border-color: var(--maroon); color: #fff; }
+.order-addon-stepper output { min-width: 14px; text-align: center; font-size: 0.68rem; font-weight: 800; }
+.order-addon-stepper button:focus-visible { outline: 2px solid var(--yellow-dark); outline-offset: 2px; }
+@media (max-width: 420px) {
+  .order-addons-grid { grid-template-columns: 1fr; }
+  .order-addons-head { align-items: flex-start; flex-direction: column; gap: 2px; }
+}
 .order-line-controls {
   display: flex;
   flex-direction: column;
@@ -1256,10 +1280,11 @@ footer {
   line-height: 1;
 }
 .qty-stepper span {
-  min-width: 24px;
+  min-width: 34px;
   text-align: center;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.68rem;
+  white-space: nowrap;
 }
 .order-line-remove {
   border: 0;

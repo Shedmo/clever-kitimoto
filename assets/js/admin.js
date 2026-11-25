@@ -34,7 +34,7 @@
   const PERMS = {
     admin: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'reset', 'clear', 'sales', 'sales_items', 'sales_clear', 'sales_manage', 'stock_add', 'expenses', 'branches', 'staff_manage', 'backup', 'eod'],
     manager: ['dashboard', 'orders', 'users', 'visits', 'export', 'reports', 'prices', 'menus', 'save', 'sales', 'sales_items', 'sales_manage', 'stock_add', 'expenses', 'branches', 'eod'],
-    seller: ['dashboard', 'sales', 'stock_view', 'sales_manage']
+    seller: ['dashboard', 'orders', 'sales', 'stock_view', 'sales_manage']
   };
 
   let attempts = 0;
@@ -67,6 +67,7 @@
 
   const ADMIN_VIEWS = [
     { id: 'dashboardPanel', label: 'Dashboard', icon: '📊', perm: 'dashboard' },
+    { id: 'sellerOrdersPanel', label: 'Oda za Wateja', icon: '🛎️', perm: 'orders' },
     { id: 'salesPanel', label: 'Smart POS', icon: '⚡', perm: 'sales' },
     { id: 'stockPanel', label: 'Stock', icon: '📦', permAny: ['stock_add', 'stock_view'] },
     { id: 'reportsPanel', label: 'Ripoti', icon: '📋', perm: 'reports' },
@@ -1159,7 +1160,7 @@
 
   function switchAdminView(viewId, opts = {}) {
     if (isSellerQuick()) {
-      if (viewId === 'salesPanel' || viewId === 'stockPanel') switchSellerTab(viewId);
+      if (viewId === 'salesPanel' || viewId === 'stockPanel' || viewId === 'sellerOrdersPanel') switchSellerTab(viewId);
       return;
     }
     const views = getAvailableViews();
@@ -1256,7 +1257,10 @@
     hideAllAdminViews();
     setViewElementsVisible(tabId, true);
     $(tabId)?.classList.add('active');
-    if (tabId === 'stockPanel') {
+    if (tabId === 'sellerOrdersPanel') {
+      document.querySelectorAll('.seller-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.sellerTab === tabId));
+      renderOrders();
+    } else if (tabId === 'stockPanel') {
       document.querySelectorAll('.seller-tab').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.sellerTab === 'stockPanel');
       });
@@ -4358,6 +4362,7 @@
     const todayVisits = visits.filter(v => isToday(v.at));
     const uniqueVisitors = new Set(visits.map(v => v.visitorId)).size;
     const uniqueCustomers = new Set(orders.map(o => (o.phone || '').trim()).filter(Boolean)).size;
+    const menu = orders.filter(o => o.channel === 'menu').length;
     const whatsapp = orders.filter(o => o.channel === 'whatsapp').length;
     const sms = orders.filter(o => o.channel === 'sms').length;
     const sales = computeSalesStats();
@@ -4372,6 +4377,7 @@
       todayVisitCount: todayVisits.length,
       uniqueVisitors,
       uniqueCustomers,
+      menu,
       whatsapp,
       sms,
       salesCount: sales.count,
@@ -4673,7 +4679,7 @@
           <div class="dash-kpi-body">
             <span class="dash-kpi-label">Wateja & Oda</span>
             <strong class="dash-kpi-value">${d.orderCount}</strong>
-            <span class="dash-kpi-sub">${d.uniqueCustomers} wateja · Leo ${d.todayOrderCount} · WA ${d.whatsapp} SMS ${d.sms}</span>
+            <span class="dash-kpi-sub">${d.uniqueCustomers} wateja · Leo ${d.todayOrderCount} · Menu ${d.menu} · WA ${d.whatsapp} · SMS ${d.sms}</span>
           </div>
         </article>
       </div>
@@ -5854,7 +5860,8 @@ alter table public.app_storage replica identity full;`;
     renderUsers();
     const orders = getOrders();
     if (!orders.length) {
-      el.innerHTML = '<div class="empty">Hakuna oda bado. Oda zitaonekana hapa baada ya wateja kutuma WhatsApp/SMS.</div>';
+      el.innerHTML = '<div class="empty">Hakuna oda bado. Oda za wateja zitaonekana hapa baada ya kutumwa kupitia menu.</div>';
+      if ($('sellerOrdersList')) $('sellerOrdersList').innerHTML = el.innerHTML;
       return;
     }
     el.innerHTML = orders.map(o => {
@@ -5870,7 +5877,7 @@ alter table public.app_storage replica identity full;`;
           <div class="order-card-head">
             <div>
               <strong>${escapeHtml(formatOrderDate(o.at))}</strong>
-              <span class="order-meta">${escapeHtml(o.channel || '—')} · ${escapeHtml(paymentLabel(o.payment))}</span>
+              <span class="order-meta">${escapeHtml(o.channel === 'menu' ? 'Menu ya mtandaoni' : o.channel || '—')} · ${escapeHtml(paymentLabel(o.payment))}</span>
               ${o.payment === 'snippe' ? '<span class="order-payment-badge payment-' + escapeHtml(o.paymentStatus || 'pending') + '">' + escapeHtml(paymentStatusLabel(o.paymentStatus || 'pending')) + '</span>' : ''}
               <span class="order-status-badge status-${status}">${escapeHtml(orderStatusLabel(status))}</span>
             </div>
@@ -5891,6 +5898,13 @@ alter table public.app_storage replica identity full;`;
     el.querySelectorAll('[data-order-status]').forEach(btn => {
       btn.addEventListener('click', () => updateOrderStatus(btn.dataset.orderStatus, btn.dataset.status));
     });
+    const sellerList = $('sellerOrdersList');
+    if (sellerList) {
+      sellerList.innerHTML = el.innerHTML;
+      sellerList.querySelectorAll('[data-order-status]').forEach(btn => {
+        btn.addEventListener('click', () => updateOrderStatus(btn.dataset.orderStatus, btn.dataset.status));
+      });
+    }
   }
 
   function clearOrders() {

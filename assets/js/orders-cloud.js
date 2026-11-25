@@ -204,6 +204,15 @@
     return data;
   }
 
+  async function checkSnippeAvailability() {
+    if (!init()) return false;
+    const { data, error } = await client.functions.invoke('snippe-checkout', {
+      body: { action: 'status' }
+    });
+    if (error) return false;
+    return data?.ready === true;
+  }
+
   async function getOrderPaymentStatus(orderId) {
     if (!init()) throw new Error('Cloud not ready');
     const { data, error } = await client.from(TABLE)
@@ -552,6 +561,7 @@
     init,
     saveOrder,
     createSnippeCheckout,
+    checkSnippeAvailability,
     getOrderPaymentStatus,
     flushOrderOutbox,
     updateOrder,

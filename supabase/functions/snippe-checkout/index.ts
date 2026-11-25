@@ -189,6 +189,17 @@ async function createCheckout(body: Record<string, unknown>) {
   return respond({ checkoutUrl: session.checkout_url, reference: session.reference || session.id || "" });
 }
 
+async function checkoutIsReady() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!Deno.env.get("SNIPPE_API_KEY") || !Deno.env.get("SNIPPE_WEBHOOK_SECRET") || !Deno.env.get("SITE_URL") || !supabaseUrl || !serviceKey) {
+    return false;
+  }
+  const db = createClient(supabaseUrl, serviceKey);
+  const { error } = await db.from("orders").select("service_fee,total,payment_status").limit(1);
+  return !error;
+}
+
 Deno.serve(async request => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return respond({ error: "Method not allowed." }, 405);
@@ -198,6 +209,9 @@ Deno.serve(async request => {
   }
   let body: Record<string, unknown>;
   try { body = JSON.parse(rawBody); } catch { return respond({ error: "Invalid JSON." }, 400); }
+  if (body.action === "status") {
+    return respond({ ready: await checkoutIsReady() });
+  }
   if (body.action !== "create") return respond({ error: "Unknown action." }, 400);
   return await createCheckout(body);
 });

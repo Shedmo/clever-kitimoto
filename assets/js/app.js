@@ -21,14 +21,6 @@
   const OPEN_HOUR = 10;
   const CLOSE_HOUR = 23;
 
-  const POPULAR = [
-    { name: 'Choma', detail: '0.5 KG', priceKey: 'choma', tag: 'Quick', desc: 'Nusu kilo — bei poa, oda haraka' },
-    { name: '1 KG Mix', detail: '', price: '35,000', tag: 'Best Seller', desc: 'Choma + Rosti + Kavu + sides' },
-    { name: 'Kisinia Couple', detail: 'Watu 2', priceKey: 'couple', tag: 'Couple', desc: 'Perfect kwa watu wawili' },
-    { name: 'Choma', detail: '1 KG', price: '18,000', tag: 'Classic', desc: 'Kitimoto choma fresh' },
-    { name: 'Zege Single', detail: '', price: '15,000', tag: 'Zege', desc: 'Kitimoto + chipsi kavu' }
-  ];
-
   const HALF_KG_ITEMS = [
     { name: 'Choma', priceKey: 'choma', icon: '🔥', desc: 'Classic choma' },
     { name: 'Choma ya Foil', priceKey: 'foil', icon: '✨', desc: 'Juicy & tender' },
@@ -171,9 +163,51 @@
     toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
   }
 
+  function resetOrderConfirmation() {
+    document.getElementById('orderConfirmation')?.setAttribute('hidden', '');
+    document.querySelector('.order-panel-body')?.classList.remove('order-complete-hidden');
+    document.querySelector('.order-panel-foot')?.classList.remove('order-complete-hidden');
+    const title = document.getElementById('orderPanelTitle');
+    const subtitle = document.getElementById('orderPanelSubtitle');
+    if (title) title.textContent = 'Weka Oda Yako';
+    if (subtitle) subtitle.textContent = 'Chagua menu, weka taarifa, kisha tuma oda moja kwa moja kwenye mfumo';
+  }
+
+  let lastSubmittedOrderMessage = '';
+  function showOrderConfirmation(record, synced, message, whatsappOpened = false) {
+    const confirmation = document.getElementById('orderConfirmation');
+    const body = document.querySelector('.order-panel-body');
+    const footer = document.querySelector('.order-panel-foot');
+    const reference = String(record.id || '').replace(/^ord-/, '').slice(0, 8).toUpperCase();
+    const whatsappInstruction = whatsappOpened
+      ? 'WhatsApp imefunguliwa; bonyeza Tuma ndani ya app.'
+      : 'Bonyeza kitufe cha WhatsApp hapa chini, kisha Tuma ujumbe.';
+    const statusMessage = message || (synced
+      ? 'Oda imehifadhiwa kwenye mfumo. Muuzaji ataiona kwenye dashibodi. ' + whatsappInstruction
+      : 'Oda itasawazishwa kwenye mfumo intaneti ikirudi. ' + whatsappInstruction);
+    document.getElementById('orderConfirmationMessage').textContent = statusMessage;
+    document.getElementById('orderConfirmationId').textContent = reference || '—';
+    document.getElementById('orderConfirmationTotal').textContent = 'TSH ' + formatMoney(Number(record.total) || Number(record.subtotal) || 0);
+    document.getElementById('orderConfirmationEyebrow').textContent = synced ? 'ODA IMEHIFADHIWA' : 'ODA INASAWAZISHWA';
+    document.getElementById('orderConfirmationHeadline').textContent = synced ? 'Asante! Oda yako imepokelewa.' : 'Oda yako imehifadhiwa kwa muda.';
+    const whatsappFallback = document.getElementById('orderConfirmationWhatsApp');
+    if (whatsappFallback) whatsappFallback.hidden = whatsappOpened || !lastSubmittedOrderMessage;
+    document.getElementById('orderPanelTitle').textContent = synced ? 'Oda Imepokelewa' : 'Oda Inasawazishwa';
+    document.getElementById('orderPanelSubtitle').textContent = 'Hifadhi namba ya oda yako kwa ufuatiliaji.';
+    if (confirmation) confirmation.hidden = false;
+    body?.classList.add('order-complete-hidden');
+    footer?.classList.add('order-complete-hidden');
+
+    cart = [];
+    saveCart();
+    updateCartUI();
+    renderMyHistory();
+  }
+
   function openOrderPanel() {
     const panel = document.getElementById('orderPanel');
     if (!panel) return;
+    resetOrderConfirmation();
     renderOrderPanel();
     panel.classList.add('open');
     panel.setAttribute('aria-hidden', 'false');
@@ -265,8 +299,6 @@
         else el.textContent = v;
       }
     });
-    renderPopularPicks();
-    renderHalfKgQuickOrder();
     renderKisiniaQuickOrder();
     renderKisiniaSmartPicker();
     renderOrderHalfKgStrip();
@@ -291,7 +323,7 @@
       address: document.getElementById('custAddress')?.value.trim() || '',
       notes: document.getElementById('custNotes')?.value.trim() || '',
       fulfillment: document.querySelector('#fulfillmentPills .pill.active')?.dataset.val || 'delivery',
-      payment: document.querySelector('#paymentPills .pill.active')?.dataset.val || 'snippe',
+      payment: document.querySelector('#paymentPills .pill.active')?.dataset.val || 'mpesa',
       timing: document.querySelector('#timingPills .pill.active')?.dataset.val || 'asap',
       scheduleDate: document.getElementById('custScheduleDate')?.value || '',
       scheduleTime: document.getElementById('custScheduleTime')?.value || ''
@@ -313,7 +345,9 @@
       set('custScheduleDate', c.scheduleDate);
       set('custScheduleTime', c.scheduleTime);
       if (c.fulfillment) setPillActive('fulfillmentPills', c.fulfillment);
-      if (c.payment) setPillActive('paymentPills', c.payment);
+      const snippeOption = document.getElementById('snippePaymentOption');
+      if (c.payment === 'snippe' && snippeOption?.hidden) setPillActive('paymentPills', 'mpesa');
+      else if (c.payment) setPillActive('paymentPills', c.payment);
       if (c.timing) setPillActive('timingPills', c.timing);
       toggleAddressField();
       toggleLipaPanel();
@@ -323,7 +357,9 @@
 
   function setPillActive(groupId, val) {
     document.querySelectorAll('#' + groupId + ' .pill').forEach(p => {
-      p.classList.toggle('active', p.dataset.val === val);
+      const active = p.dataset.val === val;
+      p.classList.toggle('active', active);
+      if (p.hasAttribute('aria-pressed')) p.setAttribute('aria-pressed', String(active));
     });
   }
 
@@ -336,14 +372,25 @@
   function toggleLipaPanel() {
     const lipa = document.querySelector('#paymentPills .pill.active')?.dataset.val === 'lipa';
     const panel = document.getElementById('lipaPanel');
-    if (panel) panel.classList.toggle('lipa-active', lipa);
+    if (panel) {
+      panel.hidden = !lipa;
+      panel.classList.toggle('lipa-active', lipa);
+    }
     const activePay = document.querySelector('#paymentPills .pill.active')?.dataset.val;
     const sendBtn = document.getElementById('cartSend');
-    if (sendBtn) sendBtn.textContent = activePay === 'snippe' ? '🔒 Lipa na Tuma Oda' : '✓ Tuma Oda WhatsApp';
-    const smsBtn = document.getElementById('cartSms');
-    if (smsBtn) smsBtn.hidden = activePay === 'snippe';
+    if (sendBtn && !orderSending) sendBtn.textContent = activePay === 'snippe' ? '🔒 Hifadhi, Lipa na WhatsApp' : '✓ Hifadhi na WhatsApp';
     const snippeNote = document.getElementById('snippeNote');
     if (snippeNote) snippeNote.hidden = activePay !== 'snippe';
+  }
+
+  function setOrderSubmitting(submitting) {
+    orderSending = submitting;
+    const sendBtn = document.getElementById('cartSend');
+    if (sendBtn) {
+      sendBtn.disabled = submitting;
+      sendBtn.textContent = submitting ? '⏳ Inahifadhi oda...' : '';
+    }
+    if (!submitting) toggleLipaPanel();
   }
 
   function toggleScheduleFields() {
@@ -380,7 +427,7 @@
     }
   }
 
-  async function saveOrderRecord(channel) {
+  async function saveOrderRecord() {
     const c = getCheckout();
     const items = cart.map(i => ({
       name: i.name,
@@ -391,7 +438,7 @@
     const record = {
       id: 'ord-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12)),
       at: new Date().toISOString(),
-      channel,
+      channel: 'menu',
       phone: c.phone,
       address: c.address,
       notes: [
@@ -749,8 +796,8 @@
       </div>`;
 
     listEl.innerHTML = history.slice(0, 20).map(order => {
-      const channel = order.channel === 'sms' ? 'sms' : 'whatsapp';
-      const channelLabel = channel === 'sms' ? 'SMS' : 'WhatsApp';
+      const channel = order.channel === 'sms' ? 'sms' : order.channel === 'menu' ? 'online' : 'whatsapp';
+      const channelLabel = channel === 'sms' ? 'SMS' : channel === 'online' ? 'Menu' : 'WhatsApp';
       const meta = [
         order.fulfillment === 'pickup' ? 'Pickup' : 'Delivery',
         paymentLabel(order.payment),
@@ -1050,13 +1097,6 @@
     renderOrderPanel();
   }
 
-  function clearCart() {
-    if (cart.length && !confirm('Futa vitu vyote kwenye oda?')) return;
-    cart = [];
-    saveCart();
-    updateCartUI();
-  }
-
   let cartEventsBound = false;
 
   function bindCartEvents() {
@@ -1064,6 +1104,15 @@
     cartEventsBound = true;
 
     document.addEventListener('click', e => {
+      const orderNowEl = e.target.closest('.btn-order-now');
+      if (orderNowEl) {
+        e.preventDefault();
+        const payload = resolveAddTarget(orderNowEl);
+        addToCart(payload.name, payload.detail, payload.price, orderNowEl);
+        openOrderPanel();
+        return;
+      }
+
       const addEl = e.target.closest('.btn-add, .price-add, .halfkg-add, .kisinia-add, .kisinia-card');
       if (addEl) {
         e.preventDefault();
@@ -1085,6 +1134,7 @@
     });
 
     document.getElementById('openOrderPanel')?.addEventListener('click', openOrderPanel);
+    document.getElementById('headerOrder')?.addEventListener('click', openOrderPanel);
     document.getElementById('cartBarTap')?.addEventListener('click', openOrderPanel);
     document.getElementById('heroOrder')?.addEventListener('click', openOrderPanel);
     document.getElementById('bannerOrder')?.addEventListener('click', openOrderPanel);
@@ -1096,21 +1146,10 @@
       openOrderPanel();
     });
 
-    document.getElementById('cartSend')?.addEventListener('click', () => sendCart('whatsapp'));
-    document.getElementById('cartSms')?.addEventListener('click', () => sendCart('sms'));
-    document.getElementById('cartClear')?.addEventListener('click', clearCart);
-    document.getElementById('orderSms')?.addEventListener('click', e => {
-      e.preventDefault();
-      openSms(getOrderMessage());
-    });
-    document.getElementById('heroSms')?.addEventListener('click', e => {
-      e.preventDefault();
-      openSms(buildSimpleOrderMessage());
-    });
-    document.getElementById('mobileSms')?.addEventListener('click', e => {
-      e.preventDefault();
-      openSms(getOrderMessage());
-      document.getElementById('mobileDrawer')?.classList.remove('open');
+    document.getElementById('cartSend')?.addEventListener('click', () => sendCart());
+    document.getElementById('orderConfirmationClose')?.addEventListener('click', closeOrderPanel);
+    document.getElementById('orderConfirmationWhatsApp')?.addEventListener('click', () => {
+      if (lastSubmittedOrderMessage) openWhatsApp(lastSubmittedOrderMessage);
     });
 
     document.addEventListener('keydown', e => {
@@ -1121,7 +1160,22 @@
     document.getElementById('reorderBtn')?.addEventListener('click', reorderLast);
   }
   let orderSending = false;
-  async function sendCart(channel) {
+  function orderWhatsAppMessage(record, message) {
+    const reference = String(record?.id || '').replace(/^ord-/, '').slice(0, 8).toUpperCase();
+    return message + '\nNamba ya oda: ' + (reference || '—');
+  }
+
+  function openReservedWhatsApp(tab, message) {
+    if (!tab || tab.closed) return false;
+    try {
+      tab.location.href = waLink(message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function sendCart() {
     if (orderSending) return;
     if (!cart.length) {
       showToast('Oda haina kitu — ongeza menu kwanza');
@@ -1149,16 +1203,29 @@
     }
     saveCheckout();
     localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(cart));
-    orderSending = true;
+    const orderMessage = buildCartMessage();
+    // Reserve the WhatsApp window during the button click; populate it only after saving.
+    const whatsappTab = window.open('about:blank', '_blank');
+    setOrderSubmitting(true);
     document.getElementById('reorderBtn')?.removeAttribute('hidden');
 
-    const msg = buildCartMessage();
     if (c.payment === 'snippe') {
+      let savedRecord = null;
+      let whatsappOpened = false;
       try {
-        const result = await saveOrderRecord(channel);
-        if (!result.cloud || !result.synced) {
-          showToast('Oda imehifadhiwa kwenye kifaa. Unganisha Supabase ili kuanza malipo ya Snippe.');
-          orderSending = false;
+        const result = await saveOrderRecord();
+        if (!result.cloud) {
+          whatsappTab?.close();
+          showToast('Hatuwezi kuanza malipo: oda haijahifadhiwa kwenye database. Angalia intaneti kisha jaribu tena.');
+          setOrderSubmitting(false);
+          return;
+        }
+        savedRecord = result.record;
+        lastSubmittedOrderMessage = orderWhatsAppMessage(savedRecord, orderMessage);
+        whatsappOpened = openReservedWhatsApp(whatsappTab, lastSubmittedOrderMessage);
+        if (!result.synced) {
+          setOrderSubmitting(false);
+          showOrderConfirmation(savedRecord, false, 'Oda itasawazishwa kwenye mfumo intaneti ikirudi. ' + (whatsappOpened ? 'WhatsApp imefunguliwa; bonyeza Tuma.' : 'Fungua WhatsApp kwa kutumia kitufe hapa chini.'), whatsappOpened);
           return;
         }
         const payment = await window.CleverOrdersCloud.createSnippeCheckout(result.record.id);
@@ -1166,70 +1233,36 @@
         window.location.assign(payment.checkoutUrl);
       } catch (err) {
         console.warn('Snippe checkout could not start', err);
-        openWhatsApp(msg);
-        showToast('Oda imehifadhiwa, lakini malipo hayajaanza. Tumefungua WhatsApp ili tukusaidie.');
-        orderSending = false;
+        setOrderSubmitting(false);
+        if (savedRecord) {
+          showOrderConfirmation(savedRecord, true, 'Oda imehifadhiwa kwenye mfumo, lakini malipo hayakuanza. ' + (whatsappOpened ? 'WhatsApp imefunguliwa; bonyeza Tuma.' : 'Fungua WhatsApp kwa kutumia kitufe hapa chini.'), whatsappOpened);
+        } else {
+          whatsappTab?.close();
+          showToast('Oda haijahifadhiwa kwenye mfumo. Angalia intaneti kisha jaribu tena.');
+        }
       }
       return;
     }
-    // Open the customer's chosen app while still inside the click gesture;
-    // some browsers block popups after an awaited network request.
-    if (channel === 'sms') openSms(msg);
-    else openWhatsApp(msg);
     let result;
     try {
-      result = await saveOrderRecord(channel);
+      result = await saveOrderRecord();
     } catch (err) {
       console.error('Unable to save order on this device', err);
+      whatsappTab?.close();
       showToast('Imeshindikana kuhifadhi oda. Tafadhali jaribu tena.');
-      orderSending = false;
+      setOrderSubmitting(false);
       return;
     }
-    orderSending = false;
-    if (result.synced) showToast('Oda imetumwa na imehifadhiwa mtandaoni ✓');
-    else if (result.cloud) showToast('Oda imetumwa; imehifadhiwa kwenye kifaa, itasawazishwa mtandao ukirudi.');
-    else showToast('Oda imetumwa na imehifadhiwa kwenye kifaa ✓');
-  }
-
-  function renderPopularPicks() {
-    const grid = document.getElementById('popularGrid');
-    if (!grid) return;
-    grid.innerHTML = POPULAR.map(p => {
-      const price = p.priceKey ? formatPrice(p.priceKey) : p.price;
-      return `
-      <article class="popular-card reveal">
-        <span class="popular-tag">${esc(p.tag)}</span>
-        <h3>${esc(p.name)}</h3>
-        <p>${esc(p.desc)}${p.detail ? ' · ' + esc(p.detail) : ''}</p>
-        <div class="popular-price">TSH ${esc(price)}</div>
-        <button type="button" class="btn btn-add btn-sm"
-          data-item="${esc(p.name)}" data-detail="${esc(p.detail)}" data-price-val="${esc(price)}">+ Ongeza kwenye Oda</button>
-      </article>
-    `;
-    }).join('');
-  }
-
-  function renderHalfKgQuickOrder() {
-    const grid = document.getElementById('halfKgGrid');
-    if (!grid) return;
-    grid.innerHTML = HALF_KG_ITEMS.map(item => {
-      const price = formatPrice(item.priceKey);
-      return `
-        <article class="halfkg-card reveal">
-          <div class="halfkg-icon">${item.icon}</div>
-          <div class="halfkg-body">
-            <span class="halfkg-badge">0.5 KG</span>
-            <h3>${esc(item.name)}</h3>
-            <p>${esc(item.desc)}</p>
-            <div class="halfkg-price">TSH ${esc(price)}</div>
-          </div>
-          <button type="button" class="btn btn-primary halfkg-add"
-            data-item="${esc(item.name)}" data-detail="${SIZE_DETAIL}" data-price-val="${esc(price)}">
-            + Oda 0.5 KG
-          </button>
-        </article>
-      `;
-    }).join('');
+    if (!result.cloud) {
+      whatsappTab?.close();
+      showToast('Database haijaunganishwa. Oda haikutumwa kwenye mfumo; jaribu tena baadaye.');
+      setOrderSubmitting(false);
+      return;
+    }
+    lastSubmittedOrderMessage = orderWhatsAppMessage(result.record, orderMessage);
+    const whatsappOpened = openReservedWhatsApp(whatsappTab, lastSubmittedOrderMessage);
+    setOrderSubmitting(false);
+    showOrderConfirmation(result.record, result.synced, '', whatsappOpened);
   }
 
   function findKisiniaItem(priceKey) {
@@ -1311,7 +1344,7 @@
     const root = document.getElementById('kisiniaRoot');
     if (!root) return;
     root.innerHTML = KISINIA_GROUPS.map(group => `
-      <div class="kisinia-group reveal">
+      <div class="kisinia-group">
         <div class="kisinia-group-head">
           <h3>${esc(group.title)}</h3>
           <span>${esc(group.subtitle)}</span>
@@ -1321,7 +1354,7 @@
             const price = formatPrice(item.priceKey);
             const includes = (item.includes || []).slice(0, 3).join(' · ');
             return `
-              <article class="kisinia-card reveal"
+              <article class="kisinia-card"
                 data-item="${esc(item.name)}" data-detail="${esc(item.detail)}" data-price-key="${esc(item.priceKey)}">
                 <div class="kisinia-card-top">
                   <span class="kisinia-icon">${item.icon}</span>
@@ -1407,8 +1440,12 @@
       group.addEventListener('click', e => {
         const pill = e.target.closest('.pill');
         if (!pill) return;
-        group.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+        group.querySelectorAll('.pill').forEach(p => {
+          p.classList.remove('active');
+          if (p.hasAttribute('aria-pressed')) p.setAttribute('aria-pressed', 'false');
+        });
         pill.classList.add('active');
+        if (pill.hasAttribute('aria-pressed')) pill.setAttribute('aria-pressed', 'true');
         saveCheckout();
         if (group.id === 'fulfillmentPills') toggleAddressField();
         if (group.id === 'paymentPills') toggleLipaPanel();
@@ -1424,6 +1461,22 @@
       document.getElementById('reorderBtn')?.removeAttribute('hidden');
     }
     updateReorderButtons();
+    refreshSnippeAvailability();
+  }
+
+  async function refreshSnippeAvailability() {
+    const option = document.getElementById('snippePaymentOption');
+    if (!option) return;
+    let ready = false;
+    try {
+      ready = !!(await window.CleverOrdersCloud?.checkSnippeAvailability?.());
+    } catch { ready = false; }
+    option.hidden = !ready;
+    if (!ready && document.querySelector('#paymentPills .pill.active')?.dataset.val === 'snippe') {
+      setPillActive('paymentPills', 'mpesa');
+    }
+    toggleLipaPanel();
+    saveCheckout();
   }
 
   async function handleSnippeReturn() {
@@ -1539,7 +1592,7 @@
       entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
     }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
 
-    document.querySelectorAll('.section, .card, .order-banner, .popular-card, .halfkg-card, .kisinia-card, .kisinia-group, .faq-section').forEach(el => {
+    document.querySelectorAll('.section, .card, .order-banner, .faq-section').forEach(el => {
       el.classList.add('reveal');
       obs.observe(el);
     });
@@ -1589,7 +1642,7 @@
           <div class="price-main">TSH ${esc(x.price)}${x.size ? ` <small>· ${esc(x.size)}</small>` : ''}</div>
           <div class="card-actions">
             <button class="btn btn-add btn-sm" data-item="${esc(x.name)}" data-detail="${esc(x.size || '')}" data-price-val="${esc(x.price)}">+ Add</button>
-            <a class="btn btn-primary btn-sm" href="${waLink('Habari Clever Kitimoto, naomba ' + x.name + (x.size ? ' (' + x.size + ')' : '') + ' — TSH ' + x.price)}">Order</a>
+            <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="${esc(x.name)}" data-detail="${esc(x.size || '')}" data-price-val="${esc(x.price)}">Weka Oda</button>
           </div>
         </div>
       </article>
@@ -1611,8 +1664,6 @@
         window.CleverCloudSync.onRemoteChange(() => {
           applyPrices();
           renderCustomMenus();
-          renderPopularPicks();
-          renderHalfKgQuickOrder();
           renderKisiniaQuickOrder();
           renderKisiniaSmartPicker();
         });
@@ -1624,8 +1675,6 @@
     function refreshMenuFromCloud() {
       applyPrices();
       renderCustomMenus();
-      renderPopularPicks();
-      renderHalfKgQuickOrder();
       renderKisiniaQuickOrder();
       renderKisiniaSmartPicker();
     }
@@ -1660,8 +1709,6 @@
   window.addEventListener('storage', () => {
     applyPrices();
     renderCustomMenus();
-    renderPopularPicks();
-    renderHalfKgQuickOrder();
     renderKisiniaQuickOrder();
     renderKisiniaSmartPicker();
   });

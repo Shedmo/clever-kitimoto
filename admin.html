@@ -106,6 +106,16 @@
       </div>
 
       <div class="admin-views" id="adminViews">
+  <section class="panel admin-view hidden" id="sellerOrdersPanel" data-view-title="Oda za Wateja" data-view-sub="Oda mpya kutoka kwenye menu ya mtandaoni">
+    <div class="panel-head-row">
+      <div>
+        <h2>🛎️ Oda za Wateja</h2>
+        <p class="panel-note panel-note-tight">Oda zinazoingia kutoka WhatsApp, SMS na malipo ya mtandaoni. Sasisha hali ili Admin aone maendeleo.</p>
+      </div>
+    </div>
+    <div id="sellerOrdersList" class="orders-list"></div>
+  </section>
+
   <section class="panel admin-view hidden" id="branchPanel" data-view-title="Matawi" data-view-sub="Usimamizi wa matawi na muuzaji">
     <div class="panel-head-row">
       <div>
@@ -590,6 +600,9 @@
   <nav class="admin-mobile-nav hidden" id="adminMobileNav" aria-label="Menyu ya simu"></nav>
 
   <nav class="seller-quick-bar hidden" id="sellerQuickBar" aria-label="Mauzo haraka">
+    <button type="button" class="seller-tab" data-seller-tab="sellerOrdersPanel">
+      <span>🛎️</span><small>Oda</small>
+    </button>
     <button type="button" class="seller-tab active" data-seller-tab="salesPanel" data-pos-tab="sell">
       <span>🛒</span><small>Uza</small>
     </button>

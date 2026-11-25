@@ -28,8 +28,6 @@
       <div class="brand-text">Clever Kitimoto<span>Kitimoto Bora · Bei Poa</span></div>
     </a>
     <nav class="nav-links">
-      <a href="#popular">Maarufu</a>
-      <a href="#halfkg">0.5 KG</a>
       <a href="#kisinia">Kisinia</a>
       <a href="#kitimoto">Kitimoto</a>
       <a href="#mixed">Mixed</a>
@@ -43,7 +41,7 @@
         🛒 <span class="cart-nav-label">Oda</span> <span class="cart-badge" id="cartBadge" data-count="0">0</span>
       </button>
       <a class="btn btn-ghost btn-sm" href="admin.html">Admin</a>
-      <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza">WhatsApp</a>
+      <button class="btn btn-primary btn-sm" id="headerOrder" type="button">Agiza</button>
       <button class="menu-toggle" id="menuToggle" aria-label="Open menu">☰</button>
     </div>
   </div>
@@ -54,7 +52,6 @@
     <button class="mobile-close" id="mobileClose" aria-label="Close">✕</button>
     <div style="margin:48px 0 24px;font-family:var(--font-display);font-size:1.4rem;font-weight:800">Menu</div>
     <a href="#kitimoto">Kitimoto</a>
-    <a href="#halfkg">Oda 0.5 KG</a>
     <a href="#kisinia">Clever Kisinia</a>
     <a href="#mixed">Mixed Kitimoto</a>
     <a href="#packages">Kisinia Packages</a>
@@ -63,8 +60,7 @@
     <a href="#myHistory">Historia Yako</a>
     <a href="admin.html">Admin Panel</a>
     <a href="#" id="mobileOpenOrder">🛒 Angalia Oda Yako</a>
-    <a href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20kuagiza" style="color:var(--whatsapp);margin-top:16px">📲 Order WhatsApp</a>
-    <a href="#" id="mobileSms" style="color:#2563eb;margin-top:8px">💬 Tuma SMS</a>
+    <a href="tel:+255683497330" style="color:var(--maroon);margin-top:16px">📞 Piga simu</a>
   </div>
 </div>
 
@@ -80,7 +76,6 @@
     </div>
     <div class="hero-actions">
       <button class="btn btn-primary" type="button" id="heroOrder">🛒 Weka Oda</button>
-      <a class="btn btn-sms" href="#" id="heroSms">💬 Tuma SMS</a>
       <a class="btn btn-ghost" href="#packages">Tazama Packages</a>
       <button class="btn btn-ghost" type="button" id="shareMenuBtn">🔗 Shiriki Menu</button>
     </div>
@@ -108,7 +103,7 @@
     </div>
     <div class="hero-order-card">
       <span class="hero-order-icon">⚡</span>
-      <div><b>Oda kwa dakika 1</b><small>Chagua menu · Weka muda · Tuma WhatsApp</small></div>
+      <div><b>Oda kwa dakika 1</b><small>Chagua menu · Weka muda · Hifadhi kwenye mfumo</small></div>
     </div>
   </aside>
 </section>
@@ -159,25 +154,6 @@
     </div>
     <div class="history-list" id="historyList"></div>
   </div>
-</section>
-
-<section class="popular-section" id="popular">
-  <div class="section-head compact">
-    <div><div class="kicker">Smart Pick</div><h2>Maarufu Sana</h2></div>
-    <p>Oda haraka — bonyeza tu kuongeza kwenye oda yako.</p>
-  </div>
-  <div class="popular-grid" id="popularGrid"></div>
-</section>
-
-<section class="section halfkg-section" id="halfkg">
-  <div class="section-head compact">
-    <div>
-      <div class="kicker">Quick Order</div>
-      <h2>Oda 0.5 KG</h2>
-    </div>
-    <p>Chagua aina yako — nusu kilo, bei poa. Bonyeza moja tu kuongeza kwenye oda.</p>
-  </div>
-  <div class="halfkg-grid" id="halfKgGrid"></div>
 </section>
 
 <section class="section kisinia-section" id="kisinia">
@@ -242,7 +218,7 @@
         </div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="Choma" data-detail="1 KG" data-price-val="18,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Choma%201%20KG">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="Choma" data-detail="1 KG" data-price-key="choma1">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -263,7 +239,7 @@
         </div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="Choma ya Foil" data-detail="1 KG" data-price-val="18,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Choma%20ya%20Foil%201%20KG">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="Choma ya Foil" data-detail="1 KG" data-price-key="foil1">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -284,7 +260,7 @@
         </div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="Rosti" data-detail="1 KG" data-price-val="17,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Rosti%201%20KG">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="Rosti" data-detail="1 KG" data-price-key="rosti1">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -305,7 +281,7 @@
         </div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="Kavu" data-detail="1 KG" data-price-val="17,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Kavu%201%20KG">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="Kavu" data-detail="1 KG" data-price-key="kavu1">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -331,7 +307,7 @@
         <div class="price-main" data-price="mixedhalf" data-price-prefix="tsh">TSH 25,000</div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="½ KG Mix" data-detail="" data-price-val="25,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20%C2%BD%20KG%20Mix">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="½ KG Mix" data-price-key="mixedhalf">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -347,7 +323,7 @@
         <div class="price-main" data-price="mixedone" data-price-prefix="tsh">TSH 35,000</div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="1 KG Mix" data-detail="" data-price-val="35,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%201%20KG%20Mix">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="1 KG Mix" data-price-key="mixedone">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -363,7 +339,7 @@
         <div class="price-main" data-price="mixedtwo" data-price-prefix="tsh">TSH 65,000</div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="2 KG Mix Special" data-detail="" data-price-val="65,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%202%20KG%20Mix%20Special">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="2 KG Mix Special" data-price-key="mixedtwo">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -444,7 +420,7 @@
         <div class="price-main" data-price="zegeSingle" data-price-prefix="tsh">TSH 15,000</div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="Zege Single" data-detail="" data-price-val="15,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Zege%20Single">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="Zege Single" data-price-key="zegeSingle">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -460,7 +436,7 @@
         <div class="price-main" data-price="zegeCouple" data-price-prefix="tsh">TSH 30,000</div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="Zege Couple" data-detail="" data-price-val="30,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Zege%20Couple">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="Zege Couple" data-price-key="zegeCouple">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -476,7 +452,7 @@
         <div class="price-main" data-price="zegeSpecial" data-price-prefix="tsh">TSH 35,000</div>
         <div class="card-actions">
           <button class="btn btn-add btn-sm" data-item="Zege Special" data-detail="" data-price-val="35,000">+ Add</button>
-          <a class="btn btn-primary btn-sm" href="https://wa.me/255683497330?text=Habari%20Clever%20Kitimoto%2C%20naomba%20Zege%20Special">Order</a>
+          <button class="btn btn-primary btn-sm btn-order-now" type="button" data-item="Zege Special" data-price-key="zegeSpecial">Weka Oda</button>
         </div>
       </div>
     </article>
@@ -572,7 +548,7 @@
   <div>
     <div class="kicker">Ready to order?</div>
     <h2>Weka oda yako kwa urahisi.</h2>
-    <p>Call, WhatsApp au SMS:<br>
+    <p>Kwa msaada wa simu:<br>
       <span class="phone" id="phoneCopy" title="Click to copy">0683 497 330</span> ·
       <span class="phone" id="phoneCopy2" title="Click to copy">0794 607 335</span>
     </p>
@@ -580,7 +556,6 @@
   </div>
   <div class="order-banner-actions">
     <button class="btn btn-primary" type="button" id="bannerOrder">🛒 Weka Oda</button>
-    <a class="btn btn-sms" href="#" id="orderSms">💬 Tuma SMS</a>
   </div>
 </div>
 
@@ -620,7 +595,7 @@
     <div>
       <b>Wasiliana</b>
       <p><a href="tel:+255683497330">0683 497 330</a> · <a href="tel:+255794607335">0794 607 335</a></p>
-      <p><a href="https://wa.me/255683497330">WhatsApp Order</a></p>
+      <p><a href="https://wa.me/255683497330">WhatsApp (msaada)</a></p>
     </div>
     <div>
       <b>Saa za kazi</b>
@@ -653,10 +628,20 @@
     <div class="order-panel-head">
       <div>
         <h2 id="orderPanelTitle">Weka Oda Yako</h2>
-        <p id="orderPanelSubtitle">Chagua menu, weka taarifa, kisha tuma oda</p>
+        <p id="orderPanelSubtitle">Chagua menu, weka taarifa, kisha tuma oda moja kwa moja kwenye mfumo</p>
       </div>
       <button class="order-panel-close" id="orderPanelClose" type="button" aria-label="Funga">✕</button>
     </div>
+    <section class="order-confirmation" id="orderConfirmation" aria-live="polite" hidden>
+      <div class="order-confirmation-mark" aria-hidden="true">✓</div>
+      <p class="order-confirmation-eyebrow" id="orderConfirmationEyebrow">ODA IMETUMWA</p>
+      <h3 id="orderConfirmationHeadline">Asante! Oda yako imepokelewa.</h3>
+      <p id="orderConfirmationMessage">Oda imehifadhiwa kwenye mfumo na muuzaji ataiona.</p>
+      <div class="order-confirmation-ref"><span>Namba ya oda</span><strong id="orderConfirmationId"></strong></div>
+      <div class="order-confirmation-total"><span>Jumla ya oda</span><strong id="orderConfirmationTotal"></strong></div>
+      <button type="button" class="btn btn-ghost" id="orderConfirmationWhatsApp" hidden>📲 Fungua WhatsApp kwa muuzaji</button>
+      <button type="button" class="btn btn-primary" id="orderConfirmationClose">Rudi kwenye menu</button>
+    </section>
     <div class="order-panel-body">
       <div class="order-repeat-strip" id="orderRepeatStrip" hidden>
         <div class="order-quick-label">🔁 Rudia oda yako</div>
@@ -668,7 +653,7 @@
       </div>
       <div class="order-panel-list" id="orderPanelList"></div>
       <div class="checkout-form" id="checkoutForm">
-      <div class="booking-steps" aria-label="Hatua za kuagiza"><span class="active">1. Menu</span><i></i><span class="active">2. Taarifa</span><i></i><span>3. Tuma oda</span></div>
+      <div class="booking-steps" aria-label="Hatua za kuagiza"><span class="active">1. Menu</span><i></i><span class="active">2. Taarifa</span><i></i><span>3. Hifadhi oda</span></div>
       <div class="checkout-title">Taarifa za oda <span class="checkout-hint">— tunatumia kuthibitisha oda yako</span></div>
       <div class="checkout-grid">
         <label class="ck-field full"><span>Jina lako</span><input id="custName" type="text" placeholder="Mfano: Asha Mushi" autocomplete="name"></label>
@@ -696,19 +681,27 @@
       </div>
       <div class="pill-row">
         <span class="pill-label">Malipo</span>
-        <div class="pill-group" id="paymentPills">
-          <button type="button" class="pill active" data-val="snippe">🔒 Lipa online</button>
-          <button type="button" class="pill" data-val="mpesa">📱 M-Pesa</button>
-          <button type="button" class="pill" data-val="cash">💵 Cash</button>
-          <button type="button" class="pill" data-val="lipa">💳 Lipa namba</button>
+        <div class="pill-group payment-options" id="paymentPills" role="group" aria-label="Chagua njia ya malipo">
+          <button type="button" class="pill payment-option" id="snippePaymentOption" data-val="snippe" aria-pressed="false" hidden>
+            <span class="payment-option-icon" aria-hidden="true">🔒</span><span class="payment-option-copy"><strong>Lipa online</strong><small>Malipo salama, uthibitisho papo hapo</small></span>
+          </button>
+          <button type="button" class="pill payment-option active" data-val="mpesa" aria-pressed="true">
+            <span class="payment-option-icon" aria-hidden="true">📱</span><span class="payment-option-copy"><strong>M-Pesa</strong><small>Malipo yatafuatiliwa na muuzaji</small></span>
+          </button>
+          <button type="button" class="pill payment-option" data-val="cash" aria-pressed="false">
+            <span class="payment-option-icon" aria-hidden="true">💵</span><span class="payment-option-copy"><strong>Cash</strong><small>Lipa unapopokea oda</small></span>
+          </button>
+          <button type="button" class="pill payment-option" data-val="lipa" aria-pressed="false">
+            <span class="payment-option-icon" aria-hidden="true">💳</span><span class="payment-option-copy"><strong>Lipa namba</strong><small>Lipa kwa namba ya biashara</small></span>
+          </button>
         </div>
       </div>
       <p class="snippe-note" id="snippeNote" hidden>Malipo salama kupitia Airtel Money, M-Pesa, Mixx by Yas au Halotel. Ada ya huduma ya TSH 200 imejumuishwa kwenye jumla.</p>
-      <div class="lipa-panel" id="lipaPanel">
+      <div class="lipa-panel" id="lipaPanel" hidden>
         <div class="lipa-head">
           <div>
             <strong>💳 Lipa namba zetu</strong>
-            <small>Bonyeza namba kunakili · lipa kisha tuma oda</small>
+            <small>Chagua namba, lipa, kisha hifadhi oda hapa</small>
           </div>
         </div>
         <div class="lipa-grid">
@@ -742,10 +735,9 @@
         <div class="summary-row total"><span>JUMLA</span><strong id="orderGrandTotal">TSH 0</strong></div>
       </div>
       <div class="order-panel-actions">
-        <button class="btn btn-ghost" id="cartClear" type="button">Futa zote</button>
         <button class="btn btn-ghost" id="orderRepeatLastBtn" type="button" hidden>🔁 Rudia oda</button>
-        <button class="btn btn-sms" id="cartSms" type="button">💬 SMS</button>
-        <button class="btn btn-primary" id="cartSend" type="button">✓ Tuma Oda WhatsApp</button>
+        <p class="order-submit-note">🔒 Oda itahifadhiwa kwenye mfumo, kisha WhatsApp itafunguka kwa muuzaji.</p>
+        <button class="btn btn-primary" id="cartSend" type="button">✓ Hifadhi na WhatsApp</button>
       </div>
     </div>
   </div>

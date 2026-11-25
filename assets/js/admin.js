@@ -5127,7 +5127,10 @@
     orders.forEach(o => {
       const items = (o.items || []).map(i =>
         orderItemQuantityLabel(i) + ' ' + i.name + (i.detail && !orderItemKg(i) ? ' (' + i.detail + ')' : '') +
-          (i.price ? ' @ TSH ' + i.price + ' / ' + (orderItemKg(i) ? orderItemKg(i) + ' KG' : 'portion') : '')
+          (i.price ? ' @ TSH ' + i.price + ' / ' + (orderItemKg(i) ? orderItemKg(i) + ' KG' : 'portion') : '') +
+          ((i.addons || []).filter(addon => Number(addon.qty) > 0).length
+            ? ' + ' + (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.name + ' (' + addon.qty + ')').join(', ')
+            : '')
       ).join('; ');
       rows.push([
         csvEscape(formatOrderDate(o.at)),
@@ -5886,12 +5889,12 @@ alter table public.app_storage replica identity full;`;
     el.innerHTML = orders.map(o => {
       const items = (o.items || []).map(i => {
         const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon =>
-          escapeHtml(addon.qty + '× ' + addon.name + (addon.price ? ' · TSH ' + addon.price : ''))
+          escapeHtml(addon.name + ' (' + addon.qty + ')' + (addon.price ? ' · TSH ' + addon.price : ''))
         ).join(', ');
         const kgPerItem = orderItemKg(i);
         return '<li>' + escapeHtml(orderItemQuantityLabel(i) + ' ' + i.name + (i.detail && !kgPerItem ? ' — ' + i.detail : '') +
           (i.price ? ' @ TSH ' + i.price + ' / ' + (kgPerItem ? kgPerItem + ' KG' : 'portion') : '')) +
-          (sides ? '<small class="order-item-addons">Sides: ' + sides + '</small>' : '') + '</li>';
+          (sides ? '<small class="order-item-addons">Vionjo: ' + sides + '</small>' : '') + '</li>';
       }).join('');
       const sub = orderAmount(o) ? 'TSH ' + formatMoney(orderAmount(o)) : '—';
       const status = getOrderStatus(o);

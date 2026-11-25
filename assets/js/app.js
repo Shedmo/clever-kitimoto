@@ -566,7 +566,7 @@
       const quantity = itemQuantityLabel(i);
       const extraDetail = i.detail && !parseKgFromDetail(i.detail) ? ' (' + i.detail + ')' : '';
       const base = i.name + ' — ' + quantity + extraDetail;
-      const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.qty + '× ' + addon.name);
+      const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.name + ' (' + addon.qty + ')');
       return base + (sides.length ? ' + ' + sides.join(', ') : '');
     });
     const extra = items.length > 3 ? ' · na ' + (items.length - 3) + ' zaidi' : '';
@@ -912,7 +912,7 @@
       lines.push(line);
       const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0);
       if (sides.length) {
-        lines.push('   Sides: ' + sides.map(addon => addon.qty + '× ' + addon.name + ' @ TSH ' + addonPrice(addon)).join(', '));
+        lines.push('   Vionjo: ' + sides.map(addon => addon.name + ' (' + addon.qty + ') @ TSH ' + addonPrice(addon)).join(', '));
       }
     });
 
@@ -1011,20 +1011,21 @@
     showToast('✓ ' + name + (detail ? ' (' + detail + ')' : '') + ' imeongezwa — fungua oda kuchagua sides');
   }
 
-  function changeAddonQty(itemId, addonKey, delta) {
+  function setAddonQty(itemId, addonKey, qty) {
     const item = cart.find(line => line.id === itemId);
     const option = SIDE_OPTIONS.find(side => side.key === addonKey);
     if (!item || !option) return;
     const price = formatPrice(option.priceKey);
     const selected = item.addons || (item.addons = []);
     let addon = selected.find(side => side.key === addonKey);
-    if (!addon && delta > 0) {
-      addon = { key: option.key, name: option.name, qty: 0, price };
+    const nextQty = Math.max(0, Math.min(20, Math.floor(Number(qty) || 0)));
+    if (!addon && nextQty > 0) {
+      addon = { key: option.key, name: option.name, qty: nextQty, price };
       selected.push(addon);
     }
     if (!addon) return;
-    addon.qty = Math.max(0, Math.min(20, Number(addon.qty || 0) + delta));
-    if (!addon.qty) item.addons = selected.filter(side => side.key !== addonKey);
+    addon.qty = nextQty;
+    if (!nextQty) item.addons = selected.filter(side => side.key !== addonKey);
     else addon.price = price;
     saveCart();
     updateCartUI();
@@ -1053,17 +1054,16 @@
     if (!canAddSides(item)) return '';
     return `
       <section class="order-addons" aria-label="Chagua sides za ${esc(item.name)}">
-        <div class="order-addons-head"><strong>Ongeza sides</strong><small>Chagua kiasi unachotaka</small></div>
+        <div class="order-addons-head"><strong>Chagua vinavyoambatana na nyama</strong><small>Weka alama, kisha idadi unayotaka</small></div>
         <div class="order-addons-grid">${SIDE_OPTIONS.map(option => {
           const qty = Number(item.addons?.find(addon => addon.key === option.key)?.qty) || 0;
           const price = formatPrice(option.priceKey);
-          return `<div class="order-addon-row">
-            <span class="order-addon-name"><span aria-hidden="true">${option.icon}</span><span>${esc(option.name)}<small>TSH ${esc(price)}</small></span></span>
-            <div class="order-addon-stepper" aria-label="${esc(option.name)} kiasi">
-              <button type="button" data-addon-change="-1" data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}" aria-label="Punguza ${esc(option.name)}">−</button>
-              <output>${qty}</output>
-              <button type="button" data-addon-change="1" data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}" aria-label="Ongeza ${esc(option.name)}">+</button>
-            </div>
+          return `<div class="order-addon-row${qty ? ' is-selected' : ''}">
+            <label class="order-addon-choice">
+              <input type="checkbox" data-addon-select data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}"${qty ? ' checked' : ''}>
+              <span class="order-addon-name"><span aria-hidden="true">${option.icon}</span><span>${esc(option.name)}<small>TSH ${esc(price)} kila moja</small></span></span>
+            </label>
+            <input class="order-addon-quantity" type="number" inputmode="numeric" min="1" max="20" step="1" value="${qty || 1}" aria-label="Idadi ya ${esc(option.name)}" data-addon-qty data-addon-key="${esc(option.key)}" data-id="${esc(item.id)}"${qty ? '' : ' hidden'}>
           </div>`;
         }).join('')}</div>
       </section>`;
@@ -1171,7 +1171,7 @@
       preview.textContent = cart.map(i => {
         const sub = lineTotal(i);
         let line = i.name + ' — ' + itemQuantityLabel(i) + (i.detail && !parseKgFromDetail(i.detail) ? ' (' + i.detail + ')' : '');
-        const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.qty + '× ' + addon.name);
+        const sides = (i.addons || []).filter(addon => Number(addon.qty) > 0).map(addon => addon.name + ' (' + addon.qty + ')');
         if (sides.length) line += ' + ' + sides.join(', ');
         if (sub > 0) line += ' — TSH ' + formatMoney(sub);
         return line;
@@ -1220,15 +1220,24 @@
         return;
       }
 
-      const addonBtn = e.target.closest('[data-addon-change]');
-      if (addonBtn) {
-        changeAddonQty(addonBtn.dataset.id, addonBtn.dataset.addonKey, parseInt(addonBtn.dataset.addonChange, 10));
-        return;
-      }
-
       const removeBtn = e.target.closest('[data-remove-id]');
       if (removeBtn) {
         removeFromCart(removeBtn.dataset.removeId);
+      }
+    });
+
+    document.addEventListener('change', e => {
+      const checkbox = e.target.closest('[data-addon-select]');
+      if (checkbox) {
+        const quantityInput = checkbox.closest('.order-addon-row')?.querySelector('[data-addon-qty]');
+        const qty = checkbox.checked ? (parseInt(quantityInput?.value, 10) || 1) : 0;
+        setAddonQty(checkbox.dataset.id, checkbox.dataset.addonKey, qty);
+        return;
+      }
+      const quantityInput = e.target.closest('[data-addon-qty]');
+      if (quantityInput) {
+        const qty = Math.max(1, Math.min(20, parseInt(quantityInput.value, 10) || 1));
+        setAddonQty(quantityInput.dataset.id, quantityInput.dataset.addonKey, qty);
       }
     });
 

@@ -1235,19 +1235,20 @@ footer {
   border-radius: 12px;
   background: linear-gradient(140deg, #fffaf0, #fff);
 }
-.order-addons-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+.order-addons-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .order-addons-head strong { color: var(--maroon); font-size: 0.72rem; }
 .order-addons-head small { color: var(--muted); font-size: 0.62rem; }
-.order-addons-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; }
-.order-addon-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0; padding: 5px 0; }
+.order-addons-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.order-addon-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0; padding: 7px 8px; border: 1px solid var(--line-strong); border-radius: 10px; background: #fff; }
+.order-addon-row.is-selected { border-color: var(--maroon); background: #fff8ed; }
+.order-addon-choice { display: flex; align-items: center; gap: 7px; min-width: 0; cursor: pointer; }
+.order-addon-choice input { width: 17px; height: 17px; margin: 0; flex: 0 0 auto; accent-color: var(--maroon); }
 .order-addon-name { display: inline-flex; align-items: center; gap: 5px; min-width: 0; color: var(--ink); font-size: 0.68rem; font-weight: 700; }
 .order-addon-name > span:last-child { display: grid; gap: 1px; }
 .order-addon-name small { color: var(--muted); font-size: 0.57rem; font-weight: 600; }
-.order-addon-stepper { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
-.order-addon-stepper button { width: 25px; height: 25px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: var(--maroon); font-weight: 900; cursor: pointer; }
-.order-addon-stepper button:hover { background: var(--maroon); border-color: var(--maroon); color: #fff; }
-.order-addon-stepper output { min-width: 14px; text-align: center; font-size: 0.68rem; font-weight: 800; }
-.order-addon-stepper button:focus-visible { outline: 2px solid var(--yellow-dark); outline-offset: 2px; }
+.order-addon-quantity { width: 54px; min-width: 54px; height: 32px; padding: 3px 4px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--ink); background: #fff; font: inherit; font-size: 0.72rem; font-weight: 800; text-align: center; }
+.order-addon-quantity[hidden] { display: none; }
+.order-addon-choice:focus-within, .order-addon-quantity:focus-visible { outline: 2px solid var(--yellow-dark); outline-offset: 2px; }
 @media (max-width: 420px) {
   .order-addons-grid { grid-template-columns: 1fr; }
   .order-addons-head { align-items: flex-start; flex-direction: column; gap: 2px; }
